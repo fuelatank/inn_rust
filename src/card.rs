@@ -24,6 +24,13 @@ impl Card {
     }
 }
 
+impl PartialEq for Card {
+    fn eq(&self, other: &Card) -> bool {
+        self.name == other.name
+    }
+}
+
+#[derive(PartialEq)]
 pub enum SpecialAchievement {
     Universe,
     Wonder,
@@ -31,6 +38,7 @@ pub enum SpecialAchievement {
     // TODO: more
 }
 
+#[derive(PartialEq)]
 pub enum Achievement {
     Normal(Card),
     Special(SpecialAchievement)

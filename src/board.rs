@@ -1,15 +1,22 @@
 
-use crate::enums::{Color, Splay};
+use std::collections::VecDeque;
+use crate::enums::{Splay};
 use crate::card::Card;
 use crate::containers::Addable;
 
 struct Stack {
-    color: Color,
-    cards: std::collections::VecDeque<Card>,
+    cards: VecDeque<Card>,
     splay: Splay
 }
 
 impl Stack {
+    fn new() -> Stack {
+        Stack {
+            cards: VecDeque::new(),
+            splay: Splay::NoSplay
+        }
+    }
+
     fn push_back(&self, card: Card) {
         self.cards.push_back(card)
     }
@@ -52,6 +59,18 @@ impl<'a> Addable<Card> for BackwardWrapper<'a> {
 }
 
 impl<'a> Board {
+    pub fn new() -> Board {
+        Board {
+            stacks: [
+                Stack::new(),
+                Stack::new(),
+                Stack::new(),
+                Stack::new(),
+                Stack::new()
+            ]
+        }
+    }
+
     pub fn forward(&'a self) -> ForwardWrapper<'a> {
         ForwardWrapper { board: self }
     }
