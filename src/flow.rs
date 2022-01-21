@@ -31,11 +31,11 @@ pub enum FlowElem {
 type Flow = Vec<FlowElem>;
 
 mod tests {
-    use crate::containers::Player;
+    use crate::game::Player;
 use crate::card::Achievement;
     use crate::containers::CardSet;
     use crate::card::Card;
-    use crate::containers::Game;
+    use crate::game::Game;
     use super::*;
     #[test]
     fn name() {
