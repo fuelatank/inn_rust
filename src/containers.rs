@@ -25,7 +25,7 @@ trait Popable<T> {
     fn pop(&self) -> Option<T>;
 }
 
-trait CardSet<T>: Addable<T> + Removeable<T> {}
+pub trait CardSet<T>: Addable<T> + Removeable<T> {}
 
 struct CardPile {
     cards: std::collections::VecDeque<Card>
@@ -153,7 +153,8 @@ impl<'a> Board {
     }
 }
 
-struct Player<T: CardSet<Card>, U: Addable<Achievement>> {
+pub struct Player<T: CardSet<Card>, U: Addable<Achievement>> {
+    game: Game<T, U>,
     main_board: Board,
     hand: T,
     score_pile: T,
@@ -182,8 +183,8 @@ impl<T: CardSet<Card>, U: Addable<Achievement>> Player<T, U> {
     }
 }
 
-struct Game<T: CardSet<Card>, U: CardSet<Achievement>> {
-    main_card_pile: CardPile,
+pub struct Game<T: CardSet<Card>, U: Addable<Achievement>> {
+    main_card_pile: MainCardPile,
     players: Vec<Player<T, U>>,
 }
 
@@ -192,10 +193,26 @@ fn transfer_first<T>(from: &impl Popable<T>, to: &impl Addable<T>) -> bool {
     to.optional_add(elem)
 }
 
-fn transfer_elem<T>(from: &impl Removeable<T>, to: &impl Addable<T>, elem: &T) -> bool {
+pub fn transfer_elem<T>(from: &impl Removeable<T>, to: &impl Addable<T>, elem: &T) -> bool {
     let temp = from.remove(elem);
     to.optional_add(temp)
 }
 
 impl<T: CardSet<Card>, U: CardSet<Achievement>> Game<T, U> {
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_game_player() {
+        let game = Game {
+            main_card_pile: MainCardPile {
+                piles: [CardPile {
+                    cards: std::collections::VecDeque::new()
+                }; 10]
+            },
+            players: vec![]
+        };
+    }
 }
