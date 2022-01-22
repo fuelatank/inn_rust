@@ -66,14 +66,10 @@ use crate::containers::Addable;
         let game: Game<VecSet<Card>, VecSet<Achievement>> = Game::new();
         game.add_player();
         let the_wheel = vec![
-            FlowElem::Draw(1),
-            FlowElem::Draw(1)
         ];
         let chemistry1 = vec![
-            FlowElem::MayElse(vec![FlowElem::Splay(Splay::Right)], vec![])
         ];
         let optics = vec![
-            FlowElem::DrawAndMeld(3)
         ];
     }
 }
