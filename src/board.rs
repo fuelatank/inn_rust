@@ -32,6 +32,10 @@ impl Stack {
     fn pop_front(&self) -> Option<Card> {
         self.cards.pop_front()
     }
+
+    fn top_card(&self) -> Option<&Card> {
+        self.cards.front()
+    }
 }
 
 pub struct Board {
@@ -85,5 +89,28 @@ impl<'a> Board {
 
     fn tuck(&self, card: Card) {
         self.stacks[card.color().as_usize()].push_back(card)
+    }
+
+    fn top_cards(&self) -> Vec<&Card> {
+        let r: Vec<&Card> = Vec::new();
+        for stack in self.stacks {
+            match stack.top_card() {
+                Some(c) => r.push(c),
+                None => {}
+            }
+        }
+        r
+    }
+
+    fn highest_top_card(&self) -> Option<&Card> {
+        let top_cards = self.top_cards();
+        top_cards.into_iter().max_by_key(|card| card.age())
+    }
+
+    pub fn highest_age(&self) -> u8 {
+        match self.highest_top_card() {
+            Some(card) => card.age(),
+            None => 0
+        }
     }
 }
