@@ -24,23 +24,31 @@ impl<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> Player<'a, T, U> {
         }
     }
 
-    fn draw(&self, pile: &MainCardPile, age: u8) -> bool {
-        transfer_first(&pile.aged(age), &self.hand)
+    pub fn age(&self) -> u8 {
+        self.main_board.highest_age()
     }
 
-    fn meld(&self, card: &Card) -> bool {
+    pub fn draw(&self, age: u8) -> bool {
+        transfer_first(&self.game.pile().aged(age), &self.hand)
+    }
+
+    pub fn meld(&self, card: &Card) -> bool {
         transfer_elem(&self.hand, &self.main_board.forward(), card)
     }
 
-    fn tuck(&self, card: &Card) -> bool {
+    pub fn tuck(&self, card: &Card) -> bool {
         transfer_elem(&self.hand, &self.main_board.backward(), card)
     }
 
-    fn score(&self, card: &Card) -> bool {
+    pub fn score(&self, card: &Card) -> bool {
         transfer_elem(&self.hand, &self.score_pile, card)
     }
 
-    fn achieve(&self, source: &impl Removeable<Achievement>, card: &Achievement) -> bool{
+    pub fn draw_and_score(&self, age: u8) -> bool {
+        transfer_first(&self.game.pile().aged(age), &self.score_pile)
+    }
+
+    pub fn achieve(&self, source: &impl Removeable<Achievement>, card: &Achievement) -> bool{
         transfer_elem(source, &self.achievements, card)
     }
 }
@@ -60,16 +68,20 @@ pub fn transfer_elem<T>(from: &impl Removeable<T>, to: &impl Addable<T>, elem: &
     to.optional_add(temp)
 }
 
-impl<'a, T: CardSet<Card>, U: CardSet<Achievement> + Default> Game<'a, T, U> {
-    fn new() -> Game<'a, T, U> {
+impl<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> Game<'a, T, U> {
+    pub fn new() -> Game<'a, T, U> {
         Game {
             main_card_pile: MainCardPile::new(),
             players: vec![]
         }
     }
 
-    fn add_player(&'a self) {
+    pub fn add_player(&'a self) {
         self.players.push(Player::new(self))
+    }
+
+    pub fn pile(&self) -> &MainCardPile {
+        &self.main_card_pile
     }
 }
 
