@@ -28,7 +28,7 @@ impl<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> Player<'a, T, U> {
         self.main_board.highest_age()
     }
 
-    pub fn draw(&self, age: u8) -> bool {
+    pub fn draw(&self, age: u8) -> Option<&Card> {
         transfer_first(&self.game.pile().aged(age), &self.hand)
     }
 
@@ -44,7 +44,7 @@ impl<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> Player<'a, T, U> {
         transfer_elem(&self.hand, &self.score_pile, card)
     }
 
-    pub fn draw_and_score(&self, age: u8) -> bool {
+    pub fn draw_and_score(&self, age: u8) -> Option<&Card> {
         transfer_first(&self.game.pile().aged(age), &self.score_pile)
     }
 
@@ -58,9 +58,10 @@ pub struct Game<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> {
     players: Vec<Player<'a, T, U>>,
 }
 
-fn transfer_first<T>(from: &impl Popable<T>, to: &impl Addable<T>) -> bool {
+fn transfer_first<'a, T>(from: &'a impl Popable<T>, to: &'a impl Addable<T>) -> Option<&'a T> {
     let elem = from.pop();
-    to.optional_add(elem)
+    let y = to.optional_add(elem);
+    elem.as_ref()
 }
 
 pub fn transfer_elem<T>(from: &impl Removeable<T>, to: &impl Addable<T>, elem: &T) -> bool {
