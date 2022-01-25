@@ -1,25 +1,29 @@
 
-use crate::enums::Color;
-use crate::enums::Splay;
+use crate::containers::CardSet;
+use crate::enums::Icon;
 use crate::card::Card;
 
-enum ExecutingState<'a> {
+enum ExecutingState<'a, T: CardSet<Card>> {
     Done,
     ChooseAnyCard {
         min_num: u8,
         max_num: Option<u8>,
-        from: Vec<&'a Card>,
-        callback: Box<dyn Fn(Option<Vec<&'a Card>>) -> ExecutingState<'a>>
+        from: &'a T,
+        callback: Callback<'a, T>
+    },
+    ChooseAnOpponent {
+        callback: Callback<'a, T>
     }
 }
 
-type Flow<'a> = Box<dyn Fn() -> ExecutingState<'a>>;
+type Callback<'a, T> = Box<dyn Fn(Option<&Vec<Card>>) -> ExecutingState<'a, T>>;
+type Flow<'a, T> = Box<dyn Fn() -> ExecutingState<'a, T>>;
 
 mod tests {
     use crate::game::transfer_elem;
-use crate::containers::VecSet;
-use crate::game::Game;
-use crate::containers::Addable;
+    use crate::containers::VecSet;
+    use crate::game::Game;
+    use crate::containers::Addable;
     use crate::game::Player;
     use crate::card::{Card, Achievement};
     use crate::containers::CardSet;
@@ -36,7 +40,7 @@ use crate::containers::Addable;
         )
     }
 
-    fn opticsxx<T: CardSet<Card>, U>() -> Box<dyn Fn(Player<T, U>) -> ExecutingState>
+    fn opticsxx<T: CardSet<Card>, U>() -> Box<dyn Fn(Player<T, U>) -> ExecutingState<'_, T>>
     where 
         U: Addable<Achievement> + Default
     {
@@ -50,11 +54,13 @@ use crate::containers::Addable;
                     return ExecutingState::ChooseAnyCard {
                         min_num: 1,
                         max_num: Some(1),
-                        from: player.score_pile(),
+                        from: &player.score_pile,
                         callback: |cards| {
-                        return ChooseAnOpponent(|opponent| {
-                            transfer_elem(player.score_pile(), opponent.score_pile(), cards[0])
-                        })}
+                        return ExecutingState::ChooseAnOpponent{
+                            callback: |opponent| {
+                                transfer_elem(&player.score_pile, opponent.score_pile(), cards[0])
+                            }
+                        }}
                     };
                 }
             }
