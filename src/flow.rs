@@ -25,8 +25,7 @@ mod tests {
     use crate::game::Game;
     use crate::containers::Addable;
     use crate::game::Player;
-    use crate::card::{Card, Achievement};
-    use crate::containers::CardSet;
+    use crate::card::Achievement;
     use super::*;
 
     fn chemistry2<T: CardSet<Card>, U: Addable<Achievement> + Default>() -> Box<dyn Fn(Player<T, U>)> {
@@ -40,8 +39,9 @@ mod tests {
         )
     }
 
-    fn opticsxx<T: CardSet<Card>, U>() -> Box<dyn Fn(Player<T, U>) -> ExecutingState<'_, T>>
-    where 
+    fn opticsxx<T, U>() -> Box<dyn Fn(Player<T, U>) -> ExecutingState<'_, T>>
+    where
+        T: CardSet<Card>,
         U: Addable<Achievement> + Default
     {
         Box::new(
