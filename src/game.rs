@@ -8,8 +8,8 @@ use crate::card_pile::MainCardPile;
 pub struct Player<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> {
     game: &'a Game<'a, T, U>,
     main_board: Board,
-    hand: T,
-    score_pile: T,
+    pub hand: T,
+    pub score_pile: T,
     achievements: U
 }
 
@@ -42,6 +42,14 @@ impl<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> Player<'a, T, U> {
 
     pub fn score(&self, card: &Card) -> bool {
         transfer_elem(&self.hand, &self.score_pile, card)
+    }
+
+    pub fn draw_and_meld(&self, age: u8) -> bool {
+        transfer_first(&self.game.pile().aged(age), &self.main_board.forward())
+    }
+
+    pub fn draw_and_tuck(&self, age: u8) -> bool {
+        transfer_first(&self.game.pile().aged(age), &self.main_board.backward())
     }
 
     pub fn draw_and_score(&self, age: u8) -> bool {
