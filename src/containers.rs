@@ -22,7 +22,9 @@ pub trait Popable<T> {
     fn pop(&self) -> Option<T>;
 }
 
-pub trait CardSet<T>: Addable<T> + Removeable<T> + Default {}
+pub trait CardSet<T>: Addable<T> + Removeable<T> + Default {
+    fn as_vec(&self) -> &Vec<T>;
+}
 
 pub struct VecSet<T> {
     v: Vec<T>
@@ -50,4 +52,8 @@ impl<T: PartialEq> Removeable<T> for VecSet<T> {
     }
 }
 
-impl<T: PartialEq> CardSet<T> for VecSet<T> {}
+impl<T: PartialEq> CardSet<T> for VecSet<T> {
+    fn as_vec(&self) -> &Vec<T> {
+        &self.v
+    }
+}
