@@ -14,7 +14,7 @@ pub trait Addable<'a, T> {
 }
 
 pub trait Removeable<'a, T, P> {
-    fn remove(&mut self, param: &'a P) -> Option<&'a T>;
+    fn remove(&mut self, param: &P) -> Option<&'a T>;
 }
 
 pub trait CardSet<'a, T>: Addable<'a, T> + Removeable<'a, T, T> {
@@ -28,7 +28,7 @@ impl<'a, T> Addable<'a, T> for Box<dyn CardSet<'a, T>> {
 }
 
 impl<'a, T> Removeable<'a, T, T> for Box<dyn CardSet<'a, T>> {
-    fn remove(&mut self, elem: &'a T) -> Option<&'a T> {
+    fn remove(&mut self, elem: &T) -> Option<&'a T> {
         (**self).remove(elem)
     }
 }
@@ -50,12 +50,11 @@ impl<'a, T> Addable<'a, T> for VecSet<'a, T> {
 }
 
 impl<'a, T: PartialEq> Removeable<'a, T, T> for VecSet<'a, T> {
-    fn remove(&mut self, elem: &'a T) -> Option<&'a T> {
+    fn remove(&mut self, elem: &T) -> Option<&'a T> {
         let i = self.v.iter().position(|x| *x == elem);
         match i {
             Some(v) => {
-                self.v.remove(v);
-                Some(elem)
+                Some(self.v.remove(v))
             }
             None => None,
         }

@@ -68,7 +68,7 @@ impl<'a> Addable<'a, Card> for MainCardPile<'a> {
 }
 
 impl<'a> Removeable<'a, Card, u8> for MainCardPile<'a> {
-    fn remove(&mut self, age: &'a u8) -> Option<&'a Card> {
+    fn remove(&mut self, age: &u8) -> Option<&'a Card> {
         self.pop_age(*age)
     }
 }
