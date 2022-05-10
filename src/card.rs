@@ -1,5 +1,6 @@
 
 use crate::enums::{Color, Icon};
+use crate::flow::Flow;
 
 pub struct Dogma {
     demand: bool,
@@ -21,6 +22,12 @@ impl Card {
     }
     pub fn color(&self) -> Color {
         self.color
+    }
+    pub fn contains(&self, icon: Icon) -> bool {
+        self.icons.contains(&icon)
+    }
+    pub fn doc(&self) -> &String {
+        &self.doc
     }
 }
 

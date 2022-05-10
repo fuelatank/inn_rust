@@ -4,66 +4,50 @@ use crate::enums::{Splay};
 use crate::card::Card;
 use crate::containers::Addable;
 
-struct Stack {
-    cards: VecDeque<Card>,
+struct Stack<'a> {
+    cards: VecDeque<&'a Card>,
     splay: Splay
 }
 
-impl Stack {
-    fn new() -> Stack {
+impl<'a> Stack<'a> {
+    fn new() -> Stack<'a> {
         Stack {
             cards: VecDeque::new(),
             splay: Splay::NoSplay
         }
     }
 
-    fn push_back(&self, card: Card) {
+    fn push_back(&mut self, card: &'a Card) {
         self.cards.push_back(card)
     }
 
-    fn pop_back(&self) -> Option<Card> {
+    fn pop_back(&mut self) -> Option<&'a Card> {
         self.cards.pop_back()
     }
 
-    fn push_front(&self, card: Card) {
+    fn push_front(&mut self, card: &'a Card) {
         self.cards.push_front(card)
     }
 
-    fn pop_front(&self) -> Option<Card> {
+    fn pop_front(&mut self) -> Option<&'a Card> {
         self.cards.pop_front()
     }
 
-    fn top_card(&self) -> Option<&Card> {
-        self.cards.front()
+    fn top_card(&self) -> Option<&'a Card> {
+        match self.cards.front() {
+            Some(v) => Some(*v),
+            None => None
+        }
     }
 }
 
-pub struct Board {
-    stacks: [Stack; 5]
+pub struct Board<'a> {
+    stacks: [Stack<'a>; 5],
+    is_forward: bool
 }
 
-struct ForwardWrapper<'a> {
-    board: &'a Board
-}
-
-impl<'a> Addable<Card> for ForwardWrapper<'a> {
-    fn add(&self, elem: Card) {
-        self.board.meld(elem)
-    }
-}
-
-struct BackwardWrapper<'a> {
-    board: &'a Board
-}
-
-impl<'a> Addable<Card> for BackwardWrapper<'a> {
-    fn add(&self, elem: Card) {
-        self.board.tuck(elem)
-    }
-}
-
-impl<'a> Board {
-    pub fn new() -> Board {
+impl<'a> Board<'a> {
+    pub fn new() -> Board<'a> {
         Board {
             stacks: [
                 Stack::new(),
@@ -71,29 +55,31 @@ impl<'a> Board {
                 Stack::new(),
                 Stack::new(),
                 Stack::new()
-            ]
+            ],
+            is_forward: true
         }
     }
 
-    pub fn forward(&'a self) -> ForwardWrapper<'a> {
-        ForwardWrapper { board: self }
+    pub fn forward(&mut self) {
+        self.is_forward = true;
     }
 
-    pub fn backward(&'a self) -> BackwardWrapper<'a> {
-        BackwardWrapper { board: self }
+    pub fn backward(&mut self) {
+        self.is_forward = false
     }
 
-    fn meld(&self, card: Card) {
-        self.stacks[card.color().as_usize()].push_front(card)
+    fn meld(&mut self, card: &'a Card) {
+        let stack = &mut self.stacks[card.color().as_usize()];
+        stack.push_front(card)
     }
 
-    fn tuck(&self, card: Card) {
+    fn tuck(&mut self, card: &'a Card) {
         self.stacks[card.color().as_usize()].push_back(card)
     }
 
     fn top_cards(&self) -> Vec<&Card> {
-        let r: Vec<&Card> = Vec::new();
-        for stack in self.stacks {
+        let mut r: Vec<&Card> = Vec::new();
+        for stack in self.stacks.iter() {
             match stack.top_card() {
                 Some(c) => r.push(c),
                 None => {}
@@ -111,6 +97,16 @@ impl<'a> Board {
         match self.highest_top_card() {
             Some(card) => card.age(),
             None => 0
+        }
+    }
+}
+
+impl<'a> Addable<'a, Card> for Board<'a> {
+    fn add(&mut self, elem: &'a Card) {
+        if self.is_forward {
+            self.meld(elem)
+        } else {
+            self.tuck(elem)
         }
     }
 }

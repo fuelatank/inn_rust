@@ -1,26 +1,27 @@
 
+use crate::game::Player;
+use crate::game::BoxCardSet;
 use crate::containers::CardSet;
 use crate::enums::Icon;
 use crate::card::Card;
 
-enum ExecutingState<'a, T: CardSet<Card>> {
+pub enum ExecutingState<'a> {
     Done,
     ChooseAnyCard {
         min_num: u8,
         max_num: Option<u8>,
-        from: &'a T,
-        callback: Callback<'a, T>
+        from: &'a [&'a Card],
+        callback: Box<dyn Fn(Option<&'a Vec<&'a Card>>) -> ExecutingState<'a> + 'a>
     },
     ChooseAnOpponent {
-        callback: Callback<'a, T>
+        callback: Box<dyn Fn(&'a Player<'a>) -> ExecutingState<'a> + 'a>
     }
 }
 
-type Callback<'a, T> = Box<dyn Fn(Option<&Vec<Card>>) -> ExecutingState<'a, T>>;
-type Flow<'a, T> = Box<dyn Fn() -> ExecutingState<'a, T>>;
+pub type Flow = Box<dyn for<'a> Fn(&'a Player) -> ExecutingState<'a>>;
 
 mod tests {
-    use crate::game::transfer_elem;
+    //use crate::game::transfer_elem;
     use crate::containers::VecSet;
     use crate::game::Game;
     use crate::containers::Addable;
@@ -28,39 +29,38 @@ mod tests {
     use crate::card::Achievement;
     use super::*;
 
-    fn chemistry2<T: CardSet<Card>, U: Addable<Achievement> + Default>() -> Box<dyn Fn(Player<T, U>)> {
+    fn chemistry2<'a, T: CardSet<'a, Card>, U: Addable<'a, Achievement> + Default>() -> Box<dyn Fn(&mut Game, usize)> {
         // Player is inside Game
         // One player must be placed inside one game
         // Player is created when that Game is created
         Box::new(
-            |player| {
-                player.draw_and_score(player.age() + 1);
+            |game, player| {
+                //game.draw_and_score(player, player.age() + 1);
             }
         )
     }
 
-    fn opticsxx<T, U>() -> Box<dyn Fn(Player<T, U>) -> ExecutingState<'_, T>>
-    where
-        T: CardSet<Card>,
-        U: Addable<Achievement> + Default
+    fn opticsxx() -> Box<dyn for<'a> Fn(&'a mut Game<'a>, usize) -> ExecutingState<'a>>
     {
         Box::new(
-            |player| {
-                let card = player.draw_and_meld(3);
+            |game, player_index| {
+                let card = game.draw_and_meld(player_index, &3).unwrap();
                 if card.contains(Icon::Crown) {
-                    player.draw_and_score(4);
+                    game.draw_and_score(player_index, &4);
                     return ExecutingState::Done;
                 } else {
                     return ExecutingState::ChooseAnyCard {
                         min_num: 1,
                         max_num: Some(1),
-                        from: &player.score_pile,
-                        callback: |cards| {
-                        return ExecutingState::ChooseAnOpponent{
-                            callback: |opponent| {
-                                transfer_elem(&player.score_pile, opponent.score_pile(), cards[0])
-                            }
-                        }}
+                        from: game.player(player_index).score_pile.as_slice(),
+                        callback: Box::new(move |cards: Option<&Vec<&Card>>| {
+                            return ExecutingState::ChooseAnOpponent {
+                                callback: Box::new(move |opponent: &Player| {
+                                    //transfer_elem(&mut player.score_pile, &opponent.score_pile, &cards.unwrap()[0]);
+                                    return ExecutingState::Done;
+                                })
+                            };
+                        })
                     };
                 }
             }
@@ -69,8 +69,8 @@ mod tests {
 
     #[test]
     fn name() {
-        let game: Game<VecSet<Card>, VecSet<Achievement>> = Game::new();
-        game.add_player();
+        let game: Game = Game::new();
+        game.add_player(Box::new(VecSet::default()), Box::new(VecSet::default()), Box::new(VecSet::default()));
         let the_wheel = vec![
         ];
         let chemistry1 = vec![

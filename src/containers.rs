@@ -1,59 +1,69 @@
+pub trait Addable<'a, T> {
+    fn add(&mut self, elem: &'a T);
 
-pub trait Addable<T> {
-    fn add(&self, elem: T);
-
-    fn optional_add(&self, elem: Option<T>) -> bool {
+    /*fn optional_add(&mut self, elem: Option<&'a T>) -> bool {
+        //
         // return success?
         match elem {
             Some(value) => {
-                self.add(value);
                 true
             }
             None => false
         }
+    }*/
+}
+
+pub trait Removeable<'a, T, P> {
+    fn remove(&mut self, param: &'a P) -> Option<&'a T>;
+}
+
+pub trait CardSet<'a, T>: Addable<'a, T> + Removeable<'a, T, T> {
+    fn as_slice(&self) -> &[&T];
+}
+
+impl<'a, T> Addable<'a, T> for Box<dyn CardSet<'a, T>> {
+    fn add(&mut self, elem: &'a T) {
+        (**self).add(elem)
     }
 }
 
-pub trait Removeable<T> {
-    fn remove(&self, elem: &T) -> Option<T>; // return ownership
+impl<'a, T> Removeable<'a, T, T> for Box<dyn CardSet<'a, T>> {
+    fn remove(&mut self, elem: &'a T) -> Option<&'a T> {
+        (**self).remove(elem)
+    }
 }
 
-pub trait Popable<T> {
-    fn pop(&self) -> Option<T>;
+pub struct VecSet<'a, T> {
+    v: Vec<&'a T>,
 }
 
-pub trait CardSet<T>: Addable<T> + Removeable<T> + Default {
-    fn as_vec(&self) -> &Vec<T>;
-}
-
-pub struct VecSet<T> {
-    v: Vec<T>
-}
-
-impl<T> Default for VecSet<T> {
-    fn default() -> VecSet<T> {
+impl<'a, T> Default for VecSet<'a, T> {
+    fn default() -> VecSet<'a, T> {
         VecSet { v: Vec::new() }
     }
 }
 
-impl<T> Addable<T> for VecSet<T> {
-    fn add(&self, elem: T) {
+impl<'a, T> Addable<'a, T> for VecSet<'a, T> {
+    fn add(&mut self, elem: &'a T) {
         self.v.push(elem)
     }
 }
 
-impl<T: PartialEq> Removeable<T> for VecSet<T> {
-    fn remove(&self, elem: &T) -> Option<T> {
-        let i = self.v.iter().position(|x| x == elem);
+impl<'a, T: PartialEq> Removeable<'a, T, T> for VecSet<'a, T> {
+    fn remove(&mut self, elem: &'a T) -> Option<&'a T> {
+        let i = self.v.iter().position(|x| *x == elem);
         match i {
-            Some(v) => Some(self.v.remove(v)),
-            None => None
+            Some(v) => {
+                self.v.remove(v);
+                Some(elem)
+            }
+            None => None,
         }
     }
 }
 
-impl<T: PartialEq> CardSet<T> for VecSet<T> {
-    fn as_vec(&self) -> &Vec<T> {
-        &self.v
+impl<'a, T: PartialEq> CardSet<'a, T> for VecSet<'a, T> {
+    fn as_slice(&self) -> &[&T] {
+        &self.v[..]
     }
 }

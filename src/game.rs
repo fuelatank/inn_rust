@@ -1,96 +1,88 @@
 
 use crate::card::Card;
 use crate::card::Achievement;
-use crate::containers::{Addable, Removeable, Popable, CardSet};
+use crate::containers::{Addable, Removeable, CardSet};
 use crate::board::Board;
 use crate::card_pile::MainCardPile;
 
-pub struct Player<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> {
-    game: &'a Game<'a, T, U>,
-    main_board: Board,
-    pub hand: T,
-    pub score_pile: T,
-    achievements: U
+pub type BoxCardSet<'a> = Box<dyn CardSet<'a, Card>>;
+pub type BoxAchievementSet<'a> = Box<dyn CardSet<'a, Achievement>>;
+
+pub struct Player<'a> {
+    main_board: Board<'a>,
+    pub hand: BoxCardSet<'a>,
+    pub score_pile: BoxCardSet<'a>,
+    achievements: BoxAchievementSet<'a>
 }
 
-impl<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> Player<'a, T, U> {
-    fn new(game: &'a Game<'a, T, U>) -> Player<'a, T, U> {
+impl<'a> Player<'a> {
+    fn new(hand: BoxCardSet<'a>, score_pile: BoxCardSet<'a>, achievements: BoxAchievementSet<'a>) -> Player<'a> {
         Player {
-            game,
             main_board: Board::new(),
-            hand: Default::default(),
-            score_pile: Default::default(),
-            achievements: Default::default()
+            hand,
+            score_pile,
+            achievements
         }
     }
 
     pub fn age(&self) -> u8 {
         self.main_board.highest_age()
     }
-
-    pub fn draw(&self, age: u8) -> bool {
-        transfer_first(&self.game.pile().aged(age), &self.hand)
-    }
-
-    pub fn meld(&self, card: &Card) -> bool {
-        transfer_elem(&self.hand, &self.main_board.forward(), card)
-    }
-
-    pub fn tuck(&self, card: &Card) -> bool {
-        transfer_elem(&self.hand, &self.main_board.backward(), card)
-    }
-
-    pub fn score(&self, card: &Card) -> bool {
-        transfer_elem(&self.hand, &self.score_pile, card)
-    }
-
-    pub fn draw_and_meld(&self, age: u8) -> bool {
-        transfer_first(&self.game.pile().aged(age), &self.main_board.forward())
-    }
-
-    pub fn draw_and_tuck(&self, age: u8) -> bool {
-        transfer_first(&self.game.pile().aged(age), &self.main_board.backward())
-    }
-
-    pub fn draw_and_score(&self, age: u8) -> bool {
-        transfer_first(&self.game.pile().aged(age), &self.score_pile)
-    }
-
-    pub fn achieve(&self, source: &impl Removeable<Achievement>, card: &Achievement) -> bool{
-        transfer_elem(source, &self.achievements, card)
-    }
 }
 
-pub struct Game<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> {
-    main_card_pile: MainCardPile,
-    players: Vec<Player<'a, T, U>>,
+pub struct Game<'a> {
+    main_card_pile: MainCardPile<'a>,
+    players: Vec<Player<'a>>,
 }
 
-fn transfer_first<T>(from: &impl Popable<T>, to: &impl Addable<T>) -> bool {
-    let elem = from.pop();
-    to.optional_add(elem)
-}
-
-pub fn transfer_elem<T>(from: &impl Removeable<T>, to: &impl Addable<T>, elem: &T) -> bool {
-    let temp = from.remove(elem);
-    to.optional_add(temp)
-}
-
-impl<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> Game<'a, T, U> {
-    pub fn new() -> Game<'a, T, U> {
+impl<'a> Game<'a> {
+    pub fn new() -> Game<'a> {
         Game {
             main_card_pile: MainCardPile::new(),
             players: vec![]
         }
     }
 
-    pub fn add_player(&'a self) {
-        self.players.push(Player::new(self))
+    pub fn add_player(&mut self, hand: BoxCardSet<'a>, score_pile: BoxCardSet<'a>, achievements: BoxAchievementSet<'a>) {
+        self.players.push(Player::new(hand, score_pile, achievements))
     }
 
-    pub fn pile(&self) -> &MainCardPile {
+    pub fn player(&self, index: usize) -> &Player<'a> {
+        &self.players[index]
+    }
+
+    pub fn pile(&self) -> &MainCardPile<'a> {
         &self.main_card_pile
     }
+
+    pub fn draw(&mut self, player: usize, age: &'a u8) -> Option<&'a Card> {
+        transfer(&mut self.main_card_pile, &mut self.players[player].hand, age)
+    }
+
+    pub fn draw_and_meld(&mut self, player: usize, age: &'a u8) -> Option<&'a Card> {
+        transfer(&mut self.main_card_pile, &mut self.players[player].main_board, age)
+    }
+
+    pub fn draw_and_score(&mut self, player: usize, age: &'a u8) -> Option<&'a Card> {
+        transfer(&mut self.main_card_pile, &mut self.players[player].score_pile, age)
+    }
+
+    pub fn score(&mut self, player: usize, card: &'a Card) -> Option<&'a Card> {
+        let p = &mut self.players[player];
+        transfer(&mut p.hand, &mut p.score_pile, card)
+    }
+
+    pub fn r#return(&mut self, player: usize, card: &'a Card) -> Option<&'a Card> {
+        transfer(&mut self.players[player].hand, &mut self.main_card_pile, card)
+    }
+}
+
+fn transfer<'a, T, P>(from: &mut impl Removeable<'a, T, P>, to: &mut impl Addable<'a, T>, param: &'a P) -> Option<&'a T> {
+    let c = from.remove(param);
+    if let Some(card) = c {
+        to.add(card);
+    }
+    c
 }
 
 mod tests {
@@ -99,7 +91,7 @@ mod tests {
 
     #[test]
     fn create_game_player() {
-        let game: Game<VecSet<Card>, VecSet<Achievement>> = Game::new();
-        game.add_player();
+        let mut game = Game::new();
+        game.add_player(Box::new(VecSet::default()), Box::new(VecSet::default()), Box::new(VecSet::default()));
     }
 }

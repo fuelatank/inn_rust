@@ -1,4 +1,5 @@
 
+#[derive(Copy, Clone)]
 pub enum Color {
     Blue,
     Red,
@@ -19,6 +20,7 @@ impl Color {
     }
 }
 
+#[derive(PartialEq)]
 pub enum Icon {
     Castle,
     Factory,
