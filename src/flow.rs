@@ -20,19 +20,35 @@ pub enum ExecutingState<'a> {
     },
 }
 
+pub enum ExecutionState<'a> {
+    Card {
+        min_num: u8,
+        max_num: Option<u8>,
+        from: Vec<&'a Card>,
+        callback: Box<dyn FnOnce(Vec<&'a Card>) -> Option<ExecutionState<'a>> + 'a>,
+    },
+    Opponent {
+        callback: Box<dyn FnOnce(&'a Player<'a>) -> Option<ExecutionState<'a>> + 'a>,
+    },
+    Yn {
+        callback: Box<dyn FnOnce(bool) -> Option<ExecutionState<'a>> + 'a>,
+    },
+}
+
 pub enum State<'a> {
     Card {
         min_num: u8,
         max_num: Option<u8>,
         from: Vec<&'a Card>,
-        callback: Box<dyn FnOnce(Vec<&'a Card>) -> Option<State<'a>> + 'a>,
     },
-    Opponent {
-        callback: Box<dyn FnOnce(&'a Player<'a>) -> Option<State<'a>> + 'a>,
-    },
-    Yn {
-        callback: Box<dyn FnOnce(bool) -> Option<State<'a>> + 'a>,
-    },
+    Opponent,
+    Yn,
+}
+
+pub enum Action<'a> {
+    Card(Vec<&'a Card>),
+    Opponent(&'a Player<'a>),
+    Yn(bool),
 }
 
 pub enum Yield<'a> {
@@ -44,9 +60,38 @@ pub enum Yield<'a> {
     ChooseAnOpponent,
 }
 
-pub type ShareFlow = Box<dyn for<'a> Fn(&'a Player<'a>, &'a Game<'a>) -> Option<State<'a>>>;
+pub type ShareFlow =
+    Box<dyn for<'a> Fn(&'a Player<'a>, &'a Game<'a>) -> Option<ExecutionState<'a>>>;
 pub type DemandFlow =
-    Box<dyn for<'a> Fn(&'a Player<'a>, &'a Player<'a>, &'a Game<'a>) -> Option<State<'a>>>;
+    Box<dyn for<'a> Fn(&'a Player<'a>, &'a Player<'a>, &'a Game<'a>) -> Option<ExecutionState<'a>>>;
+
+struct ESC<'a> {
+    state: Option<ExecutionState<'a>>,
+}
+
+impl<'a> ESC<'a> {
+    fn next(&mut self, action: Action<'a>) -> Option<State> {
+        let state = self.state.take().expect("already finished");
+        let (inner, outer) = match (state, action) {
+            (
+                ExecutionState::Card {
+                    min_num,
+                    max_num,
+                    from,
+                    callback,
+                },
+                Action::Card(action),
+            ) => (callback(action), State::Card { min_num, max_num, from }),
+            (ExecutionState::Opponent { callback }, Action::Opponent(opponent)) => {
+                (callback(opponent), State::Opponent)
+            }
+            (ExecutionState::Yn { callback }, Action::Yn(yn)) => (callback(yn),State::Yn),
+            _ => unreachable!(),
+        };
+        self.state = inner;
+        self.state.as_ref().map(|_| outer)
+    }
+}
 
 mod tests {
     //use crate::game::transfer_elem;
@@ -72,7 +117,7 @@ mod tests {
         Box::new(|player, opponent, _game| {
             opponent.draw(1);
             let age = opponent.age();
-            Some(State::Card {
+            Some(ExecutionState::Card {
                 min_num: 1,
                 max_num: Some(1),
                 from: opponent
@@ -97,13 +142,13 @@ mod tests {
                 player.draw_and_score(4);
                 return None;
             } else {
-                return Some(State::Card {
+                return Some(ExecutionState::Card {
                     min_num: 1,
                     max_num: Some(1),
                     from: player.score_pile.borrow().as_vec(),
                     callback: Box::new(move |cards: Vec<&Card>| {
                         let card = *cards.get(0)?;
-                        Some(State::Opponent {
+                        Some(ExecutionState::Opponent {
                             callback: Box::new(move |opponent: &Player| {
                                 transfer(&player.score_pile, &opponent.score_pile, card);
                                 None
@@ -117,7 +162,7 @@ mod tests {
 
     fn _code_of_laws() -> ShareFlow {
         Box::new(|player, _game| {
-            return Some(State::Card {
+            return Some(ExecutionState::Card {
                 min_num: 0,
                 max_num: Some(1),
                 from: player
@@ -133,7 +178,7 @@ mod tests {
                     if player.is_splayed(card.color(), Splay::Left) {
                         return None;
                     }
-                    Some(State::Yn {
+                    Some(ExecutionState::Yn {
                         callback: Box::new(move |yn| {
                             if yn {
                                 player.splay(card.color(), Splay::Left);
