@@ -5,37 +5,6 @@ use crate::game::Game;
 use crate::game::Player;
 use generator::{done, Gn, LocalGenerator, Scope};
 
-pub enum ExecutingState<'a> {
-    Done,
-    ChooseAnyCard {
-        min_num: u8,
-        max_num: Option<u8>,
-        from: Vec<&'a Card>,
-        callback: Box<dyn FnOnce(Vec<&'a Card>) -> ExecutingState<'a> + 'a>,
-    },
-    ChooseAnOpponent {
-        callback: Box<dyn FnOnce(&'a Player<'a>) -> ExecutingState<'a> + 'a>,
-    },
-    ChooseYn {
-        callback: Box<dyn FnOnce(bool) -> ExecutingState<'a> + 'a>,
-    },
-}
-
-pub enum ExecutionState<'a> {
-    Card {
-        min_num: u8,
-        max_num: Option<u8>,
-        from: Vec<&'a Card>,
-        callback: Box<dyn FnOnce(Vec<&'a Card>) -> Option<ExecutionState<'a>> + 'a>,
-    },
-    Opponent {
-        callback: Box<dyn FnOnce(&'a Player<'a>) -> Option<ExecutionState<'a>> + 'a>,
-    },
-    Yn {
-        callback: Box<dyn FnOnce(bool) -> Option<ExecutionState<'a>> + 'a>,
-    },
-}
-
 pub enum State<'a> {
     Card {
         min_num: u8,
@@ -89,46 +58,9 @@ impl<'a> Action<'a> {
     }
 }
 
-pub type ShareFlow =
-    Box<dyn for<'a> Fn(&'a Player<'a>, &'a Game<'a>) -> Option<ExecutionState<'a>>>;
-pub type DemandFlow =
-    Box<dyn for<'a> Fn(&'a Player<'a>, &'a Player<'a>, &'a Game<'a>) -> Option<ExecutionState<'a>>>;
+pub type ShareFlow = for<'a> fn(&'a Player<'a>, &'a Game<'a>) -> FlowState<'a>;
+pub type DemandFlow = for<'a> fn(&'a Player<'a>, &'a Player<'a>, &'a Game<'a>) -> FlowState<'a>;
 pub type FlowState<'a> = LocalGenerator<'a, Action<'a>, State<'a>>;
-
-struct ESC<'a> {
-    state: Option<ExecutionState<'a>>,
-}
-
-impl<'a> ESC<'a> {
-    fn next(&mut self, action: Action<'a>) -> Option<State> {
-        let state = self.state.take().expect("already finished");
-        let (inner, outer) = match (state, action) {
-            (
-                ExecutionState::Card {
-                    min_num,
-                    max_num,
-                    from,
-                    callback,
-                },
-                Action::Card(action),
-            ) => (
-                callback(action),
-                State::Card {
-                    min_num,
-                    max_num,
-                    from,
-                },
-            ),
-            (ExecutionState::Opponent { callback }, Action::Opponent(opponent)) => {
-                (callback(opponent), State::Opponent)
-            }
-            (ExecutionState::Yn { callback }, Action::Yn(yn)) => (callback(yn), State::Yn),
-            _ => unreachable!(),
-        };
-        self.state = inner;
-        self.state.as_ref().map(|_| outer)
-    }
-}
 
 mod tests {
     //use crate::game::transfer_elem;
