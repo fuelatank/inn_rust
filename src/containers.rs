@@ -18,7 +18,7 @@ pub trait Removeable<'a, T, P> {
 }
 
 pub trait CardSet<'a, T>: Addable<'a, T> + Removeable<'a, T, T> {
-    fn as_slice(&self) -> &[&T];
+    fn as_vec(&'_ self) -> Vec<&'a T>;
 }
 
 impl<'a, T> Addable<'a, T> for Box<dyn CardSet<'a, T>> {
@@ -62,7 +62,7 @@ impl<'a, T: PartialEq> Removeable<'a, T, T> for VecSet<'a, T> {
 }
 
 impl<'a, T: PartialEq> CardSet<'a, T> for VecSet<'a, T> {
-    fn as_slice(&self) -> &[&T] {
-        &self.v[..]
+    fn as_vec(&self) -> Vec<&'a T> {
+        self.v.clone()
     }
 }

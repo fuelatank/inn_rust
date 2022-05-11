@@ -1,10 +1,11 @@
 
+use crate::enums::Color;
 use std::collections::VecDeque;
 use crate::enums::{Splay};
 use crate::card::Card;
 use crate::containers::Addable;
 
-struct Stack<'a> {
+pub struct Stack<'a> {
     cards: VecDeque<&'a Card>,
     splay: Splay
 }
@@ -31,6 +32,19 @@ impl<'a> Stack<'a> {
 
     fn pop_front(&mut self) -> Option<&'a Card> {
         self.cards.pop_front()
+    }
+
+    pub fn splay(&mut self, direction: Splay) {
+        assert_ne!(self.splay, direction);
+        self.splay = direction;
+    }
+
+    pub fn is_splayed(&self, direction: Splay) -> bool {
+        self.splay == direction
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cards.is_empty()
     }
 
     fn top_card(&self) -> Option<&'a Card> {
@@ -66,6 +80,18 @@ impl<'a> Board<'a> {
 
     pub fn backward(&mut self) {
         self.is_forward = false
+    }
+
+    pub fn get_stack(&self, color: Color) -> &Stack<'a> {
+        &self.stacks[color.as_usize()]
+    }
+
+    pub fn get_stack_mut(&mut self, color: Color) -> &mut Stack<'a> {
+        &mut self.stacks[color.as_usize()]
+    }
+
+    pub fn is_splayed(&self, color: Color, direction: Splay) -> bool {
+        self.stacks[color.as_usize()].is_splayed(direction)
     }
 
     fn meld(&mut self, card: &'a Card) {

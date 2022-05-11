@@ -1,20 +1,20 @@
+use crate::enums::{Color, Splay};
 use crate::board::Board;
 use crate::card::Achievement;
 use crate::card::Card;
 use crate::card_pile::MainCardPile;
 use crate::containers::{Addable, CardSet, Removeable};
 use std::cell::RefCell;
-use std::ops::DerefMut;
 
 pub type BoxCardSet<'a> = Box<dyn CardSet<'a, Card>>;
 pub type BoxAchievementSet<'a> = Box<dyn CardSet<'a, Achievement>>;
 
 pub struct Player<'a> {
     main_pile: &'a RefCell<MainCardPile<'a>>,
-    main_board: Board<'a>,
-    pub hand: BoxCardSet<'a>,
-    pub score_pile: BoxCardSet<'a>,
-    achievements: BoxAchievementSet<'a>,
+    main_board: RefCell<Board<'a>>,
+    pub hand: RefCell<BoxCardSet<'a>>,
+    pub score_pile: RefCell<BoxCardSet<'a>>,
+    achievements: RefCell<BoxAchievementSet<'a>>,
 }
 
 impl<'a> Player<'a> {
@@ -26,35 +26,51 @@ impl<'a> Player<'a> {
     ) -> Player<'a> {
         Player {
             main_pile: main_pile,
-            main_board: Board::new(),
-            hand,
-            score_pile,
-            achievements,
+            main_board: RefCell::new(Board::new()),
+            hand: RefCell::new(hand),
+            score_pile: RefCell::new(score_pile),
+            achievements: RefCell::new(achievements),
         }
     }
 
     pub fn age(&self) -> u8 {
-        self.main_board.highest_age()
+        self.main_board.borrow().highest_age()
     }
 
-    pub fn draw(&mut self, age: &'a u8) -> Option<&'a Card> {
-        transfer(self.main_pile.borrow_mut(), &mut self.hand, age)
+    pub fn board(&self) -> &RefCell<Board<'a>> {
+        &self.main_board
     }
 
-    pub fn draw_and_meld(&mut self, age: &'a u8) -> Option<&'a Card> {
-        transfer(self.main_pile.borrow_mut(), &mut self.main_board, age)
+    pub fn draw(&self, age: u8) -> Option<&'a Card> {
+        transfer(self.main_pile, &self.hand, &age)
     }
 
-    pub fn draw_and_score(&mut self, age: &'a u8) -> Option<&'a Card> {
-        transfer(self.main_pile.borrow_mut(), &mut self.score_pile, age)
+    pub fn draw_and_meld(&self, age: u8) -> Option<&'a Card> {
+        transfer(self.main_pile, &self.main_board, &age)
     }
 
-    pub fn score(&mut self, card: &'a Card) -> Option<&'a Card> {
-        transfer(&mut self.hand, &mut self.score_pile, card)
+    pub fn draw_and_score(&self, age: u8) -> Option<&'a Card> {
+        transfer(self.main_pile, &self.score_pile, &age)
     }
 
-    pub fn r#return(&mut self, card: &'a Card) -> Option<&'a Card> {
-        transfer(&mut self.hand, self.main_pile.borrow_mut(), card)
+    pub fn score(&self, card: &'a Card) -> Option<&'a Card> {
+        transfer(&self.hand, &self.score_pile, card)
+    }
+
+    pub fn tuck(&self, card: &'a Card) -> Option<&'a Card> {
+        transfer(&self.hand, &self.main_board, card)
+    }
+
+    pub fn splay(&self, color: Color, direction: Splay) {
+        self.main_board.borrow_mut().get_stack_mut(color).splay(direction);
+    }
+
+    pub fn is_splayed(&self, color: Color, direction: Splay) -> bool {
+        self.main_board.borrow().is_splayed(color, direction)
+    }
+
+    pub fn r#return(&self, card: &'a Card) -> Option<&'a Card> {
+        transfer(&self.hand, self.main_pile, card)
     }
 }
 
@@ -94,16 +110,14 @@ impl<'a> Game<'a> {
     } */
 }
 
-pub fn transfer<'a, T, P, R, S, A, B>(mut from: A, mut to: B, param: &'a P) -> Option<&'a T>
+pub fn transfer<'a, T, P, R, S>(from: &RefCell<R>, to: &RefCell<S>, param: &P) -> Option<&'a T>
 where
     R: Removeable<'a, T, P>,
     S: Addable<'a, T>,
-    A: DerefMut<Target = R>,
-    B: DerefMut<Target = S>,
 {
-    let c = from.remove(param);
+    let c = from.borrow_mut().remove(param);
     if let Some(card) = c {
-        to.add(card);
+        to.borrow_mut().add(card);
     }
     c
 }

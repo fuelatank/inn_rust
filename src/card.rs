@@ -1,10 +1,10 @@
 
 use crate::enums::{Color, Icon};
-use crate::flow::Flow;
+use crate::flow::{ShareFlow, DemandFlow};
 
-pub struct Dogma {
-    demand: bool,
-    flow: Flow
+pub enum Dogma {
+    Share(ShareFlow),
+    Demand(DemandFlow),
 }
 
 pub struct Card {

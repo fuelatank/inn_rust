@@ -30,6 +30,7 @@ pub enum Icon {
     Leaf
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Splay {
     NoSplay,
     Left,
