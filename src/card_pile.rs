@@ -1,16 +1,15 @@
-
-use std::collections::VecDeque;
 use crate::card::Card;
 use crate::containers::{Addable, Removeable};
+use std::collections::VecDeque;
 
 struct CardPile<'a> {
-    cards: VecDeque<&'a Card>
+    cards: VecDeque<&'a Card>,
 }
 
 impl<'a> CardPile<'a> {
     fn new() -> CardPile<'a> {
         CardPile {
-            cards: VecDeque::new()
+            cards: VecDeque::new(),
         }
     }
 }
@@ -44,7 +43,7 @@ impl<'a> MainCardPile<'a> {
                 CardPile::new(),
                 CardPile::new(),
                 CardPile::new(),
-                CardPile::new()
+                CardPile::new(),
             ],
         }
     }
@@ -55,7 +54,7 @@ impl<'a> MainCardPile<'a> {
         }
         match self.piles[(age - 1) as usize].remove(&()) {
             Some(card) => Some(card),
-            None => self.pop_age(age + 1)
+            None => self.pop_age(age + 1),
         }
     }
 }

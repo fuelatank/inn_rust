@@ -88,7 +88,6 @@ impl<'a> Player<'a> {
     ) -> LocalGenerator<'g, Action<'a, 'g>, State<'a, 'g>> {
         Gn::new_scoped_local(move |mut s| {
             let _main_icon = card.main_icon();
-            
             for dogma in card.dogmas() {
                 match dogma {
                     Dogma::Share(flow) => {
@@ -109,7 +108,6 @@ impl<'a> Player<'a> {
                         // should filter out ineligible players
                         for player in game.players(self.id) {
                             let mut gen = flow(self, player, game);
-                            
                             // s.yield_from(gen);
                             let mut state = gen.resume();
                             while let Some(st) = state {

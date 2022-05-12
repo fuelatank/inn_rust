@@ -53,9 +53,7 @@ impl<'a, T: PartialEq> Removeable<'a, T, T> for VecSet<'a, T> {
     fn remove(&mut self, elem: &T) -> Option<&'a T> {
         let i = self.v.iter().position(|x| *x == elem);
         match i {
-            Some(v) => {
-                Some(self.v.remove(v))
-            }
+            Some(v) => Some(self.v.remove(v)),
             None => None,
         }
     }

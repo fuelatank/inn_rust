@@ -1,20 +1,18 @@
-
-use crate::enums::Color;
-use std::collections::VecDeque;
-use crate::enums::{Splay};
 use crate::card::Card;
 use crate::containers::Addable;
+use crate::enums::{Color, Splay};
+use std::collections::VecDeque;
 
 pub struct Stack<'a> {
     cards: VecDeque<&'a Card>,
-    splay: Splay
+    splay: Splay,
 }
 
 impl<'a> Stack<'a> {
     fn new() -> Stack<'a> {
         Stack {
             cards: VecDeque::new(),
-            splay: Splay::NoSplay
+            splay: Splay::NoSplay,
         }
     }
 
@@ -50,14 +48,14 @@ impl<'a> Stack<'a> {
     fn top_card(&self) -> Option<&'a Card> {
         match self.cards.front() {
             Some(v) => Some(*v),
-            None => None
+            None => None,
         }
     }
 }
 
 pub struct Board<'a> {
     stacks: [Stack<'a>; 5],
-    is_forward: bool
+    is_forward: bool,
 }
 
 impl<'a> Board<'a> {
@@ -68,9 +66,9 @@ impl<'a> Board<'a> {
                 Stack::new(),
                 Stack::new(),
                 Stack::new(),
-                Stack::new()
+                Stack::new(),
             ],
-            is_forward: true
+            is_forward: true,
         }
     }
 
@@ -122,7 +120,7 @@ impl<'a> Board<'a> {
     pub fn highest_age(&self) -> u8 {
         match self.highest_top_card() {
             Some(card) => card.age(),
-            None => 0
+            None => 0,
         }
     }
 }

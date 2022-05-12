@@ -1,11 +1,10 @@
-
 #[derive(Copy, Clone)]
 pub enum Color {
     Blue,
     Red,
     Green,
     Yellow,
-    Purple
+    Purple,
 }
 
 impl Color {
@@ -15,7 +14,7 @@ impl Color {
             Color::Red => 1,
             Color::Green => 2,
             Color::Yellow => 3,
-            Color::Purple => 4
+            Color::Purple => 4,
         }
     }
 }
@@ -27,7 +26,7 @@ pub enum Icon {
     Clock,
     Crown,
     Lightblub,
-    Leaf
+    Leaf,
 }
 
 #[derive(Debug, PartialEq)]
@@ -35,5 +34,5 @@ pub enum Splay {
     NoSplay,
     Left,
     Right,
-    Up
+    Up,
 }
