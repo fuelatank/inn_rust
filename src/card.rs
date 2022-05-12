@@ -1,6 +1,6 @@
-
 use crate::enums::{Color, Icon};
-use crate::flow::{ShareFlow, DemandFlow};
+use crate::flow::{DemandFlow, ShareFlow};
+use counter::Counter;
 
 pub enum Dogma {
     Share(ShareFlow),
@@ -12,11 +12,30 @@ pub struct Card {
     age: u8,
     color: Color,
     icons: [Icon; 4],
+    main_icon: Icon,
     dogmas: Vec<Dogma>,
-    doc: String
+    doc: String,
 }
 
 impl Card {
+    pub fn new(
+        name: String,
+        age: u8,
+        color: Color,
+        icons: [Icon; 4],
+        dogmas: Vec<Dogma>,
+        doc: String,
+    ) -> Card {
+        Card {
+            name,
+            age,
+            color,
+            icons,
+            main_icon: *icons.iter().collect::<Counter<_>>().most_common()[0].0,
+            dogmas,
+            doc,
+        }
+    }
     pub fn age(&self) -> u8 {
         self.age
     }
@@ -28,6 +47,12 @@ impl Card {
     }
     pub fn doc(&self) -> &String {
         &self.doc
+    }
+    pub fn dogmas(&self) -> &[Dogma] {
+        &self.dogmas
+    }
+    pub fn main_icon(&self) -> Icon {
+        self.main_icon
     }
 }
 
@@ -48,5 +73,5 @@ pub enum SpecialAchievement {
 #[derive(PartialEq)]
 pub enum Achievement {
     Normal(Card),
-    Special(SpecialAchievement)
+    Special(SpecialAchievement),
 }

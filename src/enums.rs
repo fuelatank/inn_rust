@@ -20,7 +20,7 @@ impl Color {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone)]
 pub enum Icon {
     Castle,
     Factory,
