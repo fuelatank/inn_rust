@@ -87,13 +87,15 @@ impl<'a> Player<'a> {
         game: &'g Game<'a>,
     ) -> LocalGenerator<'g, Action<'a, 'g>, State<'a, 'g>> {
         Gn::new_scoped_local(move |mut s| {
-            let main_icon = card.main_icon();
+            let _main_icon = card.main_icon();
+            
             for dogma in card.dogmas() {
                 match dogma {
                     Dogma::Share(flow) => {
                         // should filter out ineligible players
                         for player in game.players(self.id) {
                             let mut gen = flow(player, game);
+
                             // s.yield_from(gen);
                             let mut state = gen.resume();
                             while let Some(st) = state {
@@ -103,7 +105,20 @@ impl<'a> Player<'a> {
                             }
                         }
                     }
-                    Dogma::Demand(_) => {}
+                    Dogma::Demand(flow) => {
+                        // should filter out ineligible players
+                        for player in game.players(self.id) {
+                            let mut gen = flow(self, player, game);
+                            
+                            // s.yield_from(gen);
+                            let mut state = gen.resume();
+                            while let Some(st) = state {
+                                let a = s.yield_(st).expect("Generator got None");
+                                gen.set_para(a);
+                                state = gen.resume();
+                            }
+                        }
+                    }
                 }
             }
             generator::done!()
@@ -140,18 +155,10 @@ impl<'a> Game<'a> {
         ))
     }
 
-    pub fn player(&self, index: usize) -> &Player<'a> {
-        &self.players[index]
-    }
-
     pub fn players(&self, main_player_id: usize) -> impl Iterator<Item = &Player<'a>> {
         (0..self.players.len())
             .map(move |i| &self.players[(i + main_player_id) % self.players.len()])
     }
-
-    /* pub fn pile(&self) -> &MainCardPile<'a> {
-        &self.main_card_pile
-    } */
 }
 
 pub fn transfer<'a, T, P, R, S>(from: &RefCell<R>, to: &RefCell<S>, param: &P) -> Option<&'a T>
