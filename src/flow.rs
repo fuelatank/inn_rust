@@ -5,7 +5,7 @@ use crate::game::Game;
 use crate::game::Player;
 use generator::{done, Gn, LocalGenerator, Scope};
 
-pub enum State<'a> {
+pub enum Choose<'a> {
     Card {
         min_num: u8,
         max_num: Option<u8>,
@@ -15,14 +15,19 @@ pub enum State<'a> {
     Yn,
 }
 
-pub enum Action<'a> {
-    Card(Vec<&'a Card>),
-    Opponent(&'a Player<'a>),
+pub struct State<'c, 'g> {
+    state: Choose<'c>,
+    actor: &'g Player<'c>,
+}
+
+pub enum Action<'c, 'g> {
+    Card(Vec<&'c Card>),
+    Opponent(&'g Player<'c>),
     Yn(bool),
 }
 
-impl<'a> Action<'a> {
-    fn card(self) -> Option<&'a Card> {
+impl<'c, 'g> Action<'c, 'g> {
+    fn card(self) -> Option<&'c Card> {
         if let Action::Card(cards) = self {
             if cards.len() == 0 {
                 None
@@ -35,14 +40,14 @@ impl<'a> Action<'a> {
             panic!("Error when unwrapping Action to one card")
         }
     }
-    fn cards(self) -> Vec<&'a Card> {
+    fn cards(self) -> Vec<&'c Card> {
         if let Action::Card(cards) = self {
             cards
         } else {
             panic!("Error when unwrapping Action to cards")
         }
     }
-    fn player(self) -> &'a Player<'a> {
+    fn player(self) -> &'g Player<'c> {
         if let Action::Opponent(player) = self {
             player
         } else {
@@ -58,9 +63,10 @@ impl<'a> Action<'a> {
     }
 }
 
-pub type ShareFlow = for<'a> fn(&'a Player<'a>, &'a Game<'a>) -> FlowState<'a>;
-pub type DemandFlow = for<'a> fn(&'a Player<'a>, &'a Player<'a>, &'a Game<'a>) -> FlowState<'a>;
-pub type FlowState<'a> = LocalGenerator<'a, Action<'a>, State<'a>>;
+pub type ShareFlow = for<'c, 'g> fn(&'g Player<'c>, &'g Game<'c>) -> FlowState<'c, 'g>;
+pub type DemandFlow =
+    for<'c, 'g> fn(&'g Player<'c>, &'g Player<'c>, &'g Game<'c>) -> FlowState<'c, 'g>;
+pub type FlowState<'c, 'g> = LocalGenerator<'g, Action<'c, 'g>, State<'c, 'g>>;
 
 mod tests {
     //use crate::game::transfer_elem;
@@ -82,25 +88,28 @@ mod tests {
         })
     }
 
-    fn _archery<'a>(
-        player: &'a Player<'a>,
-        opponent: &'a Player<'a>,
-        _game: &'a Game<'a>,
-    ) -> FlowState<'a> {
+    fn _archery<'c, 'g>(
+        player: &'g Player<'c>,
+        opponent: &'g Player<'c>,
+        _game: &'g Game<'c>,
+    ) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s: Scope<Action, _>| {
             opponent.draw(1);
             let age = opponent.age();
             let cards = s
-                .yield_(State::Card {
-                    min_num: 1,
-                    max_num: Some(1),
-                    from: opponent
-                        .hand
-                        .borrow()
-                        .as_vec()
-                        .into_iter()
-                        .filter(|c| c.age() == age)
-                        .collect(),
+                .yield_(State {
+                    state: Choose::Card {
+                        min_num: 1,
+                        max_num: Some(1),
+                        from: opponent
+                            .hand
+                            .borrow()
+                            .as_vec()
+                            .into_iter()
+                            .filter(|c| c.age() == age)
+                            .collect(),
+                    },
+                    actor: opponent,
                 })
                 .expect("Generator got None")
                 .cards();
@@ -109,7 +118,7 @@ mod tests {
         })
     }
 
-    fn _opticsxx<'a>(player: &'a Player<'a>, _game: &'a Game<'a>) -> FlowState<'a> {
+    fn _opticsxx<'c, 'g>(player: &'g Player<'c>, _game: &'g Game<'c>) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s: Scope<Action, _>| {
             let card = player.draw_and_meld(3).unwrap();
             if card.contains(Icon::Crown) {
@@ -117,10 +126,13 @@ mod tests {
                 done!()
             } else {
                 let opt_card = s
-                    .yield_(State::Card {
-                        min_num: 1,
-                        max_num: Some(1),
-                        from: player.score_pile.borrow().as_vec(),
+                    .yield_(State {
+                        state: Choose::Card {
+                            min_num: 1,
+                            max_num: Some(1),
+                            from: player.score_pile.borrow().as_vec(),
+                        },
+                        actor: player,
                     })
                     .expect("Generator got None")
                     .card();
@@ -129,7 +141,10 @@ mod tests {
                     None => done!(),
                 };
                 let opponent = s
-                    .yield_(State::Opponent)
+                    .yield_(State {
+                        state: Choose::Opponent,
+                        actor: player,
+                    })
                     .expect("Generator got None")
                     .player();
                 transfer(&player.score_pile, &opponent.score_pile, card);
@@ -138,19 +153,24 @@ mod tests {
         })
     }
 
-    fn _code_of_laws<'a>(player: &'a Player<'a>, _game: &'a Game<'a>) -> FlowState<'a> {
+    fn _code_of_laws<'c, 'g>(player: &'g Player<'c>, _game: &'g Game<'c>) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s: Scope<Action, _>| {
             let opt_card = s
-                .yield_(State::Card {
-                    min_num: 0,
-                    max_num: Some(1),
-                    from: player
-                        .hand
-                        .borrow()
-                        .as_vec()
-                        .into_iter()
-                        .filter(|card| !player.board().borrow().get_stack(card.color()).is_empty())
-                        .collect(),
+                .yield_(State {
+                    state: Choose::Card {
+                        min_num: 0,
+                        max_num: Some(1),
+                        from: player
+                            .hand
+                            .borrow()
+                            .as_vec()
+                            .into_iter()
+                            .filter(|card| {
+                                !player.board().borrow().get_stack(card.color()).is_empty()
+                            })
+                            .collect(),
+                    },
+                    actor: player,
                 })
                 .expect("Generator got None")
                 .card();
@@ -162,7 +182,13 @@ mod tests {
             if player.is_splayed(card.color(), Splay::Left) {
                 done!()
             }
-            if s.yield_(State::Yn).expect("Generator got None").yn() {
+            if s.yield_(State {
+                state: Choose::Yn,
+                actor: player,
+            })
+            .expect("Generator got None")
+            .yn()
+            {
                 player.splay(card.color(), Splay::Left);
             }
             done!()
