@@ -1,89 +1,176 @@
-
-use crate::card::Card;
-use crate::card::Achievement;
-use crate::containers::{Addable, Removeable, Popable, CardSet};
 use crate::board::Board;
+use crate::card::Achievement;
+use crate::card::{Card, Dogma};
 use crate::card_pile::MainCardPile;
+use crate::containers::{Addable, CardSet, Removeable};
+use crate::enums::{Color, Splay};
+use crate::flow::{Action, State};
+use generator::{Gn, LocalGenerator};
+use std::cell::RefCell;
 
-pub struct Player<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> {
-    game: &'a Game<'a, T, U>,
-    main_board: Board,
-    hand: T,
-    score_pile: T,
-    achievements: U
+pub type BoxCardSet<'a> = Box<dyn CardSet<'a, Card>>;
+pub type BoxAchievementSet<'a> = Box<dyn CardSet<'a, Achievement>>;
+
+pub struct Player<'a> {
+    id: usize,
+    main_pile: &'a RefCell<MainCardPile<'a>>,
+    main_board: RefCell<Board<'a>>,
+    pub hand: RefCell<BoxCardSet<'a>>,
+    pub score_pile: RefCell<BoxCardSet<'a>>,
+    achievements: RefCell<BoxAchievementSet<'a>>,
 }
 
-impl<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> Player<'a, T, U> {
-    fn new(game: &'a Game<'a, T, U>) -> Player<'a, T, U> {
+impl<'a> Player<'a> {
+    fn new(
+        id: usize,
+        main_pile: &'a RefCell<MainCardPile<'a>>,
+        hand: BoxCardSet<'a>,
+        score_pile: BoxCardSet<'a>,
+        achievements: BoxAchievementSet<'a>,
+    ) -> Player<'a> {
         Player {
-            game,
-            main_board: Board::new(),
-            hand: Default::default(),
-            score_pile: Default::default(),
-            achievements: Default::default()
+            id,
+            main_pile: main_pile,
+            main_board: RefCell::new(Board::new()),
+            hand: RefCell::new(hand),
+            score_pile: RefCell::new(score_pile),
+            achievements: RefCell::new(achievements),
         }
     }
 
     pub fn age(&self) -> u8 {
-        self.main_board.highest_age()
+        self.main_board.borrow().highest_age()
     }
 
-    pub fn draw(&self, age: u8) -> Option<&Card> {
-        transfer_first(&self.game.pile().aged(age), &self.hand)
+    pub fn board(&self) -> &RefCell<Board<'a>> {
+        &self.main_board
     }
 
-    pub fn meld(&self, card: &Card) -> bool {
-        transfer_elem(&self.hand, &self.main_board.forward(), card)
+    pub fn draw(&self, age: u8) -> Option<&'a Card> {
+        transfer(self.main_pile, &self.hand, &age)
     }
 
-    pub fn tuck(&self, card: &Card) -> bool {
-        transfer_elem(&self.hand, &self.main_board.backward(), card)
+    pub fn draw_and_meld(&self, age: u8) -> Option<&'a Card> {
+        transfer(self.main_pile, &self.main_board, &age)
     }
 
-    pub fn score(&self, card: &Card) -> bool {
-        transfer_elem(&self.hand, &self.score_pile, card)
+    pub fn draw_and_score(&self, age: u8) -> Option<&'a Card> {
+        transfer(self.main_pile, &self.score_pile, &age)
     }
 
-    pub fn draw_and_score(&self, age: u8) -> Option<&Card> {
-        transfer_first(&self.game.pile().aged(age), &self.score_pile)
+    pub fn score(&self, card: &'a Card) -> Option<&'a Card> {
+        transfer(&self.hand, &self.score_pile, card)
     }
 
-    pub fn achieve(&self, source: &impl Removeable<Achievement>, card: &Achievement) -> bool{
-        transfer_elem(source, &self.achievements, card)
+    pub fn tuck(&self, card: &'a Card) -> Option<&'a Card> {
+        transfer(&self.hand, &self.main_board, card)
+    }
+
+    pub fn splay(&self, color: Color, direction: Splay) {
+        self.main_board
+            .borrow_mut()
+            .get_stack_mut(color)
+            .splay(direction);
+    }
+
+    pub fn is_splayed(&self, color: Color, direction: Splay) -> bool {
+        self.main_board.borrow().is_splayed(color, direction)
+    }
+
+    pub fn r#return(&self, card: &'a Card) -> Option<&'a Card> {
+        transfer(&self.hand, self.main_pile, card)
+    }
+
+    pub fn execute<'g>(
+        &'g self,
+        card: &'a Card,
+        game: &'g Game<'a>,
+    ) -> LocalGenerator<'g, Action<'a, 'g>, State<'a, 'g>> {
+        Gn::new_scoped_local(move |mut s| {
+            let _main_icon = card.main_icon();
+            
+            for dogma in card.dogmas() {
+                match dogma {
+                    Dogma::Share(flow) => {
+                        // should filter out ineligible players
+                        for player in game.players(self.id) {
+                            let mut gen = flow(player, game);
+
+                            // s.yield_from(gen);
+                            let mut state = gen.resume();
+                            while let Some(st) = state {
+                                let a = s.yield_(st).expect("Generator got None");
+                                gen.set_para(a);
+                                state = gen.resume();
+                            }
+                        }
+                    }
+                    Dogma::Demand(flow) => {
+                        // should filter out ineligible players
+                        for player in game.players(self.id) {
+                            let mut gen = flow(self, player, game);
+                            
+                            // s.yield_from(gen);
+                            let mut state = gen.resume();
+                            while let Some(st) = state {
+                                let a = s.yield_(st).expect("Generator got None");
+                                gen.set_para(a);
+                                state = gen.resume();
+                            }
+                        }
+                    }
+                }
+            }
+            generator::done!()
+        })
     }
 }
 
-pub struct Game<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> {
-    main_card_pile: MainCardPile,
-    players: Vec<Player<'a, T, U>>,
+pub struct Game<'a> {
+    main_card_pile: RefCell<MainCardPile<'a>>,
+    players: Vec<Player<'a>>,
 }
 
-fn transfer_first<'a, T>(from: &'a impl Popable<T>, to: &'a impl Addable<T>) -> Option<&'a T> {
-    let elem = from.pop();
-    let y = to.optional_add(elem);
-    elem.as_ref()
-}
-
-pub fn transfer_elem<T>(from: &impl Removeable<T>, to: &impl Addable<T>, elem: &T) -> bool {
-    let temp = from.remove(elem);
-    to.optional_add(temp)
-}
-
-impl<'a, T: CardSet<Card>, U: Addable<Achievement> + Default> Game<'a, T, U> {
-    pub fn new() -> Game<'a, T, U> {
+impl<'a> Game<'a> {
+    pub fn new() -> Game<'a> {
         Game {
-            main_card_pile: MainCardPile::new(),
-            players: vec![]
+            main_card_pile: RefCell::new(MainCardPile::new()),
+            players: vec![],
         }
     }
 
-    pub fn add_player(&'a self) {
-        self.players.push(Player::new(self))
+    pub fn add_player(
+        &'a mut self,
+        hand: BoxCardSet<'a>,
+        score_pile: BoxCardSet<'a>,
+        achievements: BoxAchievementSet<'a>,
+    ) {
+        let id = self.players.len();
+        self.players.push(Player::new(
+            id,
+            &self.main_card_pile,
+            hand,
+            score_pile,
+            achievements,
+        ))
     }
 
-    pub fn pile(&self) -> &MainCardPile {
-        &self.main_card_pile
+    pub fn players(&self, main_player_id: usize) -> impl Iterator<Item = &Player<'a>> {
+        (0..self.players.len())
+            .map(move |i| &self.players[(i + main_player_id) % self.players.len()])
     }
+}
+
+pub fn transfer<'a, T, P, R, S>(from: &RefCell<R>, to: &RefCell<S>, param: &P) -> Option<&'a T>
+where
+    R: Removeable<'a, T, P>,
+    S: Addable<'a, T>,
+{
+    let c = from.borrow_mut().remove(param);
+    if let Some(card) = c {
+        to.borrow_mut().add(card);
+    }
+    c
 }
 
 mod tests {
@@ -92,7 +179,11 @@ mod tests {
 
     #[test]
     fn create_game_player() {
-        let game: Game<VecSet<Card>, VecSet<Achievement>> = Game::new();
-        game.add_player();
+        let mut game = Game::new();
+        game.add_player(
+            Box::new(VecSet::default()),
+            Box::new(VecSet::default()),
+            Box::new(VecSet::default()),
+        );
     }
 }

@@ -1,53 +1,38 @@
 
 use std::collections::VecDeque;
 use crate::card::Card;
-use crate::containers::{Addable, Popable};
+use crate::containers::{Addable, Removeable};
 
-struct CardPile {
-    cards: VecDeque<Card>
+struct CardPile<'a> {
+    cards: VecDeque<&'a Card>
 }
 
-impl CardPile {
-    fn new() -> CardPile {
+impl<'a> CardPile<'a> {
+    fn new() -> CardPile<'a> {
         CardPile {
             cards: VecDeque::new()
         }
     }
-
-    fn is_empty(&self) -> bool {
-        self.cards.is_empty()
-    }
 }
 
-impl Addable<Card> for CardPile {
-    fn add(&self, card: Card) {
+impl<'a> Addable<'a, Card> for CardPile<'a> {
+    fn add(&mut self, card: &'a Card) {
         self.cards.push_back(card)
     }
 }
 
-impl Popable<Card> for CardPile {
-    fn pop(&self) -> Option<Card> {
+impl<'a> Removeable<'a, Card, ()> for CardPile<'a> {
+    fn remove(&mut self, _: &()) -> Option<&'a Card> {
         self.cards.pop_front()
     }
 }
 
-struct AgePileWrapper<'a> {
-    main_pile: &'a MainCardPile,
-    age: u8
+pub struct MainCardPile<'a> {
+    piles: [CardPile<'a>; 10],
 }
 
-impl<'a> Popable<Card> for AgePileWrapper<'a> {
-    fn pop(&self) -> Option<Card> {
-        self.main_pile.pop_age(self.age)
-    }
-}
-
-pub struct MainCardPile {
-    piles: [CardPile; 10]
-}
-
-impl<'a> MainCardPile {
-    pub fn new() -> MainCardPile {
+impl<'a> MainCardPile<'a> {
+    pub fn new() -> MainCardPile<'a> {
         MainCardPile {
             piles: [
                 CardPile::new(),
@@ -60,28 +45,30 @@ impl<'a> MainCardPile {
                 CardPile::new(),
                 CardPile::new(),
                 CardPile::new()
-            ]
+            ],
         }
     }
 
-    pub fn aged(&'a self, age: u8) -> AgePileWrapper<'a> {
-        AgePileWrapper { main_pile: self, age }
-    }
-
-    fn pop_age(&self, age: u8) -> Option<Card> {
+    fn pop_age(&mut self, age: u8) -> Option<&'a Card> {
         if age >= 11 || age == 0 {
             return None;
         }
-        match self.piles[(age - 1) as usize].pop() {
+        match self.piles[(age - 1) as usize].remove(&()) {
             Some(card) => Some(card),
             None => self.pop_age(age + 1)
         }
     }
 }
 
-impl Addable<Card> for MainCardPile {
-    fn add(&self, card: Card) {
+impl<'a> Addable<'a, Card> for MainCardPile<'a> {
+    fn add(&mut self, card: &'a Card) {
         let age = card.age();
-        self.piles[(age - 1) as usize].add(card);
+        self.piles[(age - 1) as usize].add(card)
+    }
+}
+
+impl<'a> Removeable<'a, Card, u8> for MainCardPile<'a> {
+    fn remove(&mut self, age: &u8) -> Option<&'a Card> {
+        self.pop_age(*age)
     }
 }

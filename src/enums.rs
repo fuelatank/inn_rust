@@ -1,4 +1,5 @@
 
+#[derive(Copy, Clone)]
 pub enum Color {
     Blue,
     Red,
@@ -19,6 +20,7 @@ impl Color {
     }
 }
 
+#[derive(PartialEq, Eq, Hash, Copy, Clone)]
 pub enum Icon {
     Castle,
     Factory,
@@ -28,6 +30,7 @@ pub enum Icon {
     Leaf
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Splay {
     NoSplay,
     Left,
