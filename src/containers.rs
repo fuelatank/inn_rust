@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use crate::card::{Achievement, Card};
+
 pub trait Addable<'a, T> {
     fn add(&mut self, elem: &'a T);
 
@@ -63,4 +66,19 @@ impl<'a, T: PartialEq> CardSet<'a, T> for VecSet<'a, T> {
     fn as_vec(&self) -> Vec<&'a T> {
         self.v.clone()
     }
+}
+
+pub type BoxCardSet<'a> = Box<dyn CardSet<'a, Card>>;
+pub type BoxAchievementSet<'a> = Box<dyn CardSet<'a, Achievement>>;
+
+pub fn transfer<'a, T, P, R, S>(from: &RefCell<R>, to: &RefCell<S>, param: &P) -> Option<&'a T>
+where
+    R: Removeable<'a, T, P>,
+    S: Addable<'a, T>,
+{
+    let c = from.borrow_mut().remove(param);
+    if let Some(card) = c {
+        to.borrow_mut().add(card);
+    }
+    c
 }

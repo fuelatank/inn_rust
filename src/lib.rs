@@ -5,6 +5,7 @@ pub mod containers;
 pub mod enums;
 pub mod flow;
 pub mod game;
+pub mod player;
 pub mod xx;
 
 #[cfg(test)]

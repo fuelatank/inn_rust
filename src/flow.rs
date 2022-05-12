@@ -2,7 +2,7 @@ use crate::card::Card;
 use crate::containers::CardSet;
 use crate::enums::Icon;
 use crate::game::Game;
-use crate::game::Player;
+use crate::player::Player;
 use generator::{done, Gn, LocalGenerator, Scope};
 
 pub enum Choose<'a> {
@@ -63,20 +63,18 @@ impl<'c, 'g> Action<'c, 'g> {
     }
 }
 
+pub type FlowState<'c, 'g> = LocalGenerator<'g, Action<'c, 'g>, State<'c, 'g>>;
+
 pub type ShareFlow = for<'c, 'g> fn(&'g Player<'c>, &'g Game<'c>) -> FlowState<'c, 'g>;
 pub type DemandFlow =
     for<'c, 'g> fn(&'g Player<'c>, &'g Player<'c>, &'g Game<'c>) -> FlowState<'c, 'g>;
-pub type FlowState<'c, 'g> = LocalGenerator<'g, Action<'c, 'g>, State<'c, 'g>>;
 
 mod tests {
     //use crate::game::transfer_elem;
     use super::*;
     use crate::card::Achievement;
-    use crate::containers::Addable;
-    use crate::containers::VecSet;
+    use crate::containers::{transfer, Addable, VecSet};
     use crate::enums::Splay;
-    use crate::game::transfer;
-    use crate::game::Player;
 
     fn _chemistry2<'a, T: CardSet<'a, Card>, U: Addable<'a, Achievement> + Default>(
     ) -> Box<dyn Fn(&mut Game, usize)> {
