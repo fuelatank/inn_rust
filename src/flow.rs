@@ -1,69 +1,13 @@
+use crate::action::ExecutingAction;
 use crate::card::Card;
 use crate::containers::CardSet;
 use crate::enums::Icon;
 use crate::game::Game;
 use crate::player::Player;
+use crate::state::{Choose, ExecutionState};
 use generator::{done, Gn, LocalGenerator, Scope};
 
-pub enum Choose<'a> {
-    Card {
-        min_num: u8,
-        max_num: Option<u8>,
-        from: Vec<&'a Card>,
-    },
-    Opponent,
-    Yn,
-}
-
-pub struct State<'c, 'g> {
-    state: Choose<'c>,
-    actor: &'g Player<'c>,
-}
-
-pub enum Action<'c, 'g> {
-    Card(Vec<&'c Card>),
-    Opponent(&'g Player<'c>),
-    Yn(bool),
-}
-
-impl<'c, 'g> Action<'c, 'g> {
-    fn card(self) -> Option<&'c Card> {
-        if let Action::Card(cards) = self {
-            if cards.len() == 0 {
-                None
-            } else if cards.len() == 1 {
-                Some(cards[0])
-            } else {
-                panic!("Error when unwrapping Action to one card")
-            }
-        } else {
-            panic!("Error when unwrapping Action to one card")
-        }
-    }
-    fn cards(self) -> Vec<&'c Card> {
-        if let Action::Card(cards) = self {
-            cards
-        } else {
-            panic!("Error when unwrapping Action to cards")
-        }
-    }
-    fn player(self) -> &'g Player<'c> {
-        if let Action::Opponent(player) = self {
-            player
-        } else {
-            panic!("Error when unwrapping Action to player")
-        }
-    }
-    fn yn(self) -> bool {
-        if let Action::Yn(yn) = self {
-            yn
-        } else {
-            panic!("Error when unwrapping Action to yn")
-        }
-    }
-}
-
-pub type FlowState<'c, 'g> = LocalGenerator<'g, Action<'c, 'g>, State<'c, 'g>>;
+pub type FlowState<'c, 'g> = LocalGenerator<'g, ExecutingAction<'c, 'g>, ExecutionState<'c, 'g>>;
 
 pub type ShareFlow = for<'c, 'g> fn(&'g Player<'c>, &'g Game<'c>) -> FlowState<'c, 'g>;
 pub type DemandFlow =
@@ -91,12 +35,13 @@ mod tests {
         opponent: &'g Player<'c>,
         _game: &'g Game<'c>,
     ) -> FlowState<'c, 'g> {
-        Gn::new_scoped_local(move |mut s: Scope<Action, _>| {
+        Gn::new_scoped_local(move |mut s: Scope<ExecutingAction, _>| {
             opponent.draw(1);
             let age = opponent.age();
             let cards = s
-                .yield_(State {
-                    state: Choose::Card {
+                .yield_(ExecutionState::new(
+                    opponent,
+                    Choose::Card {
                         min_num: 1,
                         max_num: Some(1),
                         from: opponent
@@ -107,8 +52,7 @@ mod tests {
                             .filter(|c| c.age() == age)
                             .collect(),
                     },
-                    actor: opponent,
-                })
+                ))
                 .expect("Generator got None")
                 .cards();
             transfer(&opponent.hand, &player.hand, cards[0]);
@@ -117,21 +61,21 @@ mod tests {
     }
 
     fn _opticsxx<'c, 'g>(player: &'g Player<'c>, _game: &'g Game<'c>) -> FlowState<'c, 'g> {
-        Gn::new_scoped_local(move |mut s: Scope<Action, _>| {
+        Gn::new_scoped_local(move |mut s: Scope<ExecutingAction, _>| {
             let card = player.draw_and_meld(3).unwrap();
             if card.contains(Icon::Crown) {
                 player.draw_and_score(4);
                 done!()
             } else {
                 let opt_card = s
-                    .yield_(State {
-                        state: Choose::Card {
+                    .yield_(ExecutionState::new(
+                        player,
+                        Choose::Card {
                             min_num: 1,
                             max_num: Some(1),
                             from: player.score_pile.borrow().as_vec(),
                         },
-                        actor: player,
-                    })
+                    ))
                     .expect("Generator got None")
                     .card();
                 let card = match opt_card {
@@ -139,10 +83,7 @@ mod tests {
                     None => done!(),
                 };
                 let opponent = s
-                    .yield_(State {
-                        state: Choose::Opponent,
-                        actor: player,
-                    })
+                    .yield_(ExecutionState::new(player, Choose::Opponent))
                     .expect("Generator got None")
                     .player();
                 transfer(&player.score_pile, &opponent.score_pile, card);
@@ -152,10 +93,11 @@ mod tests {
     }
 
     fn _code_of_laws<'c, 'g>(player: &'g Player<'c>, _game: &'g Game<'c>) -> FlowState<'c, 'g> {
-        Gn::new_scoped_local(move |mut s: Scope<Action, _>| {
+        Gn::new_scoped_local(move |mut s: Scope<ExecutingAction, _>| {
             let opt_card = s
-                .yield_(State {
-                    state: Choose::Card {
+                .yield_(ExecutionState::new(
+                    player,
+                    Choose::Card {
                         min_num: 0,
                         max_num: Some(1),
                         from: player
@@ -168,8 +110,7 @@ mod tests {
                             })
                             .collect(),
                     },
-                    actor: player,
-                })
+                ))
                 .expect("Generator got None")
                 .card();
             let card = match opt_card {
@@ -180,12 +121,9 @@ mod tests {
             if player.is_splayed(card.color(), Splay::Left) {
                 done!()
             }
-            if s.yield_(State {
-                state: Choose::Yn,
-                actor: player,
-            })
-            .expect("Generator got None")
-            .yn()
+            if s.yield_(ExecutionState::new(player, Choose::Yn))
+                .expect("Generator got None")
+                .yn()
             {
                 player.splay(card.color(), Splay::Left);
             }
@@ -195,14 +133,14 @@ mod tests {
 
     #[test]
     fn name() {
-        let game: Game = Game::new();
+        let mut game: Game = Game::new();
         game.add_player(
             Box::new(VecSet::default()),
             Box::new(VecSet::default()),
             Box::new(VecSet::default()),
         );
-        let the_wheel = vec![];
-        let chemistry1 = vec![];
-        let optics = vec![];
+        //let the_wheel = vec![];
+        //let chemistry1 = vec![];
+        //let optics = vec![];
     }
 }

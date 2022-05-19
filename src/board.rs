@@ -45,6 +45,10 @@ impl<'a> Stack<'a> {
         self.cards.is_empty()
     }
 
+    pub fn contains(&self, card: &'a Card) -> bool {
+        self.cards.contains(&card)
+    }
+
     fn top_card(&self) -> Option<&'a Card> {
         match self.cards.front() {
             Some(v) => Some(*v),
@@ -90,6 +94,10 @@ impl<'a> Board<'a> {
 
     pub fn is_splayed(&self, color: Color, direction: Splay) -> bool {
         self.stacks[color.as_usize()].is_splayed(direction)
+    }
+
+    pub fn contains(&self, card: &'a Card) -> bool {
+        self.stacks[card.color().as_usize()].contains(card)
     }
 
     fn meld(&mut self, card: &'a Card) {

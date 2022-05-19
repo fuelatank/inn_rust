@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::cell::RefCell;
 use crate::card::{Achievement, Card};
 
@@ -71,10 +72,12 @@ impl<'a, T: PartialEq> CardSet<'a, T> for VecSet<'a, T> {
 pub type BoxCardSet<'a> = Box<dyn CardSet<'a, Card>>;
 pub type BoxAchievementSet<'a> = Box<dyn CardSet<'a, Achievement>>;
 
-pub fn transfer<'a, T, P, R, S>(from: &RefCell<R>, to: &RefCell<S>, param: &P) -> Option<&'a T>
+pub fn transfer<'a, T, P, R, S, A, B>(from: A, to: B, param: &P) -> Option<&'a T>
 where
     R: Removeable<'a, T, P>,
     S: Addable<'a, T>,
+    A: Deref<Target = RefCell<R>>,
+    B: Deref<Target = RefCell<S>>
 {
     let c = from.borrow_mut().remove(param);
     if let Some(card) = c {
