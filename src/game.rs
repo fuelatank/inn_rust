@@ -28,17 +28,17 @@ impl<'c> InnerGame<'c> {
         C: CardSet<'c, Card> + Default + 'static,
         A: CardSet<'c, Achievement> + Default + 'static,
     {
-        let mut players = InnerGame::empty();
-        for i in 0..num_players {
-            players.players.push(Player::new(
+        let pile = Rc::new(RefCell::new(MainCardPile::new(cards)));
+        InnerGame {
+            main_card_pile: Rc::clone(&pile),
+            players: (0..num_players).map(|i| Player::new(
                 i,
-                Rc::clone(&players.main_card_pile),
+                Rc::clone(&pile),
                 Box::new(C::default()),
                 Box::new(C::default()),
                 Box::new(A::default()),
-            ));
+            )).collect()
         }
-        players
     }
 
     pub fn add_player(
