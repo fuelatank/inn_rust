@@ -31,7 +31,7 @@ pub struct MainCardPile<'a> {
 }
 
 impl<'a> MainCardPile<'a> {
-    pub fn new() -> MainCardPile<'a> {
+    pub fn empty() -> MainCardPile<'a> {
         MainCardPile {
             piles: [
                 CardPile::new(),
@@ -46,6 +46,14 @@ impl<'a> MainCardPile<'a> {
                 CardPile::new(),
             ],
         }
+    }
+
+    pub fn new(cards: Vec<&'a Card>) -> MainCardPile<'a> {
+        let mut pile = MainCardPile::empty();
+        for card in cards {
+            pile.add(card);
+        }
+        pile
     }
 
     fn pop_age(&mut self, age: u8) -> Option<&'a Card> {

@@ -1,4 +1,5 @@
 use crate::card::Card;
+use crate::game::InnerGame;
 use crate::player::Player;
 
 pub enum StepAction<'c> {
@@ -6,6 +7,22 @@ pub enum StepAction<'c> {
     Meld(&'c Card),
     Achieve(u8),
     Execute(&'c Card),
+}
+
+pub enum OuterExecutingAction<'c> {
+    Card(Vec<&'c Card>),
+    Opponent(usize),
+    Yn(bool),
+}
+
+impl<'c> OuterExecutingAction<'c> {
+    pub fn take_player<'g>(self, game: &'g InnerGame<'c>) -> ExecutingAction<'c, 'g> {
+        match self {
+            OuterExecutingAction::Card(c) => ExecutingAction::Card(c),
+            OuterExecutingAction::Opponent(id) => ExecutingAction::Opponent(game.player_at(id)),
+            OuterExecutingAction::Yn(yn) => ExecutingAction::Yn(yn)
+        }
+    }
 }
 
 pub enum ExecutingAction<'c, 'g> {
@@ -54,7 +71,7 @@ impl<'c, 'g> ExecutingAction<'c, 'g> {
     }
 }
 
-pub enum Action<'c, 'g> {
+pub enum Action<'c> {
     Step(StepAction<'c>),
-    Executing(ExecutingAction<'c, 'g>),
+    Executing(OuterExecutingAction<'c>),
 }

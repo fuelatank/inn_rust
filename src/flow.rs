@@ -2,16 +2,16 @@ use crate::action::ExecutingAction;
 use crate::card::Card;
 use crate::containers::CardSet;
 use crate::enums::Icon;
-use crate::game::Game;
+use crate::game::InnerGame;
 use crate::player::Player;
 use crate::state::{Choose, ExecutionState};
 use generator::{done, Gn, LocalGenerator, Scope};
 
 pub type FlowState<'c, 'g> = LocalGenerator<'g, ExecutingAction<'c, 'g>, ExecutionState<'c, 'g>>;
 
-pub type ShareFlow = for<'c, 'g> fn(&'g Player<'c>, &'g Game<'c>) -> FlowState<'c, 'g>;
+pub type ShareFlow = for<'c, 'g> fn(&'g Player<'c>, &'g InnerGame<'c>) -> FlowState<'c, 'g>;
 pub type DemandFlow =
-    for<'c, 'g> fn(&'g Player<'c>, &'g Player<'c>, &'g Game<'c>) -> FlowState<'c, 'g>;
+    for<'c, 'g> fn(&'g Player<'c>, &'g Player<'c>, &'g InnerGame<'c>) -> FlowState<'c, 'g>;
 
 mod tests {
     //use crate::game::transfer_elem;
@@ -21,7 +21,7 @@ mod tests {
     use crate::enums::Splay;
 
     fn _chemistry2<'a, T: CardSet<'a, Card>, U: Addable<'a, Achievement> + Default>(
-    ) -> Box<dyn Fn(&mut Game, usize)> {
+    ) -> Box<dyn Fn(&mut InnerGame, usize)> {
         // Player is inside Game
         // One player must be placed inside one game
         // Player is created when that Game is created
@@ -33,7 +33,7 @@ mod tests {
     fn _archery<'c, 'g>(
         player: &'g Player<'c>,
         opponent: &'g Player<'c>,
-        _game: &'g Game<'c>,
+        _game: &'g InnerGame<'c>,
     ) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s: Scope<ExecutingAction, _>| {
             opponent.draw(1);
@@ -60,7 +60,7 @@ mod tests {
         })
     }
 
-    fn _opticsxx<'c, 'g>(player: &'g Player<'c>, _game: &'g Game<'c>) -> FlowState<'c, 'g> {
+    fn _opticsxx<'c, 'g>(player: &'g Player<'c>, _game: &'g InnerGame<'c>) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s: Scope<ExecutingAction, _>| {
             let card = player.draw_and_meld(3).unwrap();
             if card.contains(Icon::Crown) {
@@ -92,7 +92,7 @@ mod tests {
         })
     }
 
-    fn _code_of_laws<'c, 'g>(player: &'g Player<'c>, _game: &'g Game<'c>) -> FlowState<'c, 'g> {
+    fn _code_of_laws<'c, 'g>(player: &'g Player<'c>, _game: &'g InnerGame<'c>) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s: Scope<ExecutingAction, _>| {
             let opt_card = s
                 .yield_(ExecutionState::new(
@@ -133,12 +133,12 @@ mod tests {
 
     #[test]
     fn name() {
-        let mut game: Game = Game::new();
-        game.add_player(
+        let mut game: InnerGame = InnerGame::empty();
+        /*game.add_player(
             Box::new(VecSet::default()),
             Box::new(VecSet::default()),
             Box::new(VecSet::default()),
-        );
+        );*/
         //let the_wheel = vec![];
         //let chemistry1 = vec![];
         //let optics = vec![];
