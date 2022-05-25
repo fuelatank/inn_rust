@@ -3,6 +3,7 @@ pub mod board;
 pub mod card;
 pub mod card_pile;
 pub mod containers;
+pub mod dogma_fn;
 pub mod enums;
 pub mod flow;
 pub mod game;

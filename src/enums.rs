@@ -27,6 +27,7 @@ pub enum Icon {
     Crown,
     Lightblub,
     Leaf,
+    Empty,
 }
 
 #[derive(Debug, PartialEq)]

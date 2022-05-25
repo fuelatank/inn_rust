@@ -25,19 +25,23 @@ impl<'c> InnerGame<'c> {
 
     pub fn new<C, A>(num_players: usize, cards: Vec<&'c Card>) -> InnerGame<'c>
     where
-        C: CardSet<'c, Card> + Default + 'static,
-        A: CardSet<'c, Achievement> + Default + 'static,
+        C: CardSet<'c, Card> + Default + 'c,
+        A: CardSet<'c, Achievement> + Default + 'c,
     {
         let pile = Rc::new(RefCell::new(MainCardPile::new(cards)));
         InnerGame {
             main_card_pile: Rc::clone(&pile),
-            players: (0..num_players).map(|i| Player::new(
-                i,
-                Rc::clone(&pile),
-                Box::new(C::default()),
-                Box::new(C::default()),
-                Box::new(A::default()),
-            )).collect()
+            players: (0..num_players)
+                .map(|i| {
+                    Player::new(
+                        i,
+                        Rc::clone(&pile),
+                        Box::new(C::default()),
+                        Box::new(C::default()),
+                        Box::new(A::default()),
+                    )
+                })
+                .collect(),
         }
     }
 
@@ -90,8 +94,8 @@ struct OuterGame<'c> {
 impl<'c> OuterGame<'c> {
     fn init<C, A>(num_players: usize, cards: Vec<&'c Card>) -> OuterGame<'c>
     where
-        C: CardSet<'c, Card> + Default + 'static,
-        A: CardSet<'c, Achievement> + Default + 'static,
+        C: CardSet<'c, Card> + Default + 'c,
+        A: CardSet<'c, Achievement> + Default + 'c,
     {
         OuterGameBuilder {
             players: InnerGame::new::<C, A>(num_players, cards),
@@ -168,20 +172,43 @@ impl<'c> OuterGame<'c> {
 
 mod tests {
     use super::*;
-    use crate::containers::VecSet;
+    use crate::{
+        card::Dogma,
+        containers::VecSet,
+        dogma_fn::{archery, code_of_laws, optics},
+        enums::{Color, Icon},
+    };
 
     #[test]
     fn create_game_player() {
-        let mut game = InnerGame::empty();
-        /*game.add_player(
-            Box::new(VecSet::default()),
-            Box::new(VecSet::default()),
-            Box::new(VecSet::default()),
-        );
-        game.add_player(
-            Box::new(VecSet::default()),
-            Box::new(VecSet::default()),
-            Box::new(VecSet::default()),
-        );*/
+        let cards = vec![
+            Card::new(
+                String::from("Archery"),
+                1,
+                Color::Red,
+                [Icon::Castle, Icon::Lightblub, Icon::Empty, Icon::Castle],
+                vec![Dogma::Demand(archery)],
+                String::from(""),
+            ),
+            Card::new(
+                String::from("Code of Laws"),
+                1,
+                Color::Purple,
+                [Icon::Empty, Icon::Crown, Icon::Crown, Icon::Leaf],
+                vec![Dogma::Share(code_of_laws)],
+                String::from("this is the doc of the card 'code of laws'"),
+            ),
+            Card::new(
+                String::from("Optics"),
+                3,
+                Color::Red,
+                [Icon::Crown, Icon::Crown, Icon::Crown, Icon::Empty],
+                vec![Dogma::Share(optics)],
+                String::from("this is the doc of the card 'optics'"),
+            ),
+        ];
+        let mut game =
+            OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards.iter().collect());
+        game.step(Action::Step(StepAction::Draw));
     }
 }
