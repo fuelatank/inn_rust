@@ -1,11 +1,11 @@
 use generator::{done, Gn, Scope};
 
 use crate::{
-    action::ExecutingAction,
+    action::RefChoice,
     containers::transfer,
     enums::{Icon, Splay},
     flow::FlowState,
-    game::InnerGame,
+    game::Players,
     player::Player,
     state::{Choose, ExecutionState},
 };
@@ -13,9 +13,9 @@ use crate::{
 pub fn archery<'c, 'g>(
     player: &'g Player<'c>,
     opponent: &'g Player<'c>,
-    _game: &'g InnerGame<'c>,
+    _game: &'g Players<'c>,
 ) -> FlowState<'c, 'g> {
-    Gn::new_scoped_local(move |mut s: Scope<ExecutingAction, _>| {
+    Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
         opponent.draw(1);
         let age = opponent.age();
         let cards = s
@@ -40,8 +40,8 @@ pub fn archery<'c, 'g>(
     })
 }
 
-pub fn optics<'c, 'g>(player: &'g Player<'c>, _game: &'g InnerGame<'c>) -> FlowState<'c, 'g> {
-    Gn::new_scoped_local(move |mut s: Scope<ExecutingAction, _>| {
+pub fn optics<'c, 'g>(player: &'g Player<'c>, _game: &'g Players<'c>) -> FlowState<'c, 'g> {
+    Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
         let card = player.draw_and_meld(3).unwrap();
         if card.contains(Icon::Crown) {
             player.draw_and_score(4);
@@ -72,8 +72,8 @@ pub fn optics<'c, 'g>(player: &'g Player<'c>, _game: &'g InnerGame<'c>) -> FlowS
     })
 }
 
-pub fn code_of_laws<'c, 'g>(player: &'g Player<'c>, _game: &'g InnerGame<'c>) -> FlowState<'c, 'g> {
-    Gn::new_scoped_local(move |mut s: Scope<ExecutingAction, _>| {
+pub fn code_of_laws<'c, 'g>(player: &'g Player<'c>, _game: &'g Players<'c>) -> FlowState<'c, 'g> {
+    Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
         let opt_card = s
             .yield_(ExecutionState::new(
                 player,

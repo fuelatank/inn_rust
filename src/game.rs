@@ -1,4 +1,4 @@
-use crate::action::{Action, StepAction};
+use crate::action::{Action, MainAction};
 use crate::card::{Achievement, Card};
 use crate::card_pile::MainCardPile;
 use crate::containers::{BoxAchievementSet, BoxCardSet, CardSet};
@@ -10,26 +10,26 @@ use std::rc::Rc;
 
 pub type RcCell<T> = Rc<RefCell<T>>;
 
-pub struct InnerGame<'c> {
+pub struct Players<'c> {
     main_card_pile: RcCell<MainCardPile<'c>>,
     players: Vec<Player<'c>>,
 }
 
-impl<'c> InnerGame<'c> {
-    pub fn empty() -> InnerGame<'c> {
-        InnerGame {
+impl<'c> Players<'c> {
+    pub fn empty() -> Players<'c> {
+        Players {
             main_card_pile: Rc::new(RefCell::new(MainCardPile::empty())),
             players: vec![],
         }
     }
 
-    pub fn new<C, A>(num_players: usize, cards: Vec<&'c Card>) -> InnerGame<'c>
+    pub fn new<C, A>(num_players: usize, cards: Vec<&'c Card>) -> Players<'c>
     where
         C: CardSet<'c, Card> + Default + 'c,
         A: CardSet<'c, Achievement> + Default + 'c,
     {
         let pile = Rc::new(RefCell::new(MainCardPile::new(cards)));
-        InnerGame {
+        Players {
             main_card_pile: Rc::clone(&pile),
             players: (0..num_players)
                 .map(|i| {
@@ -81,9 +81,9 @@ impl<'c> InnerGame<'c> {
 
 #[self_referencing]
 struct OuterGame<'c> {
-    players: InnerGame<'c>,
+    players: Players<'c>,
     #[borrows(players)]
-    players_ref: &'this InnerGame<'c>,
+    players_ref: &'this Players<'c>,
     current_player_id: usize,
     is_second_action: bool,
     #[borrows()]
@@ -98,7 +98,7 @@ impl<'c> OuterGame<'c> {
         A: CardSet<'c, Achievement> + Default + 'c,
     {
         OuterGameBuilder {
-            players: InnerGame::new::<C, A>(num_players, cards),
+            players: Players::new::<C, A>(num_players, cards),
             players_ref_builder: |players| &players,
             current_player_id: 0,
             is_second_action: true,
@@ -107,15 +107,15 @@ impl<'c> OuterGame<'c> {
         .build()
     }
 
-    fn is_available_step_action(&self, action: &StepAction<'c>) -> bool {
+    fn is_available_step_action(&self, action: &MainAction<'c>) -> bool {
         self.with(|fields| match action {
-            StepAction::Draw => true,
-            StepAction::Meld(c) => {
+            MainAction::Draw => true,
+            MainAction::Meld(c) => {
                 let player = &fields.players.players[*fields.current_player_id];
                 player.hand.borrow().as_vec().contains(c)
             }
-            StepAction::Achieve(_) => todo!(),
-            StepAction::Execute(c) => {
+            MainAction::Achieve(_) => todo!(),
+            MainAction::Execute(c) => {
                 let player = &fields.players.players[*fields.current_player_id];
                 player.board().borrow().contains(c)
             }
@@ -129,16 +129,16 @@ impl<'c> OuterGame<'c> {
                     State::Main => {
                         let player = (*fields.players_ref).player_at(*fields.current_player_id);
                         match action {
-                            StepAction::Draw => {
+                            MainAction::Draw => {
                                 player.draw(player.age());
                             }
-                            StepAction::Meld(card) => {
+                            MainAction::Meld(card) => {
                                 player.meld(card);
                             }
-                            StepAction::Achieve(age) => {
+                            MainAction::Achieve(age) => {
                                 todo!()
                             }
-                            StepAction::Execute(card) => {
+                            MainAction::Execute(card) => {
                                 *fields.state =
                                     State::Executing(player.execute(card, *fields.players_ref));
                             }
@@ -156,7 +156,7 @@ impl<'c> OuterGame<'c> {
                 Action::Executing(action) => match fields.state {
                     State::Main => panic!("State and action mismatched"),
                     State::Executing(state) => {
-                        state.set_para(action.take_player(*fields.players_ref));
+                        state.set_para(action.to_ref(*fields.players_ref));
                     }
                 },
             }
@@ -209,6 +209,6 @@ mod tests {
         ];
         let mut game =
             OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards.iter().collect());
-        game.step(Action::Step(StepAction::Draw));
+        game.step(Action::Step(MainAction::Draw));
     }
 }

@@ -5,7 +5,7 @@ use crate::card_pile::MainCardPile;
 use crate::containers::{transfer, BoxAchievementSet, BoxCardSet};
 use crate::enums::{Color, Splay};
 use crate::flow::FlowState;
-use crate::game::{RcCell, InnerGame};
+use crate::game::{RcCell, Players};
 use generator::{Gn, LocalGenerator};
 use std::cell::RefCell;
 
@@ -86,7 +86,7 @@ impl<'c> Player<'c> {
     pub fn execute<'g>(
         &'g self,
         card: &'c Card,
-        game: &'g InnerGame<'c>,
+        game: &'g Players<'c>,
     ) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s| {
             let _main_icon = card.main_icon();
