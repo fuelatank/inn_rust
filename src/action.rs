@@ -2,6 +2,7 @@ use crate::card::Card;
 use crate::game::Players;
 use crate::player::Player;
 
+#[derive(Clone)]
 pub enum MainAction<'c> {
     Draw,
     Meld(&'c Card),
@@ -9,6 +10,7 @@ pub enum MainAction<'c> {
     Execute(&'c Card),
 }
 
+#[derive(Clone)]
 pub enum IdChoice<'c> {
     Card(Vec<&'c Card>),
     Opponent(usize),
@@ -71,6 +73,7 @@ impl<'c, 'g> RefChoice<'c, 'g> {
     }
 }
 
+#[derive(Clone)]
 pub enum Action<'c> {
     Step(MainAction<'c>),
     Executing(IdChoice<'c>),

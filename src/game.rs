@@ -2,7 +2,8 @@ use crate::action::{Action, MainAction};
 use crate::card::{Achievement, Card};
 use crate::card_pile::MainCardPile;
 use crate::containers::{BoxAchievementSet, BoxCardSet, CardSet};
-use crate::observation::{ObsType, Observation, TurnView};
+use crate::logger::Logger;
+use crate::observation::{ObsType, Observation};
 use crate::player::Player;
 use crate::state::State;
 use ouroboros::self_referencing;
@@ -80,6 +81,7 @@ impl<'c> Players<'c> {
     }
 }
 
+#[derive(Debug)]
 pub struct Turn {
     action: usize,
     num_players: usize,
@@ -95,11 +97,11 @@ impl Turn {
         }
     }
 
-    fn is_second_action(&self) -> bool {
+    pub fn is_second_action(&self) -> bool {
         self.action % 2 == 0
     }
 
-    fn player_id(&self) -> usize {
+    pub fn player_id(&self) -> usize {
         let a = (self.action + 1) / 2;
         (a + self.first_player) % self.num_players
     }
@@ -110,18 +112,19 @@ impl Turn {
 }
 
 #[self_referencing]
-struct OuterGame<'c> {
+pub struct OuterGame<'c> {
     players: Players<'c>,
     #[borrows(players)]
     players_ref: &'this Players<'c>,
     turn: Turn,
+    logger: RcCell<Logger<'c>>,
     #[borrows()]
     #[covariant]
     state: State<'c, 'this>,
 }
 
 impl<'c> OuterGame<'c> {
-    fn init<C, A>(num_players: usize, cards: Vec<&'c Card>) -> OuterGame<'c>
+    pub fn init<C, A>(num_players: usize, cards: Vec<&'c Card>) -> OuterGame<'c>
     where
         C: CardSet<'c, Card> + Default + 'c,
         A: CardSet<'c, Achievement> + Default + 'c,
@@ -130,6 +133,7 @@ impl<'c> OuterGame<'c> {
             players: Players::new::<C, A>(num_players, cards),
             players_ref_builder: |players| &players,
             turn: Turn::new(num_players, 0),
+            logger: Rc::new(RefCell::new(Logger::new())),
             state: State::Main,
         }
         .build()
@@ -152,6 +156,7 @@ impl<'c> OuterGame<'c> {
 
     pub fn step(&mut self, action: Action<'c>) -> Observation {
         let (player, obs_type) = self.with_mut(|fields| {
+            fields.logger.borrow_mut().act(action.clone());
             match action {
                 Action::Step(action) => match fields.state {
                     State::Main => {
@@ -165,7 +170,7 @@ impl<'c> OuterGame<'c> {
                                 player.meld(card);
                                 fields.turn.next();
                             }
-                            MainAction::Achieve(age) => {
+                            MainAction::Achieve(_age) => {
                                 fields.turn.next();
                                 todo!()
                             }
@@ -232,8 +237,8 @@ mod tests {
     use crate::{
         card::Dogma,
         containers::VecSet,
-        dogma_fn::{archery, code_of_laws, optics},
-        enums::{Color, Icon},
+        dogma_fn,
+        enums::{Color, Icon}, action::IdChoice, state::ExecutionObs,
     };
 
     #[test]
@@ -281,34 +286,45 @@ mod tests {
 
     #[test]
     fn create_game_player() {
-        let cards = vec![
-            Card::new(
-                String::from("Archery"),
-                1,
-                Color::Red,
-                [Icon::Castle, Icon::Lightblub, Icon::Empty, Icon::Castle],
-                vec![Dogma::Demand(archery)],
-                String::from(""),
-            ),
-            Card::new(
-                String::from("Code of Laws"),
-                1,
-                Color::Purple,
-                [Icon::Empty, Icon::Crown, Icon::Crown, Icon::Leaf],
-                vec![Dogma::Share(code_of_laws)],
-                String::from("this is the doc of the card 'code of laws'"),
-            ),
-            Card::new(
-                String::from("Optics"),
-                3,
-                Color::Red,
-                [Icon::Crown, Icon::Crown, Icon::Crown, Icon::Empty],
-                vec![Dogma::Share(optics)],
-                String::from("this is the doc of the card 'optics'"),
-            ),
-        ];
-        let mut game =
-            OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards.iter().collect());
+        let archery = Card::new(
+            String::from("Archery"),
+            1,
+            Color::Red,
+            [Icon::Castle, Icon::Lightblub, Icon::Empty, Icon::Castle],
+            vec![Dogma::Demand(dogma_fn::archery)],
+            String::from(""),
+        );
+        let code_of_laws = Card::new(
+            String::from("Code of Laws"),
+            1,
+            Color::Purple,
+            [Icon::Empty, Icon::Crown, Icon::Crown, Icon::Leaf],
+            vec![Dogma::Share(dogma_fn::code_of_laws)],
+            String::from("this is the doc of the card 'code of laws'"),
+        );
+        let optics = Card::new(
+            String::from("Optics"),
+            3,
+            Color::Red,
+            [Icon::Crown, Icon::Crown, Icon::Crown, Icon::Empty],
+            vec![Dogma::Share(dogma_fn::optics)],
+            String::from("this is the doc of the card 'optics'"),
+        );
+        let cards = vec![&archery, &code_of_laws, &optics];
+        let mut game = OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards);
         game.step(Action::Step(MainAction::Draw));
+        game.step(Action::Step(MainAction::Draw));
+        println!("{:#?}", game.step(Action::Step(MainAction::Draw)));
+        println!("{:#?}", game.step(Action::Step(MainAction::Meld(&archery))));
+        {
+            let obs = game.step(Action::Step(MainAction::Execute(&archery)));
+            assert!(matches!(obs.obstype, ObsType::Executing(_)))
+        }
+        {
+            let obs = game.step(Action::Executing(IdChoice::Card(vec![&optics])));
+            println!("{:#?}", obs);
+            assert_eq!(obs.turn.player_id(), 1);
+            assert!(matches!(obs.obstype, ObsType::Main));
+        }
     }
 }

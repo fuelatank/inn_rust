@@ -61,10 +61,11 @@ impl<'a> MainCardPile<'a> {
     }
 
     fn pop_age(&mut self, age: u8) -> Option<&'a Card> {
-        if age >= 11 || age == 0 {
+        if age >= 11 {
             return None;
         }
-        match self.piles[(age - 1) as usize].remove(&()) {
+        let index = if age == 0 { 0 } else { age - 1 };
+        match self.piles[index as usize].remove(&()) {
             Some(card) => Some(card),
             None => self.pop_age(age + 1),
         }

@@ -3,6 +3,7 @@ use crate::containers::Addable;
 use crate::enums::{Color, Splay};
 use std::collections::VecDeque;
 
+#[derive(Debug)]
 pub struct Stack<'a> {
     cards: VecDeque<&'a Card>,
     splay: Splay,
@@ -57,6 +58,7 @@ impl<'a> Stack<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct Board<'a> {
     stacks: [Stack<'a>; 5],
     is_forward: bool,

@@ -2,6 +2,7 @@ use crate::card::Card;
 use crate::flow::FlowState;
 use crate::player::Player;
 
+#[derive(Debug)]
 pub enum Choose<'a> {
     Card {
         min_num: u8,
@@ -45,6 +46,7 @@ impl<'c, 'g> ExecutionState<'c, 'g> {
     }
 }
 
+#[derive(Debug)]
 pub struct ExecutionObs<'c> {
     state: Choose<'c>,
     card: &'c Card,

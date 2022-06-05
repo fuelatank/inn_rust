@@ -1,11 +1,10 @@
 use crate::action::RefChoice;
 use crate::card::Card;
 use crate::containers::CardSet;
-use crate::enums::Icon;
 use crate::game::Players;
 use crate::player::Player;
-use crate::state::{Choose, ExecutionState};
-use generator::{done, Gn, LocalGenerator, Scope};
+use crate::state::ExecutionState;
+use generator::LocalGenerator;
 
 pub type FlowState<'c, 'g> = LocalGenerator<'g, RefChoice<'c, 'g>, ExecutionState<'c, 'g>>;
 
@@ -17,8 +16,7 @@ mod tests {
     //use crate::game::transfer_elem;
     use super::*;
     use crate::card::Achievement;
-    use crate::containers::{transfer, Addable, VecSet};
-    use crate::enums::Splay;
+    use crate::containers::Addable;
 
     fn _chemistry2<'a, T: CardSet<'a, Card>, U: Addable<'a, Achievement> + Default>(
     ) -> Box<dyn Fn(&mut Players, usize)> {
@@ -32,7 +30,7 @@ mod tests {
     
     #[test]
     fn name() {
-        let mut game: Players = Players::empty();
+        // let mut game: Players = Players::empty();
         /*game.add_player(
             Box::new(VecSet::default()),
             Box::new(VecSet::default()),

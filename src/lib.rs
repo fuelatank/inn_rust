@@ -7,6 +7,7 @@ pub mod dogma_fn;
 pub mod enums;
 pub mod flow;
 pub mod game;
+pub mod logger;
 pub mod observation;
 pub mod player;
 pub mod state;

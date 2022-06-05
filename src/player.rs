@@ -6,7 +6,7 @@ use crate::enums::{Color, Splay};
 use crate::flow::FlowState;
 use crate::game::{Players, RcCell};
 use crate::observation::{MainPlayerView, OtherPlayerView};
-use generator::{Gn, LocalGenerator};
+use generator::Gn;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -109,7 +109,7 @@ impl<'c> Player<'c> {
                     }
                     Dogma::Demand(flow) => {
                         // should filter out ineligible players
-                        for player in game.players_from(self.id) {
+                        for player in game.players_from(self.id).skip(1) {
                             let mut gen = flow(self, player, game);
                             // s.yield_from(gen); but with or(card)
                             let mut state = gen.resume();
@@ -129,7 +129,7 @@ impl<'c> Player<'c> {
     pub fn self_view(&self) -> MainPlayerView {
         MainPlayerView {
             hand: self.hand.borrow().as_vec(),
-            score: self.hand.borrow().as_vec(),
+            score: self.score_pile.borrow().as_vec(),
             board: self.main_board.borrow(), /* what if it's mut borrowed? */
             achievements: self
                 .achievements
@@ -151,7 +151,7 @@ impl<'c> Player<'c> {
                 .map(|c| c.age())
                 .collect(),
             score: self
-                .hand
+                .score_pile
                 .borrow()
                 .as_vec()
                 .into_iter()

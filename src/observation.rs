@@ -12,6 +12,7 @@ type BoardView<'a> = Ref<'a, Board<'a>>;
 type CardView<'a> = Vec<&'a Card>;
 type AgeView = Vec<u8>;
 
+#[derive(Debug)]
 pub enum SingleAchievementView<'a> {
     Special(&'a SpecialAchievement),
     Normal(u8),
@@ -29,6 +30,7 @@ impl TurnView {
     }
 }
 
+#[derive(Debug)]
 pub struct MainPlayerView<'a> {
     pub hand: CardView<'a>,
     pub score: CardView<'a>,
@@ -36,6 +38,7 @@ pub struct MainPlayerView<'a> {
     pub achievements: AchievementView<'a>,
 }
 
+#[derive(Debug)]
 pub struct OtherPlayerView<'a> {
     pub hand: AgeView,
     pub score: AgeView,
@@ -43,11 +46,13 @@ pub struct OtherPlayerView<'a> {
     pub achievements: AchievementView<'a>,
 }
 
+#[derive(Debug)]
 pub enum ObsType<'a> {
     Main,
     Executing(ExecutionObs<'a>),
 }
 
+#[derive(Debug)]
 pub struct Observation<'a> {
     pub main_player: MainPlayerView<'a>,
     pub other_players: Vec<OtherPlayerView<'a>>,
