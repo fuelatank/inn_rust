@@ -12,6 +12,10 @@ impl<'a> CardPile<'a> {
             cards: VecDeque::new(),
         }
     }
+
+    fn len(&self) -> usize {
+        self.cards.len()
+    }
 }
 
 impl<'a> Addable<'a, Card> for CardPile<'a> {
@@ -64,6 +68,21 @@ impl<'a> MainCardPile<'a> {
             Some(card) => Some(card),
             None => self.pop_age(age + 1),
         }
+    }
+
+    pub fn view(&self) -> [usize; 10] {
+        [
+            self.piles[0].len(),
+            self.piles[1].len(),
+            self.piles[2].len(),
+            self.piles[3].len(),
+            self.piles[4].len(),
+            self.piles[5].len(),
+            self.piles[6].len(),
+            self.piles[7].len(),
+            self.piles[8].len(),
+            self.piles[9].len(),
+        ]
     }
 }
 

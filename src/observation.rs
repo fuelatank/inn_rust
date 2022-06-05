@@ -3,21 +3,21 @@ use std::cell::Ref;
 use crate::{
     board::Board,
     card::{Card, SpecialAchievement},
-    state::Choose,
+    state::{Choose, ExecutionObs}, game::Turn,
 };
 
 // lifetime?
 type BoardView<'a> = Ref<'a, Board<'a>>;
 
-pub struct CardView<'a>(Vec<&'a Card>);
-pub struct AgeView(Vec<u8>);
+type CardView<'a> = Vec<&'a Card>;
+type AgeView = Vec<u8>;
 
-pub enum SingleAchievementView {
-    Special(SpecialAchievement),
+pub enum SingleAchievementView<'a> {
+    Special(&'a SpecialAchievement),
     Normal(u8),
 }
 
-pub struct AchievementView(Vec<SingleAchievementView>);
+type AchievementView<'a> = Vec<SingleAchievementView<'a>>;
 
 pub struct TurnView {
     main_action_index: usize,
@@ -33,25 +33,25 @@ pub struct MainPlayerView<'a> {
     pub hand: CardView<'a>,
     pub score: CardView<'a>,
     pub board: BoardView<'a>,
-    pub achievements: AchievementView,
+    pub achievements: AchievementView<'a>,
 }
 
 pub struct OtherPlayerView<'a> {
     pub hand: AgeView,
     pub score: AgeView,
     pub board: BoardView<'a>,
-    pub achievements: AchievementView,
+    pub achievements: AchievementView<'a>,
 }
 
 pub enum ObsType<'a> {
     Main,
-    Executing(&'a Card, Choose<'a>),
+    Executing(ExecutionObs<'a>),
 }
 
 pub struct Observation<'a> {
     pub main_player: MainPlayerView<'a>,
     pub other_players: Vec<OtherPlayerView<'a>>,
     pub main_pile: [usize; 10],
-    pub turn: TurnView,
+    pub turn: &'a Turn,
     pub obstype: ObsType<'a>,
 }

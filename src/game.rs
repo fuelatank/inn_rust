@@ -2,6 +2,7 @@ use crate::action::{Action, MainAction};
 use crate::card::{Achievement, Card};
 use crate::card_pile::MainCardPile;
 use crate::containers::{BoxAchievementSet, BoxCardSet, CardSet};
+use crate::observation::{ObsType, Observation, TurnView};
 use crate::player::Player;
 use crate::state::State;
 use ouroboros::self_referencing;
@@ -79,13 +80,41 @@ impl<'c> Players<'c> {
     }
 }
 
+pub struct Turn {
+    action: usize,
+    num_players: usize,
+    first_player: usize,
+}
+
+impl Turn {
+    fn new(num_players: usize, first_player: usize) -> Turn {
+        Turn {
+            action: 0,
+            num_players: num_players,
+            first_player: first_player,
+        }
+    }
+
+    fn is_second_action(&self) -> bool {
+        self.action % 2 == 0
+    }
+
+    fn player_id(&self) -> usize {
+        let a = (self.action + 1) / 2;
+        (a + self.first_player) % self.num_players
+    }
+
+    fn next(&mut self) {
+        self.action += 1;
+    }
+}
+
 #[self_referencing]
 struct OuterGame<'c> {
     players: Players<'c>,
     #[borrows(players)]
     players_ref: &'this Players<'c>,
-    current_player_id: usize,
-    is_second_action: bool,
+    turn: Turn,
     #[borrows()]
     #[covariant]
     state: State<'c, 'this>,
@@ -100,8 +129,7 @@ impl<'c> OuterGame<'c> {
         OuterGameBuilder {
             players: Players::new::<C, A>(num_players, cards),
             players_ref_builder: |players| &players,
-            current_player_id: 0,
-            is_second_action: true,
+            turn: Turn::new(num_players, 0),
             state: State::Main,
         }
         .build()
@@ -111,31 +139,34 @@ impl<'c> OuterGame<'c> {
         self.with(|fields| match action {
             MainAction::Draw => true,
             MainAction::Meld(c) => {
-                let player = &fields.players.players[*fields.current_player_id];
+                let player = &fields.players.players[fields.turn.player_id()];
                 player.hand.borrow().as_vec().contains(c)
             }
             MainAction::Achieve(_) => todo!(),
             MainAction::Execute(c) => {
-                let player = &fields.players.players[*fields.current_player_id];
+                let player = &fields.players.players[fields.turn.player_id()];
                 player.board().borrow().contains(c)
             }
         })
     }
 
-    pub fn step(&mut self, action: Action<'c>) {
-        self.with_mut(|fields| {
+    pub fn step(&mut self, action: Action<'c>) -> Observation {
+        let (player, obs_type) = self.with_mut(|fields| {
             match action {
                 Action::Step(action) => match fields.state {
                     State::Main => {
-                        let player = (*fields.players_ref).player_at(*fields.current_player_id);
+                        let player = (*fields.players_ref).player_at(fields.turn.player_id());
                         match action {
                             MainAction::Draw => {
                                 player.draw(player.age());
+                                fields.turn.next();
                             }
                             MainAction::Meld(card) => {
                                 player.meld(card);
+                                fields.turn.next();
                             }
                             MainAction::Achieve(age) => {
+                                fields.turn.next();
                                 todo!()
                             }
                             MainAction::Execute(card) => {
@@ -143,11 +174,6 @@ impl<'c> OuterGame<'c> {
                                     State::Executing(player.execute(card, *fields.players_ref));
                             }
                         }
-                        if *fields.is_second_action {
-                            *fields.current_player_id =
-                                (*fields.current_player_id + 1) % fields.players_ref.num_players();
-                        }
-                        *fields.is_second_action = !*fields.is_second_action;
                     }
                     State::Executing(_) => {
                         panic!("State and action mismatched");
@@ -160,13 +186,44 @@ impl<'c> OuterGame<'c> {
                     }
                 },
             }
+
+            // resume execution, change to Main if ended,
+            // and get current player and the obsType, which contains
+            // some information if it is executing
+
             if let State::Executing(state) = fields.state {
-                let _a = state.resume();
-                if state.is_done() {
-                    *fields.state = State::Main;
+                match state.resume() {
+                    Some(st) => {
+                        let (p, o) = st.to_obs();
+                        let id = p.id();
+                        (id, ObsType::Executing(o))
+                    }
+                    None => {
+                        *fields.state = State::Main;
+                        fields.turn.next();
+                        (fields.turn.player_id(), ObsType::Main)
+                    }
                 }
+            } else {
+                (fields.turn.player_id(), ObsType::Main)
             }
-        })
+        });
+        self.observe(player, obs_type)
+    }
+
+    fn observe<'a>(&'a self, id: usize, obs_type: ObsType<'a>) -> Observation {
+        let players = *self.borrow_players_ref();
+        Observation {
+            main_player: players.player_at(id).self_view(),
+            other_players: players
+                .players_from(id)
+                .skip(1)
+                .map(|p| p.other_view())
+                .collect(),
+            main_pile: players.main_card_pile.borrow().view(),
+            turn: self.borrow_turn(),
+            obstype: obs_type,
+        }
     }
 }
 
@@ -178,6 +235,49 @@ mod tests {
         dogma_fn::{archery, code_of_laws, optics},
         enums::{Color, Icon},
     };
+
+    #[test]
+    fn turn() {
+        let mut t1 = Turn::new(5, 1);
+        assert_eq!(t1.player_id(), 1);
+        assert_eq!(t1.is_second_action(), true);
+        t1.next();
+        assert_eq!(t1.player_id(), 2);
+        assert_eq!(t1.is_second_action(), false);
+        t1.next();
+        assert_eq!(t1.player_id(), 2);
+        assert_eq!(t1.is_second_action(), true);
+        t1.next();
+        assert_eq!(t1.player_id(), 3);
+        assert_eq!(t1.is_second_action(), false);
+        t1.next();
+        assert_eq!(t1.player_id(), 3);
+        assert_eq!(t1.is_second_action(), true);
+        t1.next();
+        assert_eq!(t1.player_id(), 4);
+        assert_eq!(t1.is_second_action(), false);
+        t1.next();
+        assert_eq!(t1.player_id(), 4);
+        assert_eq!(t1.is_second_action(), true);
+        t1.next();
+        assert_eq!(t1.player_id(), 0);
+        assert_eq!(t1.is_second_action(), false);
+        t1.next();
+        assert_eq!(t1.player_id(), 0);
+        assert_eq!(t1.is_second_action(), true);
+        t1.next();
+        assert_eq!(t1.player_id(), 1);
+        assert_eq!(t1.is_second_action(), false);
+        t1.next();
+        assert_eq!(t1.player_id(), 1);
+        assert_eq!(t1.is_second_action(), true);
+        t1.next();
+        t1.next();
+        t1.next();
+        t1.next();
+        assert_eq!(t1.player_id(), 3);
+        assert_eq!(t1.is_second_action(), true);
+    }
 
     #[test]
     fn create_game_player() {

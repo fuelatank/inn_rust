@@ -1,5 +1,6 @@
 use crate::enums::{Color, Icon};
 use crate::flow::{DemandFlow, ShareFlow};
+use crate::observation::SingleAchievementView;
 use counter::Counter;
 
 pub enum Dogma {
@@ -74,4 +75,13 @@ pub enum SpecialAchievement {
 pub enum Achievement {
     Normal(Card),
     Special(SpecialAchievement),
+}
+
+impl Achievement {
+    pub fn view(&self) -> SingleAchievementView {
+        match self {
+            Achievement::Normal(c) => SingleAchievementView::Normal(c.age),
+            Achievement::Special(s) => SingleAchievementView::Special(s),
+        }
+    }
 }

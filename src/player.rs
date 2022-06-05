@@ -1,13 +1,14 @@
-use std::rc::Rc;
 use crate::board::Board;
 use crate::card::{Card, Dogma};
 use crate::card_pile::MainCardPile;
 use crate::containers::{transfer, BoxAchievementSet, BoxCardSet};
 use crate::enums::{Color, Splay};
 use crate::flow::FlowState;
-use crate::game::{RcCell, Players};
+use crate::game::{Players, RcCell};
+use crate::observation::{MainPlayerView, OtherPlayerView};
 use generator::{Gn, LocalGenerator};
 use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct Player<'c> {
     id: usize,
@@ -34,6 +35,10 @@ impl<'c> Player<'c> {
             score_pile: RefCell::new(score_pile),
             achievements: RefCell::new(achievements),
         }
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
     }
 
     pub fn age(&self) -> u8 {
@@ -83,11 +88,7 @@ impl<'c> Player<'c> {
         transfer(&self.hand, Rc::clone(&self.main_pile), card)
     }
 
-    pub fn execute<'g>(
-        &'g self,
-        card: &'c Card,
-        game: &'g Players<'c>,
-    ) -> FlowState<'c, 'g> {
+    pub fn execute<'g>(&'g self, card: &'c Card, game: &'g Players<'c>) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s| {
             let _main_icon = card.main_icon();
             for dogma in card.dogmas() {
@@ -97,10 +98,10 @@ impl<'c> Player<'c> {
                         for player in game.players_from(self.id) {
                             let mut gen = flow(player, game);
 
-                            // s.yield_from(gen);
+                            // s.yield_from(gen); but with or(card)
                             let mut state = gen.resume();
                             while let Some(st) = state {
-                                let a = s.yield_(st).expect("Generator got None");
+                                let a = s.yield_(st.or(card)).expect("Generator got None");
                                 gen.set_para(a);
                                 state = gen.resume();
                             }
@@ -110,10 +111,10 @@ impl<'c> Player<'c> {
                         // should filter out ineligible players
                         for player in game.players_from(self.id) {
                             let mut gen = flow(self, player, game);
-                            // s.yield_from(gen);
+                            // s.yield_from(gen); but with or(card)
                             let mut state = gen.resume();
                             while let Some(st) = state {
-                                let a = s.yield_(st).expect("Generator got None");
+                                let a = s.yield_(st.or(card)).expect("Generator got None");
                                 gen.set_para(a);
                                 state = gen.resume();
                             }
@@ -123,5 +124,47 @@ impl<'c> Player<'c> {
             }
             generator::done!()
         })
+    }
+
+    pub fn self_view(&self) -> MainPlayerView {
+        MainPlayerView {
+            hand: self.hand.borrow().as_vec(),
+            score: self.hand.borrow().as_vec(),
+            board: self.main_board.borrow(), /* what if it's mut borrowed? */
+            achievements: self
+                .achievements
+                .borrow()
+                .as_vec()
+                .into_iter()
+                .map(|a| a.view())
+                .collect(),
+        }
+    }
+
+    pub fn other_view(&self) -> OtherPlayerView {
+        OtherPlayerView {
+            hand: self
+                .hand
+                .borrow()
+                .as_vec()
+                .into_iter()
+                .map(|c| c.age())
+                .collect(),
+            score: self
+                .hand
+                .borrow()
+                .as_vec()
+                .into_iter()
+                .map(|c| c.age())
+                .collect(),
+            board: self.main_board.borrow(), /* what if it's mut borrowed? */
+            achievements: self
+                .achievements
+                .borrow()
+                .as_vec()
+                .into_iter()
+                .map(|a| a.view())
+                .collect(),
+        }
     }
 }

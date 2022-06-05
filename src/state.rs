@@ -1,5 +1,5 @@
-use crate::flow::FlowState;
 use crate::card::Card;
+use crate::flow::FlowState;
 use crate::player::Player;
 
 pub enum Choose<'a> {
@@ -15,15 +15,41 @@ pub enum Choose<'a> {
 pub struct ExecutionState<'c, 'g> {
     actor: &'g Player<'c>,
     state: Choose<'c>,
+    card: Option<&'c Card>, // option because a dogma doesn't know which card it belongs to
 }
 
 impl<'c, 'g> ExecutionState<'c, 'g> {
     pub fn new(actor: &'g Player<'c>, state: Choose<'c>) -> ExecutionState<'c, 'g> {
-        ExecutionState { actor, state }
+        ExecutionState {
+            actor,
+            state,
+            card: None,
+        }
+    }
+
+    pub fn or(self, card: &'c Card) -> ExecutionState<'c, 'g> {
+        ExecutionState {
+            card: self.card.or(Some(card)),
+            ..self
+        }
+    }
+
+    pub fn to_obs(self) -> (&'g Player<'c>, ExecutionObs<'c>) {
+        (
+            self.actor,
+            ExecutionObs {
+                state: self.state,
+                card: self.card.unwrap(),
+            },
+        )
     }
 }
 
-// Main should include turn, num_actions, etc.
+pub struct ExecutionObs<'c> {
+    state: Choose<'c>,
+    card: &'c Card,
+}
+
 pub enum State<'c, 'g> {
     Main,
     Executing(FlowState<'c, 'g>),
