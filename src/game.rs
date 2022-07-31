@@ -2,7 +2,8 @@ use crate::action::{Action, MainAction};
 use crate::card::{Achievement, Card};
 use crate::card_pile::MainCardPile;
 use crate::containers::{transfer, Addable, BoxAchievementSet, BoxCardSet, CardSet, Removeable};
-use crate::logger::{Logger, Operation, Place, PlayerPlace};
+use crate::error::{InnResult, InnovationError};
+use crate::logger::{AddParam, Logger, Operation, Place, PlayerPlace, RemoveParam};
 use crate::observation::{ObsType, Observation};
 use crate::player::Player;
 use crate::state::State;
@@ -89,6 +90,95 @@ impl<'c> Players<'c> {
     pub fn players_from(&self, main_player_id: usize) -> impl Iterator<Item = &Player<'c>> {
         (0..self.players.len())
             .map(move |i| &self.players[(i + main_player_id) % self.players.len()])
+    }
+
+    fn transfer(
+        &self,
+        from: Place,
+        to: Place,
+        remove_param: RemoveParam,
+        add_param: AddParam,
+    ) -> InnResult<&'c Card> {
+        let card = match from {
+            Place::MainCardPile => self
+                .main_card_pile
+                .borrow_mut()
+                .remove(&remove_param.age()?),
+            Place::Player(id, pplace) => {
+                let player = self.player_at(id);
+                match pplace {
+                    PlayerPlace::Board => {
+                        let mut board = player.board().borrow_mut();
+                        match remove_param {
+                            RemoveParam::Card(card) => board.remove(card),
+                            RemoveParam::ColoredTop(color, is_top) => {
+                                board.get_stack_mut(color).remove(&is_top)
+                            }
+                            RemoveParam::ColoredIndex(color, index) => {
+                                board.get_stack_mut(color).remove(&index)
+                            }
+                            _ => return Err(InnovationError::ParamUnwrapError),
+                        }
+                    }
+                    _ => {
+                        let mut pile = if let PlayerPlace::Hand = pplace {
+                            player.hand.borrow_mut()
+                        } else {
+                            player.score_pile.borrow_mut()
+                        };
+                        match remove_param {
+                            RemoveParam::Card(card) => pile.remove(card),
+                            _ => return Err(InnovationError::ParamUnwrapError),
+                        }
+                    }
+                }
+            }
+        };
+        match card {
+            Some(c) => {
+                match to {
+                    Place::MainCardPile => {
+                        // return a card
+                        self.main_card_pile.borrow_mut().add(c);
+                    }
+                    Place::Player(id, pplace) => {
+                        let player = self.player_at(id);
+                        match pplace {
+                            PlayerPlace::Board => {
+                                let mut board = player.board().borrow_mut();
+                                match add_param {
+                                    AddParam::Top(is_top) => {
+                                        if is_top {
+                                            board.meld(c);
+                                        } else {
+                                            board.tuck(c);
+                                        }
+                                    }
+                                    AddParam::Index(index) => {
+                                        board.insert(c, index);
+                                    }
+                                    _ => return Err(InnovationError::ParamUnwrapError),
+                                }
+                            }
+                            _ => {
+                                if let AddParam::NoParam = add_param {
+                                    let mut pile = if let PlayerPlace::Hand = pplace {
+                                        player.hand.borrow_mut()
+                                    } else {
+                                        player.score_pile.borrow_mut()
+                                    };
+                                    pile.add(c);
+                                } else {
+                                    return Err(InnovationError::ParamUnwrapError);
+                                }
+                            }
+                        }
+                    }
+                }
+                Ok(c)
+            }
+            None => Err(InnovationError::CardNotFound),
+        }
     }
 
     /*fn find_addable_place(&self, place: Place) -> &dyn Deref<Target = RefCell<dyn Addable<'c, Card>>> {

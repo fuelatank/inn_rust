@@ -5,6 +5,7 @@ pub mod card_pile;
 pub mod containers;
 pub mod dogma_fn;
 pub mod enums;
+pub mod error;
 pub mod flow;
 pub mod game;
 pub mod logger;
