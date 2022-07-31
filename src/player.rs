@@ -5,6 +5,7 @@ use crate::containers::{transfer, BoxAchievementSet, BoxCardSet};
 use crate::enums::{Color, Splay};
 use crate::flow::FlowState;
 use crate::game::{Players, RcCell};
+use crate::logger::Logger;
 use crate::observation::{MainPlayerView, OtherPlayerView};
 use generator::Gn;
 use std::cell::RefCell;
@@ -12,6 +13,7 @@ use std::rc::Rc;
 
 pub struct Player<'c> {
     id: usize,
+    logger: RcCell<Logger<'c>>,
     main_pile: RcCell<MainCardPile<'c>>,
     main_board: RefCell<Board<'c>>,
     pub hand: RefCell<BoxCardSet<'c>>,
@@ -22,6 +24,7 @@ pub struct Player<'c> {
 impl<'c> Player<'c> {
     pub fn new(
         id: usize,
+        logger: RcCell<Logger<'c>>,
         main_pile: RcCell<MainCardPile<'c>>,
         hand: BoxCardSet<'c>,
         score_pile: BoxCardSet<'c>,
@@ -29,6 +32,7 @@ impl<'c> Player<'c> {
     ) -> Player<'c> {
         Player {
             id,
+            logger,
             main_pile,
             main_board: RefCell::new(Board::new()),
             hand: RefCell::new(hand),

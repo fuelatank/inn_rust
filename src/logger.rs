@@ -4,12 +4,14 @@ use crate::{
     enums::{Color, Splay},
 };
 
+#[derive(Copy, Clone)]
 pub enum PlayerPlace {
     Hand,
     Score,
     Board,
 }
 
+#[derive(Copy, Clone)]
 pub enum Place {
     MainCardPile,
     Player(usize, PlayerPlace),

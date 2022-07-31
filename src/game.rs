@@ -1,42 +1,51 @@
 use crate::action::{Action, MainAction};
 use crate::card::{Achievement, Card};
 use crate::card_pile::MainCardPile;
-use crate::containers::{BoxAchievementSet, BoxCardSet, CardSet};
-use crate::logger::Logger;
+use crate::containers::{transfer, Addable, BoxAchievementSet, BoxCardSet, CardSet, Removeable};
+use crate::logger::{Logger, Operation, Place, PlayerPlace};
 use crate::observation::{ObsType, Observation};
 use crate::player::Player;
 use crate::state::State;
 use ouroboros::self_referencing;
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
+use std::ops::{Add, Deref};
 use std::rc::Rc;
 
 pub type RcCell<T> = Rc<RefCell<T>>;
 
 pub struct Players<'c> {
+    logger: RcCell<Logger<'c>>,
     main_card_pile: RcCell<MainCardPile<'c>>,
     players: Vec<Player<'c>>,
 }
 
 impl<'c> Players<'c> {
-    pub fn empty() -> Players<'c> {
+    pub fn empty(logger: RcCell<Logger<'c>>) -> Players<'c> {
         Players {
+            logger,
             main_card_pile: Rc::new(RefCell::new(MainCardPile::empty())),
             players: vec![],
         }
     }
 
-    pub fn new<C, A>(num_players: usize, cards: Vec<&'c Card>) -> Players<'c>
+    pub fn new<C, A>(
+        num_players: usize,
+        cards: Vec<&'c Card>,
+        logger: RcCell<Logger<'c>>,
+    ) -> Players<'c>
     where
         C: CardSet<'c, Card> + Default + 'c,
         A: CardSet<'c, Achievement> + Default + 'c,
     {
         let pile = Rc::new(RefCell::new(MainCardPile::new(cards)));
         Players {
+            logger: Rc::clone(&logger),
             main_card_pile: Rc::clone(&pile),
             players: (0..num_players)
                 .map(|i| {
                     Player::new(
                         i,
+                        Rc::clone(&logger),
                         Rc::clone(&pile),
                         Box::new(C::default()),
                         Box::new(C::default()),
@@ -52,10 +61,12 @@ impl<'c> Players<'c> {
         hand: BoxCardSet<'c>,
         score_pile: BoxCardSet<'c>,
         achievements: BoxAchievementSet<'c>,
+        logger: RcCell<Logger<'c>>,
     ) {
         let id = self.players.len();
         self.players.push(Player::new(
             id,
+            logger,
             Rc::clone(&self.main_card_pile),
             hand,
             score_pile,
@@ -79,6 +90,30 @@ impl<'c> Players<'c> {
         (0..self.players.len())
             .map(move |i| &self.players[(i + main_player_id) % self.players.len()])
     }
+
+    /*fn find_addable_place(&self, place: Place) -> &dyn Deref<Target = RefCell<dyn Addable<'c, Card>>> {
+        match place {
+            Place::MainCardPile => {
+                let x: &Rc<RefCell<dyn Addable<_>>> = &self.main_card_pile;
+                &self.main_card_pile
+            },
+            Place::Player(id, player_place) => {
+                let player = self.player_at(id);
+                match player_place {
+                    PlayerPlace::Board => player.board() as &dyn Deref<Target = RefCell<dyn Addable<'c, Card>>>,
+                    PlayerPlace::Hand => &player.hand as &dyn Deref<Target = RefCell<dyn Addable<'c, Card>>>,
+                    PlayerPlace::Score => &player.score_pile as &dyn Deref<Target = RefCell<dyn Addable<'c, Card>>>,
+                }
+            }
+        }
+    }
+
+    pub fn transfer(&self, from: Place, to: Place, card: &'c Card) -> Option<&'c Card>
+    where
+        {
+            self.logger.borrow_mut().operate(Operation::Transfer(from, to, card));
+            transfer(from, to, card)
+        }*/
 }
 
 #[derive(Debug)]
@@ -129,11 +164,12 @@ impl<'c> OuterGame<'c> {
         C: CardSet<'c, Card> + Default + 'c,
         A: CardSet<'c, Achievement> + Default + 'c,
     {
+        let logger = Rc::new(RefCell::new(Logger::new()));
         OuterGameBuilder {
-            players: Players::new::<C, A>(num_players, cards),
+            players: Players::new::<C, A>(num_players, cards, Rc::clone(&logger)),
             players_ref_builder: |players| &players,
             turn: Turn::new(num_players, 0),
-            logger: Rc::new(RefCell::new(Logger::new())),
+            logger,
             state: State::Main,
         }
         .build()
@@ -235,10 +271,12 @@ impl<'c> OuterGame<'c> {
 mod tests {
     use super::*;
     use crate::{
+        action::IdChoice,
         card::Dogma,
         containers::VecSet,
         dogma_fn,
-        enums::{Color, Icon}, action::IdChoice, state::ExecutionObs,
+        enums::{Color, Icon},
+        state::ExecutionObs,
     };
 
     #[test]
