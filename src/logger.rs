@@ -90,20 +90,20 @@ impl<'c> Logger<'c> {
         }
     }
 
-    pub fn act(&mut self, action: Action<'c>) {
+    pub fn log(&mut self, item: Item<'c>) {
         self.current_game
             .as_mut()
             .expect("cards not initialized")
             .items
-            .push(Item::Action(action));
+            .push(item);
+    }
+
+    pub fn act(&mut self, action: Action<'c>) {
+        self.log(Item::Action(action));
     }
 
     pub fn operate(&mut self, operation: Operation<'c>) {
-        self.current_game
-            .as_mut()
-            .expect("cards not initialized")
-            .items
-            .push(Item::Operation(operation));
+        self.log(Item::Operation(operation));
     }
 
     pub fn finish(&mut self) {
