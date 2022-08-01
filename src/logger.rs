@@ -1,7 +1,10 @@
 use crate::{
     action::Action,
     card::Card,
-    enums::{Color, Splay}, error::{InnResult, InnovationError},
+    card_pile::CardOrder,
+    enums::{Color, Splay},
+    error::{InnResult, InnovationError},
+    game::PlayerId,
 };
 
 #[derive(Copy, Clone)]
@@ -49,7 +52,7 @@ pub enum Operation<'c> {
     Meld(usize, &'c Card),
     Tuck(usize, &'c Card),
     Score(usize, &'c Card),
-    Splay(usize, Color, Splay),
+    Splay(PlayerId, Color, Splay),
     Return(usize, &'c Card),
     Transfer(Place, Place, &'c Card),
 }
@@ -60,12 +63,12 @@ pub enum Item<'c> {
 }
 
 pub struct Game<'c> {
-    pub initial_cards: [Vec<&'c Card>; 10],
+    pub initial_cards: CardOrder<'c>,
     pub items: Vec<Item<'c>>,
 }
 
 impl<'c> Game<'c> {
-    fn new(initial_cards: [Vec<&'c Card>; 10]) -> Self {
+    fn new(initial_cards: CardOrder<'c>) -> Self {
         Self {
             initial_cards,
             items: Vec::new(),

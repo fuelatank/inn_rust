@@ -1,7 +1,7 @@
 use crate::action::RefChoice;
 use crate::card::Card;
 use crate::containers::CardSet;
-use crate::game::Players;
+use crate::game::{Players, PlayerId};
 use crate::player::Player;
 use crate::state::ExecutionState;
 use generator::LocalGenerator;
@@ -13,7 +13,7 @@ pub type DemandFlow =
     for<'c, 'g> fn(&'g Player<'c>, &'g Player<'c>, &'g Players<'c>) -> FlowState<'c, 'g>;
 
 mod tests {
-    //use crate::game::transfer_elem;
+    //use crate::game::transfer_selem;
     use super::*;
     use crate::card::Achievement;
     use crate::containers::Addable;

@@ -1,18 +1,21 @@
 use crate::action::{Action, MainAction};
-use crate::card::{Achievement, Card};
+use crate::card::{Achievement, Card, Dogma};
 use crate::card_pile::MainCardPile;
-use crate::containers::{transfer, Addable, BoxAchievementSet, BoxCardSet, CardSet, Removeable};
+use crate::containers::{Addable, BoxAchievementSet, BoxCardSet, CardSet, Removeable};
+use crate::enums::{Color, Splay};
 use crate::error::{InnResult, InnovationError};
+use crate::flow::FlowState;
 use crate::logger::{AddParam, Logger, Operation, Place, PlayerPlace, RemoveParam};
 use crate::observation::{ObsType, Observation};
 use crate::player::Player;
 use crate::state::State;
+use generator::Gn;
 use ouroboros::self_referencing;
-use std::cell::{Ref, RefCell};
-use std::ops::{Add, Deref};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 pub type RcCell<T> = Rc<RefCell<T>>;
+pub type PlayerId = usize;
 
 pub struct Players<'c> {
     logger: RcCell<Logger<'c>>,
@@ -39,6 +42,8 @@ impl<'c> Players<'c> {
         A: CardSet<'c, Achievement> + Default + 'c,
     {
         let pile = Rc::new(RefCell::new(MainCardPile::new(cards)));
+        // Should logger cards be initialized here, or in other methods?
+        logger.borrow_mut().start(pile.borrow().contents());
         Players {
             logger: Rc::clone(&logger),
             main_card_pile: Rc::clone(&pile),
@@ -83,13 +88,151 @@ impl<'c> Players<'c> {
         self.players.iter().collect()
     }
 
-    pub fn player_at(&self, id: usize) -> &Player<'c> {
+    pub fn player_at(&self, id: PlayerId) -> &Player<'c> {
         &self.players[id]
     }
 
-    pub fn players_from(&self, main_player_id: usize) -> impl Iterator<Item = &Player<'c>> {
+    pub fn players_from(&self, main_player_id: PlayerId) -> impl Iterator<Item = &Player<'c>> {
         (0..self.players.len())
             .map(move |i| &self.players[(i + main_player_id) % self.players.len()])
+    }
+
+    fn ids_from(&self, main_player_id: PlayerId) -> impl Iterator<Item = PlayerId> {
+        let len = self.players.len();
+        (0..len).map(move |i| (i + main_player_id) % len)
+    }
+
+    pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+        // transfer(Rc::clone(&self.main_pile), &self.hand, &age)
+        self.transfer(
+            Place::MainCardPile,
+            Place::Player(player.id(), PlayerPlace::Hand),
+            RemoveParam::Age(age),
+            AddParam::NoParam,
+        )
+        .ok()
+    }
+
+    pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+        // transfer(Rc::clone(&self.main_pile), &self.main_board, &age)
+        self.transfer(
+            Place::MainCardPile,
+            Place::Player(player.id(), PlayerPlace::Board),
+            RemoveParam::Age(age),
+            AddParam::Top(true),
+        )
+        .ok()
+    }
+
+    pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+        // transfer(Rc::clone(&self.main_pile), &self.score_pile, &age)
+        self.transfer(
+            Place::MainCardPile,
+            Place::Player(player.id(), PlayerPlace::Score),
+            RemoveParam::Age(age),
+            AddParam::NoParam,
+        )
+        .ok()
+    }
+
+    pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+        // transfer(&self.hand, &self.main_board, card)
+        self.transfer(
+            Place::Player(player.id(), PlayerPlace::Hand),
+            Place::Player(player.id(), PlayerPlace::Board),
+            RemoveParam::Card(card),
+            AddParam::Top(true),
+        )
+        .ok()
+    }
+
+    pub fn score<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+        // transfer(&self.hand, &self.score_pile, card)
+        self.transfer(
+            Place::Player(player.id(), PlayerPlace::Hand),
+            Place::Player(player.id(), PlayerPlace::Score),
+            RemoveParam::Card(card),
+            AddParam::NoParam,
+        )
+        .ok()
+    }
+
+    pub fn tuck<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+        // transfer(&self.hand, &self.main_board, card)
+        self.transfer(
+            Place::Player(player.id(), PlayerPlace::Hand),
+            Place::Player(player.id(), PlayerPlace::Score),
+            RemoveParam::Card(card),
+            AddParam::Top(false),
+        )
+        .ok()
+    }
+
+    pub fn splay<'g>(&'g self, player: &'g Player<'c>, color: Color, direction: Splay) {
+        player
+            .board()
+            .borrow_mut()
+            .get_stack_mut(color)
+            .splay(direction);
+    }
+
+    pub fn is_splayed<'g>(
+        &'g self,
+        player: &'g Player<'c>,
+        color: Color,
+        direction: Splay,
+    ) -> bool {
+        player.board().borrow().is_splayed(color, direction)
+    }
+
+    pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+        // transfer(&self.hand, Rc::clone(&self.main_pile), card)
+        self.transfer(
+            Place::Player(player.id(), PlayerPlace::Hand),
+            Place::MainCardPile,
+            RemoveParam::Card(card),
+            AddParam::NoParam,
+        )
+        .ok()
+    }
+
+    pub fn execute<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> FlowState<'c, 'g> {
+        Gn::new_scoped_local(move |mut s| {
+            let _main_icon = card.main_icon();
+            let id = player.id();
+            for dogma in card.dogmas() {
+                match dogma {
+                    Dogma::Share(flow) => {
+                        // should filter out ineligible players
+                        for player in self.players_from(id) {
+                            let mut gen = flow(player, self);
+
+                            // s.yield_from(gen); but with or(card)
+                            let mut state = gen.resume();
+                            while let Some(st) = state {
+                                let a = s.yield_(st.or(card)).expect("Generator got None");
+                                gen.set_para(a);
+                                state = gen.resume();
+                            }
+                        }
+                    }
+                    Dogma::Demand(flow) => {
+                        // should filter out ineligible players
+                        for player in self.players_from(id).skip(1) {
+                            let mut gen = flow(self.player_at(id), player, self);
+                            // s.yield_from(gen); but with or(card)
+                            let mut state = gen.resume();
+                            while let Some(st) = state {
+                                let a = s.yield_(st.or(card)).expect("Generator got None");
+                                gen.set_para(a);
+                                state = gen.resume();
+                            }
+                        }
+                    }
+                }
+            }
+            generator::done!()
+        })
     }
 
     fn transfer(
@@ -136,6 +279,10 @@ impl<'c> Players<'c> {
         };
         match card {
             Some(c) => {
+                // log
+                self.logger
+                    .borrow_mut()
+                    .operate(Operation::Transfer(from, to, c));
                 match to {
                     Place::MainCardPile => {
                         // return a card
@@ -180,30 +327,6 @@ impl<'c> Players<'c> {
             None => Err(InnovationError::CardNotFound),
         }
     }
-
-    /*fn find_addable_place(&self, place: Place) -> &dyn Deref<Target = RefCell<dyn Addable<'c, Card>>> {
-        match place {
-            Place::MainCardPile => {
-                let x: &Rc<RefCell<dyn Addable<_>>> = &self.main_card_pile;
-                &self.main_card_pile
-            },
-            Place::Player(id, player_place) => {
-                let player = self.player_at(id);
-                match player_place {
-                    PlayerPlace::Board => player.board() as &dyn Deref<Target = RefCell<dyn Addable<'c, Card>>>,
-                    PlayerPlace::Hand => &player.hand as &dyn Deref<Target = RefCell<dyn Addable<'c, Card>>>,
-                    PlayerPlace::Score => &player.score_pile as &dyn Deref<Target = RefCell<dyn Addable<'c, Card>>>,
-                }
-            }
-        }
-    }
-
-    pub fn transfer(&self, from: Place, to: Place, card: &'c Card) -> Option<&'c Card>
-    where
-        {
-            self.logger.borrow_mut().operate(Operation::Transfer(from, to, card));
-            transfer(from, to, card)
-        }*/
 }
 
 #[derive(Debug)]
@@ -302,7 +425,7 @@ impl<'c> OuterGame<'c> {
                             }
                             MainAction::Execute(card) => {
                                 *fields.state =
-                                    State::Executing(player.execute(card, *fields.players_ref));
+                                    State::Executing((*fields.players_ref).execute(player, card));
                             }
                         }
                     }
@@ -362,10 +485,10 @@ mod tests {
     use super::*;
     use crate::{
         action::IdChoice,
-        card::Dogma,
+        card::Dogma::*,
         containers::VecSet,
         dogma_fn,
-        enums::{Color, Icon},
+        enums::{Color::*, Icon::*},
         state::ExecutionObs,
     };
 
@@ -417,25 +540,25 @@ mod tests {
         let archery = Card::new(
             String::from("Archery"),
             1,
-            Color::Red,
-            [Icon::Castle, Icon::Lightblub, Icon::Empty, Icon::Castle],
-            vec![Dogma::Demand(dogma_fn::archery)],
+            Red,
+            [Castle, Lightblub, Empty, Castle],
+            vec![Demand(dogma_fn::archery)],
             String::from(""),
         );
         let code_of_laws = Card::new(
             String::from("Code of Laws"),
             1,
-            Color::Purple,
-            [Icon::Empty, Icon::Crown, Icon::Crown, Icon::Leaf],
-            vec![Dogma::Share(dogma_fn::code_of_laws)],
+            Purple,
+            [Empty, Crown, Crown, Leaf],
+            vec![Share(dogma_fn::code_of_laws)],
             String::from("this is the doc of the card 'code of laws'"),
         );
         let optics = Card::new(
             String::from("Optics"),
             3,
-            Color::Red,
-            [Icon::Crown, Icon::Crown, Icon::Crown, Icon::Empty],
-            vec![Dogma::Share(dogma_fn::optics)],
+            Red,
+            [Crown, Crown, Crown, Empty],
+            vec![Share(dogma_fn::optics)],
             String::from("this is the doc of the card 'optics'"),
         );
         let cards = vec![&archery, &code_of_laws, &optics];

@@ -94,11 +94,12 @@ impl<'c> Player<'c> {
     }
 
     pub fn execute<'g>(&'g self, card: &'c Card, game: &'g Players<'c>) -> FlowState<'c, 'g> {
-        Gn::new_scoped_local(move |mut s| {
+        unimplemented!()
+        /*Gn::new_scoped_local(move |mut s| {
             let _main_icon = card.main_icon();
             for dogma in card.dogmas() {
                 match dogma {
-                    Dogma::Share(flow) => {
+                    DogmaOld::Share(flow) => {
                         // should filter out ineligible players
                         for player in game.players_from(self.id) {
                             let mut gen = flow(player, game);
@@ -112,7 +113,7 @@ impl<'c> Player<'c> {
                             }
                         }
                     }
-                    Dogma::Demand(flow) => {
+                    DogmaOld::Demand(flow) => {
                         // should filter out ineligible players
                         for player in game.players_from(self.id).skip(1) {
                             let mut gen = flow(self, player, game);
@@ -128,7 +129,7 @@ impl<'c> Player<'c> {
                 }
             }
             generator::done!()
-        })
+        })*/
     }
 
     pub fn self_view(&self) -> MainPlayerView {
