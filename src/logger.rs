@@ -1,7 +1,7 @@
 use crate::{
     action::Action,
     card::Card,
-    enums::{Color, Splay}, error::{InnResult, InnovationError},
+    enums::{Color, Splay}, error::{InnResult, InnovationError}, game::PlayerId,
 };
 
 #[derive(Copy, Clone)]
@@ -49,7 +49,7 @@ pub enum Operation<'c> {
     Meld(usize, &'c Card),
     Tuck(usize, &'c Card),
     Score(usize, &'c Card),
-    Splay(usize, Color, Splay),
+    Splay(PlayerId, Color, Splay),
     Return(usize, &'c Card),
     Transfer(Place, Place, &'c Card),
 }

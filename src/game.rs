@@ -5,7 +5,7 @@ use crate::containers::{Addable, BoxAchievementSet, BoxCardSet, CardSet, Removea
 use crate::enums::{Color, Splay};
 use crate::error::{InnResult, InnovationError};
 use crate::flow::FlowState;
-use crate::logger::{AddParam, Logger, Place, PlayerPlace, RemoveParam};
+use crate::logger::{AddParam, Logger, Operation, Place, PlayerPlace, RemoveParam};
 use crate::observation::{ObsType, Observation};
 use crate::player::Player;
 use crate::state::State;
@@ -100,91 +100,93 @@ impl<'c> Players<'c> {
         (0..len).map(move |i| (i + main_player_id) % len)
     }
 
-    pub fn draw(&self, id: PlayerId, age: u8) -> Option<&'c Card> {
+    pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.hand, &age)
         self.transfer(
             Place::MainCardPile,
-            Place::Player(id, PlayerPlace::Hand),
+            Place::Player(player.id(), PlayerPlace::Hand),
             RemoveParam::Age(age),
             AddParam::NoParam,
         )
         .ok()
     }
 
-    pub fn draw_and_meld(&self, id: PlayerId, age: u8) -> Option<&'c Card> {
+    pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.main_board, &age)
         self.transfer(
             Place::MainCardPile,
-            Place::Player(id, PlayerPlace::Board),
+            Place::Player(player.id(), PlayerPlace::Board),
             RemoveParam::Age(age),
             AddParam::Top(true),
         )
         .ok()
     }
 
-    pub fn draw_and_score(&self, id: PlayerId, age: u8) -> Option<&'c Card> {
+    pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.score_pile, &age)
         self.transfer(
             Place::MainCardPile,
-            Place::Player(id, PlayerPlace::Score),
+            Place::Player(player.id(), PlayerPlace::Score),
             RemoveParam::Age(age),
             AddParam::NoParam,
         )
         .ok()
     }
 
-    pub fn meld(&self, id: PlayerId, card: &'c Card) -> Option<&'c Card> {
+    pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
         self.transfer(
-            Place::Player(id, PlayerPlace::Hand),
-            Place::Player(id, PlayerPlace::Board),
+            Place::Player(player.id(), PlayerPlace::Hand),
+            Place::Player(player.id(), PlayerPlace::Board),
             RemoveParam::Card(card),
             AddParam::Top(true),
         )
         .ok()
     }
 
-    pub fn score(&self, id: PlayerId, card: &'c Card) -> Option<&'c Card> {
+    pub fn score<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
         // transfer(&self.hand, &self.score_pile, card)
         self.transfer(
-            Place::Player(id, PlayerPlace::Hand),
-            Place::Player(id, PlayerPlace::Score),
+            Place::Player(player.id(), PlayerPlace::Hand),
+            Place::Player(player.id(), PlayerPlace::Score),
             RemoveParam::Card(card),
             AddParam::NoParam,
         )
         .ok()
     }
 
-    pub fn tuck(&self, id: PlayerId, card: &'c Card) -> Option<&'c Card> {
+    pub fn tuck<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
         self.transfer(
-            Place::Player(id, PlayerPlace::Hand),
-            Place::Player(id, PlayerPlace::Score),
+            Place::Player(player.id(), PlayerPlace::Hand),
+            Place::Player(player.id(), PlayerPlace::Score),
             RemoveParam::Card(card),
             AddParam::Top(false),
         )
         .ok()
     }
 
-    pub fn splay(&self, id: PlayerId, color: Color, direction: Splay) {
-        self.player_at(id)
+    pub fn splay<'g>(&'g self, player: &'g Player<'c>, color: Color, direction: Splay) {
+        player
             .board()
             .borrow_mut()
             .get_stack_mut(color)
             .splay(direction);
     }
 
-    pub fn is_splayed(&self, id: PlayerId, color: Color, direction: Splay) -> bool {
-        self.player_at(id)
-            .board()
-            .borrow()
-            .is_splayed(color, direction)
+    pub fn is_splayed<'g>(
+        &'g self,
+        player: &'g Player<'c>,
+        color: Color,
+        direction: Splay,
+    ) -> bool {
+        player.board().borrow().is_splayed(color, direction)
     }
 
-    pub fn r#return(&self, id: PlayerId, card: &'c Card) -> Option<&'c Card> {
+    pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
         // transfer(&self.hand, Rc::clone(&self.main_pile), card)
         self.transfer(
-            Place::Player(id, PlayerPlace::Hand),
+            Place::Player(player.id(), PlayerPlace::Hand),
             Place::MainCardPile,
             RemoveParam::Card(card),
             AddParam::NoParam,
@@ -192,18 +194,15 @@ impl<'c> Players<'c> {
         .ok()
     }
 
-    pub fn execute<'g>(
-        &'g self,
-        id: PlayerId,
-        card: &'c Card,
-    ) -> FlowState<'c, 'g> {
+    pub fn execute<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s| {
             let _main_icon = card.main_icon();
+            let id = player.id();
             for dogma in card.dogmas() {
                 match dogma {
                     Dogma::Share(flow) => {
                         // should filter out ineligible players
-                        for player in self.ids_from(id) {
+                        for player in self.players_from(id) {
                             let mut gen = flow(player, self);
 
                             // s.yield_from(gen); but with or(card)
@@ -217,8 +216,8 @@ impl<'c> Players<'c> {
                     }
                     Dogma::Demand(flow) => {
                         // should filter out ineligible players
-                        for player in self.ids_from(id).skip(1) {
-                            let mut gen = flow(id, player, self);
+                        for player in self.players_from(id).skip(1) {
+                            let mut gen = flow(self.player_at(id), player, self);
                             // s.yield_from(gen); but with or(card)
                             let mut state = gen.resume();
                             while let Some(st) = state {
@@ -279,6 +278,9 @@ impl<'c> Players<'c> {
         match card {
             Some(c) => {
                 // log
+                self.logger
+                    .borrow_mut()
+                    .operate(Operation::Transfer(from, to, c));
                 match to {
                     Place::MainCardPile => {
                         // return a card

@@ -5,7 +5,7 @@ use crate::{
     containers::transfer,
     enums::{Icon, Splay},
     flow::FlowState,
-    game::Players,
+    game::{Players, PlayerId},
     player::Player,
     state::{Choose, ExecutionState},
 };
@@ -13,10 +13,10 @@ use crate::{
 pub fn archery<'c, 'g>(
     player: &'g Player<'c>,
     opponent: &'g Player<'c>,
-    _game: &'g Players<'c>,
+    game: &'g Players<'c>,
 ) -> FlowState<'c, 'g> {
     Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
-        opponent.draw(1);
+        game.draw(opponent, 1);
         let age = opponent.age();
         let cards = s
             .yield_(ExecutionState::new(
