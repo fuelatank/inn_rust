@@ -2,6 +2,9 @@ use crate::card::Card;
 use crate::containers::{Addable, Removeable};
 use std::collections::VecDeque;
 
+pub type CardOrder<'c> = [Vec<&'c Card>; 10];
+
+#[derive(Clone)]
 struct CardPile<'a> {
     cards: VecDeque<&'a Card>,
 }
@@ -69,6 +72,11 @@ impl<'a> MainCardPile<'a> {
             Some(card) => Some(card),
             None => self.pop_age(age + 1),
         }
+    }
+
+    pub fn contents(&self) -> CardOrder<'a> {
+        self.piles.clone()
+            .map(|pile| pile.cards.iter().map(Clone::clone).collect())
     }
 
     pub fn view(&self) -> [usize; 10] {

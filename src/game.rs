@@ -42,6 +42,8 @@ impl<'c> Players<'c> {
         A: CardSet<'c, Achievement> + Default + 'c,
     {
         let pile = Rc::new(RefCell::new(MainCardPile::new(cards)));
+        // Should logger cards be initialized here, or in other methods?
+        logger.borrow_mut().start(pile.borrow().contents());
         Players {
             logger: Rc::clone(&logger),
             main_card_pile: Rc::clone(&pile),
@@ -423,7 +425,7 @@ impl<'c> OuterGame<'c> {
                             }
                             MainAction::Execute(card) => {
                                 *fields.state =
-                                    State::Executing(player.execute(card, *fields.players_ref));
+                                    State::Executing((*fields.players_ref).execute(player, card));
                             }
                         }
                     }
@@ -533,14 +535,14 @@ mod tests {
         assert_eq!(t1.is_second_action(), true);
     }
 
-    /*#[test]
+    #[test]
     fn create_game_player() {
         let archery = Card::new(
             String::from("Archery"),
             1,
             Color::Red,
             [Icon::Castle, Icon::Lightblub, Icon::Empty, Icon::Castle],
-            vec![DogmaOld::Demand(dogma_fn::archery)],
+            vec![Dogma::Demand(dogma_fn::archery)],
             String::from(""),
         );
         let code_of_laws = Card::new(
@@ -548,7 +550,7 @@ mod tests {
             1,
             Color::Purple,
             [Icon::Empty, Icon::Crown, Icon::Crown, Icon::Leaf],
-            vec![DogmaOld::Share(dogma_fn::code_of_laws)],
+            vec![Dogma::Share(dogma_fn::code_of_laws)],
             String::from("this is the doc of the card 'code of laws'"),
         );
         let optics = Card::new(
@@ -556,7 +558,7 @@ mod tests {
             3,
             Color::Red,
             [Icon::Crown, Icon::Crown, Icon::Crown, Icon::Empty],
-            vec![DogmaOld::Share(dogma_fn::optics)],
+            vec![Dogma::Share(dogma_fn::optics)],
             String::from("this is the doc of the card 'optics'"),
         );
         let cards = vec![&archery, &code_of_laws, &optics];
@@ -575,5 +577,5 @@ mod tests {
             assert_eq!(obs.turn.player_id(), 1);
             assert!(matches!(obs.obstype, ObsType::Main));
         }
-    }*/
+    }
 }
