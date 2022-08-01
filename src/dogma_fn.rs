@@ -5,7 +5,7 @@ use crate::{
     containers::transfer,
     enums::{Icon, Splay},
     flow::FlowState,
-    game::{Players, PlayerId},
+    game::Players,
     player::Player,
     state::{Choose, ExecutionState},
 };
@@ -40,11 +40,11 @@ pub fn archery<'c, 'g>(
     })
 }
 
-pub fn optics<'c, 'g>(player: &'g Player<'c>, _game: &'g Players<'c>) -> FlowState<'c, 'g> {
+pub fn optics<'c, 'g>(player: &'g Player<'c>, game: &'g Players<'c>) -> FlowState<'c, 'g> {
     Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
-        let card = player.draw_and_meld(3).unwrap();
+        let card = game.draw_and_meld(player, 3).unwrap();
         if card.contains(Icon::Crown) {
-            player.draw_and_score(4);
+            game.draw_and_score(player, 4);
             done!()
         } else {
             let opt_card = s
@@ -72,7 +72,7 @@ pub fn optics<'c, 'g>(player: &'g Player<'c>, _game: &'g Players<'c>) -> FlowSta
     })
 }
 
-pub fn code_of_laws<'c, 'g>(player: &'g Player<'c>, _game: &'g Players<'c>) -> FlowState<'c, 'g> {
+pub fn code_of_laws<'c, 'g>(player: &'g Player<'c>, game: &'g Players<'c>) -> FlowState<'c, 'g> {
     Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
         let opt_card = s
             .yield_(ExecutionState::new(
@@ -95,15 +95,15 @@ pub fn code_of_laws<'c, 'g>(player: &'g Player<'c>, _game: &'g Players<'c>) -> F
             Some(c) => c,
             None => done!(),
         };
-        player.tuck(card);
-        if player.is_splayed(card.color(), Splay::Left) {
+        game.tuck(player, card);
+        if game.is_splayed(player, card.color(), Splay::Left) {
             done!()
         }
         if s.yield_(ExecutionState::new(player, Choose::Yn))
             .expect("Generator got None")
             .yn()
         {
-            player.splay(card.color(), Splay::Left);
+            game.splay(player, card.color(), Splay::Left);
         }
         done!()
     })
