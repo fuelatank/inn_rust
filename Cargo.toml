@@ -8,3 +8,4 @@ edition = "2018"
 [dependencies]
 generator = "0.7"
 counter = "0.5"
+ouroboros = "0.15"

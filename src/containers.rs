@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::cell::RefCell;
 use crate::card::{Achievement, Card};
 
@@ -24,13 +25,13 @@ pub trait CardSet<'a, T>: Addable<'a, T> + Removeable<'a, T, T> {
     fn as_vec(&'_ self) -> Vec<&'a T>;
 }
 
-impl<'a, T> Addable<'a, T> for Box<dyn CardSet<'a, T>> {
+impl<'a, T> Addable<'a, T> for Box<dyn CardSet<'a, T> + 'a> {
     fn add(&mut self, elem: &'a T) {
         (**self).add(elem)
     }
 }
 
-impl<'a, T> Removeable<'a, T, T> for Box<dyn CardSet<'a, T>> {
+impl<'a, T> Removeable<'a, T, T> for Box<dyn CardSet<'a, T> + 'a> {
     fn remove(&mut self, elem: &T) -> Option<&'a T> {
         (**self).remove(elem)
     }
@@ -68,13 +69,15 @@ impl<'a, T: PartialEq> CardSet<'a, T> for VecSet<'a, T> {
     }
 }
 
-pub type BoxCardSet<'a> = Box<dyn CardSet<'a, Card>>;
-pub type BoxAchievementSet<'a> = Box<dyn CardSet<'a, Achievement>>;
+pub type BoxCardSet<'a> = Box<dyn CardSet<'a, Card> + 'a>;
+pub type BoxAchievementSet<'a> = Box<dyn CardSet<'a, Achievement> + 'a>;
 
-pub fn transfer<'a, T, P, R, S>(from: &RefCell<R>, to: &RefCell<S>, param: &P) -> Option<&'a T>
+pub fn transfer<'a, T, P, R, S, A, B>(from: A, to: B, param: &P) -> Option<&'a T>
 where
     R: Removeable<'a, T, P>,
     S: Addable<'a, T>,
+    A: Deref<Target = RefCell<R>>,
+    B: Deref<Target = RefCell<S>>
 {
     let c = from.borrow_mut().remove(param);
     if let Some(card) = c {

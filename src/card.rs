@@ -1,6 +1,8 @@
 use crate::enums::{Color, Icon};
 use crate::flow::{DemandFlow, ShareFlow};
+use crate::observation::SingleAchievementView;
 use counter::Counter;
+use std::fmt::Debug;
 
 pub enum Dogma {
     Share(ShareFlow),
@@ -62,7 +64,13 @@ impl PartialEq for Card {
     }
 }
 
-#[derive(PartialEq)]
+impl Debug for Card {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.name)
+    }
+}
+
+#[derive(PartialEq, Debug)]
 pub enum SpecialAchievement {
     Universe,
     Wonder,
@@ -70,8 +78,17 @@ pub enum SpecialAchievement {
     // TODO: more
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum Achievement {
     Normal(Card),
     Special(SpecialAchievement),
+}
+
+impl Achievement {
+    pub fn view(&self) -> SingleAchievementView {
+        match self {
+            Achievement::Normal(c) => SingleAchievementView::Normal(c.age),
+            Achievement::Special(s) => SingleAchievementView::Special(s),
+        }
+    }
 }

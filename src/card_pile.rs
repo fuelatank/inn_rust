@@ -2,6 +2,9 @@ use crate::card::Card;
 use crate::containers::{Addable, Removeable};
 use std::collections::VecDeque;
 
+pub type CardOrder<'c> = [Vec<&'c Card>; 10];
+
+#[derive(Clone)]
 struct CardPile<'a> {
     cards: VecDeque<&'a Card>,
 }
@@ -11,6 +14,10 @@ impl<'a> CardPile<'a> {
         CardPile {
             cards: VecDeque::new(),
         }
+    }
+
+    fn len(&self) -> usize {
+        self.cards.len()
     }
 }
 
@@ -31,7 +38,7 @@ pub struct MainCardPile<'a> {
 }
 
 impl<'a> MainCardPile<'a> {
-    pub fn new() -> MainCardPile<'a> {
+    pub fn empty() -> MainCardPile<'a> {
         MainCardPile {
             piles: [
                 CardPile::new(),
@@ -48,14 +55,43 @@ impl<'a> MainCardPile<'a> {
         }
     }
 
+    pub fn new(cards: Vec<&'a Card>) -> MainCardPile<'a> {
+        let mut pile = MainCardPile::empty();
+        for card in cards {
+            pile.add(card);
+        }
+        pile
+    }
+
     fn pop_age(&mut self, age: u8) -> Option<&'a Card> {
-        if age >= 11 || age == 0 {
+        if age >= 11 {
             return None;
         }
-        match self.piles[(age - 1) as usize].remove(&()) {
+        let index = if age == 0 { 0 } else { age - 1 };
+        match self.piles[index as usize].remove(&()) {
             Some(card) => Some(card),
             None => self.pop_age(age + 1),
         }
+    }
+
+    pub fn contents(&self) -> CardOrder<'a> {
+        self.piles.clone()
+            .map(|pile| pile.cards.iter().map(Clone::clone).collect())
+    }
+
+    pub fn view(&self) -> [usize; 10] {
+        [
+            self.piles[0].len(),
+            self.piles[1].len(),
+            self.piles[2].len(),
+            self.piles[3].len(),
+            self.piles[4].len(),
+            self.piles[5].len(),
+            self.piles[6].len(),
+            self.piles[7].len(),
+            self.piles[8].len(),
+            self.piles[9].len(),
+        ]
     }
 }
 

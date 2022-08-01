@@ -1,8 +1,9 @@
 use crate::card::Card;
-use crate::containers::Addable;
+use crate::containers::{Addable, Removeable};
 use crate::enums::{Color, Splay};
 use std::collections::VecDeque;
 
+#[derive(Debug)]
 pub struct Stack<'a> {
     cards: VecDeque<&'a Card>,
     splay: Splay,
@@ -32,6 +33,15 @@ impl<'a> Stack<'a> {
         self.cards.pop_front()
     }
 
+    fn remove(&mut self, card: &Card) -> Option<&'a Card> {
+        let index = self.cards.iter().position(|&x| x == card)?;
+        self.cards.remove(index)
+    }
+
+    fn insert(&mut self, card: &'a Card, index: usize) {
+        self.cards.insert(index, card)
+    }
+
     pub fn splay(&mut self, direction: Splay) {
         assert_ne!(self.splay, direction);
         self.splay = direction;
@@ -45,6 +55,10 @@ impl<'a> Stack<'a> {
         self.cards.is_empty()
     }
 
+    pub fn contains(&self, card: &'a Card) -> bool {
+        self.cards.contains(&card)
+    }
+
     fn top_card(&self) -> Option<&'a Card> {
         match self.cards.front() {
             Some(v) => Some(*v),
@@ -53,9 +67,9 @@ impl<'a> Stack<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct Board<'a> {
     stacks: [Stack<'a>; 5],
-    is_forward: bool,
 }
 
 impl<'a> Board<'a> {
@@ -68,16 +82,7 @@ impl<'a> Board<'a> {
                 Stack::new(),
                 Stack::new(),
             ],
-            is_forward: true,
         }
-    }
-
-    pub fn forward(&mut self) {
-        self.is_forward = true;
-    }
-
-    pub fn backward(&mut self) {
-        self.is_forward = false
     }
 
     pub fn get_stack(&self, color: Color) -> &Stack<'a> {
@@ -92,13 +97,21 @@ impl<'a> Board<'a> {
         self.stacks[color.as_usize()].is_splayed(direction)
     }
 
-    fn meld(&mut self, card: &'a Card) {
+    pub fn contains(&self, card: &'a Card) -> bool {
+        self.stacks[card.color().as_usize()].contains(card)
+    }
+
+    pub fn meld(&mut self, card: &'a Card) {
         let stack = &mut self.stacks[card.color().as_usize()];
         stack.push_front(card)
     }
 
-    fn tuck(&mut self, card: &'a Card) {
+    pub fn tuck(&mut self, card: &'a Card) {
         self.stacks[card.color().as_usize()].push_back(card)
+    }
+
+    pub fn insert(&mut self, card: &'a Card, index: usize) {
+        self.stacks[card.color().as_usize()].insert(card, index)
     }
 
     fn top_cards(&self) -> Vec<&Card> {
@@ -127,10 +140,35 @@ impl<'a> Board<'a> {
 
 impl<'a> Addable<'a, Card> for Board<'a> {
     fn add(&mut self, elem: &'a Card) {
-        if self.is_forward {
+        self.meld(elem);
+        /*if self.is_forward {
             self.meld(elem)
         } else {
             self.tuck(elem)
+        }*/
+    }
+}
+
+impl<'a> Removeable<'a, Card, Card> for Board<'a> {
+    fn remove(&mut self, param: &Card) -> Option<&'a Card> {
+        let stack = self.get_stack_mut(param.color());
+        stack.remove(param)
+    }
+}
+
+impl<'a> Removeable<'a, Card, bool> for Stack<'a> {
+    fn remove(&mut self, param: &bool) -> Option<&'a Card> {
+        if *param {
+            self.pop_front()
+        } else {
+            self.pop_back()
         }
     }
 }
+
+impl<'a> Removeable<'a, Card, usize> for Stack<'a> {
+    fn remove(&mut self, param: &usize) -> Option<&'a Card> {
+        self.cards.remove(*param)
+    }
+}
+
