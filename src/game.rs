@@ -485,10 +485,10 @@ mod tests {
     use super::*;
     use crate::{
         action::IdChoice,
-        card::Dogma,
+        card::Dogma::*,
         containers::VecSet,
         dogma_fn,
-        enums::{Color, Icon},
+        enums::{Color::*, Icon::*},
         state::ExecutionObs,
     };
 
@@ -540,25 +540,25 @@ mod tests {
         let archery = Card::new(
             String::from("Archery"),
             1,
-            Color::Red,
-            [Icon::Castle, Icon::Lightblub, Icon::Empty, Icon::Castle],
-            vec![Dogma::Demand(dogma_fn::archery)],
+            Red,
+            [Castle, Lightblub, Empty, Castle],
+            vec![Demand(dogma_fn::archery)],
             String::from(""),
         );
         let code_of_laws = Card::new(
             String::from("Code of Laws"),
             1,
-            Color::Purple,
-            [Icon::Empty, Icon::Crown, Icon::Crown, Icon::Leaf],
-            vec![Dogma::Share(dogma_fn::code_of_laws)],
+            Purple,
+            [Empty, Crown, Crown, Leaf],
+            vec![Share(dogma_fn::code_of_laws)],
             String::from("this is the doc of the card 'code of laws'"),
         );
         let optics = Card::new(
             String::from("Optics"),
             3,
-            Color::Red,
-            [Icon::Crown, Icon::Crown, Icon::Crown, Icon::Empty],
-            vec![Dogma::Share(dogma_fn::optics)],
+            Red,
+            [Crown, Crown, Crown, Empty],
+            vec![Share(dogma_fn::optics)],
             String::from("this is the doc of the card 'optics'"),
         );
         let cards = vec![&archery, &code_of_laws, &optics];
