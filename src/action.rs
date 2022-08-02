@@ -22,7 +22,7 @@ impl<'c> IdChoice<'c> {
         match self {
             IdChoice::Card(c) => RefChoice::Card(c),
             IdChoice::Opponent(id) => RefChoice::Opponent(game.player_at(id)),
-            IdChoice::Yn(yn) => RefChoice::Yn(yn)
+            IdChoice::Yn(yn) => RefChoice::Yn(yn),
         }
     }
 }

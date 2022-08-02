@@ -75,7 +75,8 @@ impl<'a> MainCardPile<'a> {
     }
 
     pub fn contents(&self) -> CardOrder<'a> {
-        self.piles.clone()
+        self.piles
+            .clone()
             .map(|pile| pile.cards.iter().map(Clone::clone).collect())
     }
 

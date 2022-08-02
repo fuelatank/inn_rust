@@ -171,4 +171,3 @@ impl<'a> Removeable<'a, Card, usize> for Stack<'a> {
         self.cards.remove(*param)
     }
 }
-

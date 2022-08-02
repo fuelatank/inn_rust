@@ -26,7 +26,7 @@ mod tests {
             //game.draw_and_score(player, player.age() + 1);
         })
     }
-    
+
     #[test]
     fn name() {
         // let mut game: Players = Players::empty();
