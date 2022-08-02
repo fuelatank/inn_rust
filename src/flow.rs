@@ -12,6 +12,7 @@ pub type ShareFlow = for<'c, 'g> fn(&'g Player<'c>, &'g Players<'c>) -> FlowStat
 pub type DemandFlow =
     for<'c, 'g> fn(&'g Player<'c>, &'g Player<'c>, &'g Players<'c>) -> FlowState<'c, 'g>;
 
+#[cfg(test)]
 mod tests {
     //use crate::game::transfer_selem;
     use super::*;

@@ -481,6 +481,7 @@ impl<'c> OuterGame<'c> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
