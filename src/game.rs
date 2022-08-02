@@ -319,6 +319,11 @@ impl<'c> Players<'c> {
             None => Err(InnovationError::CardNotFound),
         }
     }
+
+    pub fn transfer_card(&self, from: Place, to: Place, card: &'c Card) -> InnResult<()> {
+        self.transfer(from, to, RemoveParam::Card(card), AddParam::NoParam)
+            .map(|_| ())
+    }
 }
 
 #[derive(Debug)]

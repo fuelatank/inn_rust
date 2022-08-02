@@ -5,7 +5,7 @@ use crate::{
     enums::{Icon, Splay},
     flow::{DemandFlow, ShareFlow},
     state::{Choose, ExecutionState},
-    structure::{AddParam, Place, PlayerPlace, RemoveParam},
+    structure::Place,
 };
 
 pub const ARCHERY: DemandFlow = |player, opponent, game| {
@@ -28,13 +28,8 @@ pub const ARCHERY: DemandFlow = |player, opponent, game| {
             .expect("Generator got None")
             .cards();
         // TODO should handle failure case
-        game.transfer(
-            Place::hand(opponent),
-            Place::hand(player),
-            RemoveParam::Card(cards[0]),
-            AddParam::NoParam,
-        )
-        .expect("todo");
+        game.transfer_card(Place::hand(opponent), Place::hand(player), cards[0])
+            .expect("todo");
         done!()
     })
 };
@@ -65,13 +60,8 @@ pub const OPTICS: ShareFlow = |player, game| {
                 .yield_(ExecutionState::new(player, Choose::Opponent))
                 .expect("Generator got None")
                 .player();
-            game.transfer(
-                Place::Player(player.id(), PlayerPlace::Score),
-                Place::Player(opponent.id(), PlayerPlace::Score),
-                RemoveParam::Card(card),
-                AddParam::NoParam,
-            )
-            .unwrap();
+            game.transfer_card(Place::score(player), Place::score(opponent), card)
+                .unwrap();
             done!()
         }
     })
