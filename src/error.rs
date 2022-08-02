@@ -1,5 +1,3 @@
-
-
 pub enum InnovationError {
     ParamUnwrapError,
     CardNotFound,

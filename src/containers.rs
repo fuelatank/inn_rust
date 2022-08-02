@@ -1,6 +1,6 @@
-use std::ops::Deref;
-use std::cell::RefCell;
 use crate::card::{Achievement, Card};
+use std::cell::RefCell;
+use std::ops::Deref;
 
 pub trait Addable<'a, T> {
     fn add(&mut self, elem: &'a T);
@@ -77,7 +77,7 @@ where
     R: Removeable<'a, T, P>,
     S: Addable<'a, T>,
     A: Deref<Target = RefCell<R>>,
-    B: Deref<Target = RefCell<S>>
+    B: Deref<Target = RefCell<S>>,
 {
     let c = from.borrow_mut().remove(param);
     if let Some(card) = c {

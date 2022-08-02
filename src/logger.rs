@@ -46,14 +46,8 @@ impl<'c> RemoveParam<'c> {
     }
 }
 
-// in a narrow sense
 pub enum Operation<'c> {
-    Draw(usize, u8),
-    Meld(usize, &'c Card),
-    Tuck(usize, &'c Card),
-    Score(usize, &'c Card),
     Splay(PlayerId, Color, Splay),
-    Return(usize, &'c Card),
     Transfer(Place, Place, &'c Card),
 }
 
@@ -76,7 +70,7 @@ impl<'c> Game<'c> {
     }
 }
 
-// should also have the initial arrangement etc.
+#[derive(Default)]
 pub struct Logger<'c> {
     history: Vec<Game<'c>>,
     current_game: Option<Game<'c>>,

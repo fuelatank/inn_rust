@@ -30,8 +30,9 @@ pub enum Icon {
     Empty,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub enum Splay {
+    #[default]
     NoSplay,
     Left,
     Right,

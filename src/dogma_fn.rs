@@ -4,17 +4,11 @@ use crate::{
     action::RefChoice,
     containers::transfer,
     enums::{Icon, Splay},
-    flow::FlowState,
-    game::Players,
-    player::Player,
+    flow::{DemandFlow, ShareFlow},
     state::{Choose, ExecutionState},
 };
 
-pub fn archery<'c, 'g>(
-    player: &'g Player<'c>,
-    opponent: &'g Player<'c>,
-    game: &'g Players<'c>,
-) -> FlowState<'c, 'g> {
+pub const ARCHERY: DemandFlow = |player, opponent, game| {
     Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
         game.draw(opponent, 1);
         let age = opponent.age();
@@ -38,9 +32,9 @@ pub fn archery<'c, 'g>(
         transfer(&opponent.hand, &player.hand, cards[0]);
         generator::done!()
     })
-}
+};
 
-pub fn optics<'c, 'g>(player: &'g Player<'c>, game: &'g Players<'c>) -> FlowState<'c, 'g> {
+pub const OPTICS: ShareFlow = |player, game| {
     Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
         let card = game.draw_and_meld(player, 3).unwrap();
         if card.contains(Icon::Crown) {
@@ -70,9 +64,9 @@ pub fn optics<'c, 'g>(player: &'g Player<'c>, game: &'g Players<'c>) -> FlowStat
             done!()
         }
     })
-}
+};
 
-pub fn code_of_laws<'c, 'g>(player: &'g Player<'c>, game: &'g Players<'c>) -> FlowState<'c, 'g> {
+pub const CODE_OF_LAWS: ShareFlow = |player, game| {
     Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
         let opt_card = s
             .yield_(ExecutionState::new(
@@ -107,4 +101,4 @@ pub fn code_of_laws<'c, 'g>(player: &'g Player<'c>, game: &'g Players<'c>) -> Fl
         }
         done!()
     })
-}
+};

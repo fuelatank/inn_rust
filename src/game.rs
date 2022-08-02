@@ -51,8 +51,6 @@ impl<'c> Players<'c> {
                 .map(|i| {
                     Player::new(
                         i,
-                        Rc::clone(&logger),
-                        Rc::clone(&pile),
                         Box::new(C::default()),
                         Box::new(C::default()),
                         Box::new(A::default()),
@@ -67,13 +65,10 @@ impl<'c> Players<'c> {
         hand: BoxCardSet<'c>,
         score_pile: BoxCardSet<'c>,
         achievements: BoxAchievementSet<'c>,
-        logger: RcCell<Logger<'c>>,
     ) {
         let id = self.players.len();
         self.players.push(Player::new(
             id,
-            logger,
-            Rc::clone(&self.main_card_pile),
             hand,
             score_pile,
             achievements,
@@ -97,7 +92,7 @@ impl<'c> Players<'c> {
             .map(move |i| &self.players[(i + main_player_id) % self.players.len()])
     }
 
-    fn ids_from(&self, main_player_id: PlayerId) -> impl Iterator<Item = PlayerId> {
+    fn _ids_from(&self, main_player_id: PlayerId) -> impl Iterator<Item = PlayerId> {
         let len = self.players.len();
         (0..len).map(move |i| (i + main_player_id) % len)
     }
@@ -340,8 +335,8 @@ impl Turn {
     fn new(num_players: usize, first_player: usize) -> Turn {
         Turn {
             action: 0,
-            num_players: num_players,
-            first_player: first_player,
+            num_players,
+            first_player,
         }
     }
 
@@ -380,7 +375,7 @@ impl<'c> OuterGame<'c> {
         let logger = Rc::new(RefCell::new(Logger::new()));
         OuterGameBuilder {
             players: Players::new::<C, A>(num_players, cards, Rc::clone(&logger)),
-            players_ref_builder: |players| &players,
+            players_ref_builder: |players| players,
             turn: Turn::new(num_players, 0),
             logger,
             state: State::Main,
@@ -388,7 +383,7 @@ impl<'c> OuterGame<'c> {
         .build()
     }
 
-    fn is_available_step_action(&self, action: &MainAction<'c>) -> bool {
+    fn _is_available_step_action(&self, action: &MainAction<'c>) -> bool {
         self.with(|fields| match action {
             MainAction::Draw => true,
             MainAction::Meld(c) => {
@@ -406,17 +401,18 @@ impl<'c> OuterGame<'c> {
     pub fn step(&mut self, action: Action<'c>) -> Observation {
         let (player, obs_type) = self.with_mut(|fields| {
             fields.logger.borrow_mut().act(action.clone());
+            let game = *fields.players_ref;
             match action {
                 Action::Step(action) => match fields.state {
                     State::Main => {
-                        let player = (*fields.players_ref).player_at(fields.turn.player_id());
+                        let player = game.player_at(fields.turn.player_id());
                         match action {
                             MainAction::Draw => {
-                                player.draw(player.age());
+                                game.draw(player, player.age());
                                 fields.turn.next();
                             }
                             MainAction::Meld(card) => {
-                                player.meld(card);
+                                game.meld(player, card);
                                 fields.turn.next();
                             }
                             MainAction::Achieve(_age) => {
@@ -436,7 +432,7 @@ impl<'c> OuterGame<'c> {
                 Action::Executing(action) => match fields.state {
                     State::Main => panic!("State and action mismatched"),
                     State::Executing(state) => {
-                        state.set_para(action.to_ref(*fields.players_ref));
+                        state.set_para(action.to_ref(game));
                     }
                 },
             }
@@ -481,6 +477,7 @@ impl<'c> OuterGame<'c> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
@@ -489,7 +486,6 @@ mod tests {
         containers::VecSet,
         dogma_fn,
         enums::{Color::*, Icon::*},
-        state::ExecutionObs,
     };
 
     #[test]
@@ -542,7 +538,7 @@ mod tests {
             1,
             Red,
             [Castle, Lightblub, Empty, Castle],
-            vec![Demand(dogma_fn::archery)],
+            vec![Demand(dogma_fn::ARCHERY)],
             String::from(""),
         );
         let code_of_laws = Card::new(
@@ -550,7 +546,7 @@ mod tests {
             1,
             Purple,
             [Empty, Crown, Crown, Leaf],
-            vec![Share(dogma_fn::code_of_laws)],
+            vec![Share(dogma_fn::CODE_OF_LAWS)],
             String::from("this is the doc of the card 'code of laws'"),
         );
         let optics = Card::new(
@@ -558,7 +554,7 @@ mod tests {
             3,
             Red,
             [Crown, Crown, Crown, Empty],
-            vec![Share(dogma_fn::optics)],
+            vec![Share(dogma_fn::OPTICS)],
             String::from("this is the doc of the card 'optics'"),
         );
         let cards = vec![&archery, &code_of_laws, &optics];

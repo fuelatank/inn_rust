@@ -3,7 +3,7 @@ use crate::containers::{Addable, Removeable};
 use crate::enums::{Color, Splay};
 use std::collections::VecDeque;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Stack<'a> {
     cards: VecDeque<&'a Card>,
     splay: Splay,
@@ -67,7 +67,7 @@ impl<'a> Stack<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Board<'a> {
     stacks: [Stack<'a>; 5],
 }
@@ -171,4 +171,3 @@ impl<'a> Removeable<'a, Card, usize> for Stack<'a> {
         self.cards.remove(*param)
     }
 }
-

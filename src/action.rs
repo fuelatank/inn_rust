@@ -22,7 +22,7 @@ impl<'c> IdChoice<'c> {
         match self {
             IdChoice::Card(c) => RefChoice::Card(c),
             IdChoice::Opponent(id) => RefChoice::Opponent(game.player_at(id)),
-            IdChoice::Yn(yn) => RefChoice::Yn(yn)
+            IdChoice::Yn(yn) => RefChoice::Yn(yn),
         }
     }
 }
@@ -36,7 +36,7 @@ pub enum RefChoice<'c, 'g> {
 impl<'c, 'g> RefChoice<'c, 'g> {
     pub fn card(self) -> Option<&'c Card> {
         if let RefChoice::Card(cards) = self {
-            if cards.len() == 0 {
+            if cards.is_empty() {
                 None
             } else if cards.len() == 1 {
                 Some(cards[0])
