@@ -1,7 +1,7 @@
 use crate::action::RefChoice;
 use crate::card::Card;
 use crate::containers::CardSet;
-use crate::game::{Players, PlayerId};
+use crate::game::Players;
 use crate::player::Player;
 use crate::state::ExecutionState;
 use generator::LocalGenerator;

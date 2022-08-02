@@ -3,7 +3,8 @@ use std::cell::Ref;
 use crate::{
     board::Board,
     card::{Card, SpecialAchievement},
-    state::{Choose, ExecutionObs}, game::Turn,
+    game::Turn,
+    state::ExecutionObs,
 };
 
 // lifetime?

@@ -97,7 +97,7 @@ impl<'c> Players<'c> {
             .map(move |i| &self.players[(i + main_player_id) % self.players.len()])
     }
 
-    fn ids_from(&self, main_player_id: PlayerId) -> impl Iterator<Item = PlayerId> {
+    fn _ids_from(&self, main_player_id: PlayerId) -> impl Iterator<Item = PlayerId> {
         let len = self.players.len();
         (0..len).map(move |i| (i + main_player_id) % len)
     }
