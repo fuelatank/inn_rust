@@ -19,15 +19,15 @@ pub enum Place {
 }
 
 impl Place {
-    pub fn hand<'c, 'g>(player: &'g Player<'c>) -> Place {
+    pub fn hand(player: &Player) -> Place {
         Place::Player(player.id(), PlayerPlace::Hand)
     }
 
-    pub fn score<'c, 'g>(player: &'g Player<'c>) -> Place {
+    pub fn score(player: &Player) -> Place {
         Place::Player(player.id(), PlayerPlace::Score)
     }
 
-    pub fn board<'c, 'g>(player: &'g Player<'c>) -> Place {
+    pub fn board(player: &Player) -> Place {
         Place::Player(player.id(), PlayerPlace::Board)
     }
 }
