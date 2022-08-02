@@ -70,15 +70,13 @@ impl<'c> Player<'c> {
     pub fn other_view(&self) -> OtherPlayerView {
         OtherPlayerView {
             hand: self
-                .hand
-                .borrow()
+                .hand()
                 .as_vec()
                 .into_iter()
                 .map(|c| c.age())
                 .collect(),
             score: self
-                .score_pile
-                .borrow()
+                .score_pile()
                 .as_vec()
                 .into_iter()
                 .map(|c| c.age())
