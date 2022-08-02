@@ -51,7 +51,6 @@ impl<'c> Players<'c> {
                 .map(|i| {
                     Player::new(
                         i,
-                        Rc::clone(&logger),
                         Rc::clone(&pile),
                         Box::new(C::default()),
                         Box::new(C::default()),
@@ -67,12 +66,10 @@ impl<'c> Players<'c> {
         hand: BoxCardSet<'c>,
         score_pile: BoxCardSet<'c>,
         achievements: BoxAchievementSet<'c>,
-        logger: RcCell<Logger<'c>>,
     ) {
         let id = self.players.len();
         self.players.push(Player::new(
             id,
-            logger,
             Rc::clone(&self.main_card_pile),
             hand,
             score_pile,
