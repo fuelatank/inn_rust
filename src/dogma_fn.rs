@@ -34,39 +34,6 @@ pub const ARCHERY: DemandFlow = |player, opponent, game| {
     })
 };
 
-pub const OPTICS: ShareFlow = |player, game| {
-    Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
-        let card = game.draw_and_meld(player, 3).unwrap();
-        if card.contains(Icon::Crown) {
-            game.draw_and_score(player, 4);
-            done!()
-        } else {
-            let opt_card = s
-                .yield_(ExecutionState::new(
-                    player,
-                    Choose::Card {
-                        min_num: 1,
-                        max_num: Some(1),
-                        from: player.score_pile.borrow().as_vec(),
-                    },
-                ))
-                .expect("Generator got None")
-                .card();
-            let card = match opt_card {
-                Some(c) => c,
-                None => done!(),
-            };
-            let opponent = s
-                .yield_(ExecutionState::new(player, Choose::Opponent))
-                .expect("Generator got None")
-                .player();
-            game.transfer_card(Place::score(player), Place::score(opponent), card)
-                .unwrap();
-            done!()
-        }
-    })
-};
-
 pub const CODE_OF_LAWS: ShareFlow = |player, game| {
     Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
         let opt_card = s
@@ -99,5 +66,38 @@ pub const CODE_OF_LAWS: ShareFlow = |player, game| {
             game.splay(player, card.color(), Splay::Left);
         }
         done!()
+    })
+};
+
+pub const OPTICS: ShareFlow = |player, game| {
+    Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
+        let card = game.draw_and_meld(player, 3).unwrap();
+        if card.contains(Icon::Crown) {
+            game.draw_and_score(player, 4);
+            done!()
+        } else {
+            let opt_card = s
+                .yield_(ExecutionState::new(
+                    player,
+                    Choose::Card {
+                        min_num: 1,
+                        max_num: Some(1),
+                        from: player.score_pile.borrow().as_vec(),
+                    },
+                ))
+                .expect("Generator got None")
+                .card();
+            let card = match opt_card {
+                Some(c) => c,
+                None => done!(),
+            };
+            let opponent = s
+                .yield_(ExecutionState::new(player, Choose::Opponent))
+                .expect("Generator got None")
+                .player();
+            game.transfer_card(Place::score(player), Place::score(opponent), card)
+                .unwrap();
+            done!()
+        }
     })
 };
