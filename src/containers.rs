@@ -23,6 +23,9 @@ pub trait Removeable<'a, T, P> {
 
 pub trait CardSet<'a, T>: Addable<'a, T> + Removeable<'a, T, T> {
     fn as_vec(&'_ self) -> Vec<&'a T>;
+    fn as_iter(&self) -> Box<dyn Iterator<Item = &'a T> + 'a> {
+        Box::new(self.as_vec().into_iter())
+    }
 }
 
 impl<'a, T> Addable<'a, T> for Box<dyn CardSet<'a, T> + 'a> {

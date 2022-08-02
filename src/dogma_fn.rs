@@ -4,8 +4,8 @@ use crate::{
     action::RefChoice,
     enums::{Icon, Splay},
     flow::{DemandFlow, ShareFlow},
-    structure::{Place, PlayerPlace, RemoveParam, AddParam},
     state::{Choose, ExecutionState},
+    structure::{AddParam, Place, PlayerPlace, RemoveParam},
 };
 
 pub const ARCHERY: DemandFlow = |player, opponent, game| {
@@ -20,8 +20,7 @@ pub const ARCHERY: DemandFlow = |player, opponent, game| {
                     max_num: Some(1),
                     from: opponent
                         .hand()
-                        .as_vec()
-                        .into_iter()
+                        .as_iter()
                         .filter(|c| c.age() == age)
                         .collect(),
                 },
@@ -34,7 +33,8 @@ pub const ARCHERY: DemandFlow = |player, opponent, game| {
             Place::hand(player),
             RemoveParam::Card(cards[0]),
             AddParam::NoParam,
-        ).expect("todo");
+        )
+        .expect("todo");
         done!()
     })
 };
@@ -70,7 +70,8 @@ pub const OPTICS: ShareFlow = |player, game| {
                 Place::Player(opponent.id(), PlayerPlace::Score),
                 RemoveParam::Card(card),
                 AddParam::NoParam,
-            ).unwrap();
+            )
+            .unwrap();
             done!()
         }
     })
@@ -86,8 +87,7 @@ pub const CODE_OF_LAWS: ShareFlow = |player, game| {
                     max_num: Some(1),
                     from: player
                         .hand()
-                        .as_vec()
-                        .into_iter()
+                        .as_iter()
                         .filter(|card| !player.board().borrow().get_stack(card.color()).is_empty())
                         .collect(),
                 },
