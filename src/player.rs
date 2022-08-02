@@ -91,7 +91,7 @@ impl<'c> Player<'c> {
         transfer(&self.hand, Rc::clone(&self.main_pile), card)
     }
 
-    pub fn execute<'g>(&'g self, card: &'c Card, game: &'g Players<'c>) -> FlowState<'c, 'g> {
+    pub fn execute<'g>(&'g self, _card: &'c Card, _game: &'g Players<'c>) -> FlowState<'c, 'g> {
         unimplemented!()
         /*Gn::new_scoped_local(move |mut s| {
             let _main_icon = card.main_icon();

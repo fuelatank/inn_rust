@@ -48,8 +48,8 @@ impl<'c, 'g> ExecutionState<'c, 'g> {
 
 #[derive(Debug)]
 pub struct ExecutionObs<'c> {
-    state: Choose<'c>,
-    card: &'c Card,
+    pub state: Choose<'c>,
+    pub card: &'c Card,
 }
 
 pub enum State<'c, 'g> {

@@ -1,6 +1,4 @@
 use crate::action::RefChoice;
-use crate::card::Card;
-use crate::containers::CardSet;
 use crate::game::Players;
 use crate::player::Player;
 use crate::state::ExecutionState;
@@ -16,8 +14,8 @@ pub type DemandFlow =
 mod tests {
     //use crate::game::transfer_selem;
     use super::*;
-    use crate::card::Achievement;
-    use crate::containers::Addable;
+    use crate::card::{Achievement, Card};
+    use crate::containers::{Addable, CardSet};
 
     fn _chemistry2<'a, T: CardSet<'a, Card>, U: Addable<'a, Achievement> + Default>(
     ) -> Box<dyn Fn(&mut Players, usize)> {

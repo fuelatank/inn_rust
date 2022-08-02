@@ -388,7 +388,7 @@ impl<'c> OuterGame<'c> {
         .build()
     }
 
-    fn is_available_step_action(&self, action: &MainAction<'c>) -> bool {
+    fn _is_available_step_action(&self, action: &MainAction<'c>) -> bool {
         self.with(|fields| match action {
             MainAction::Draw => true,
             MainAction::Meld(c) => {
@@ -490,7 +490,6 @@ mod tests {
         containers::VecSet,
         dogma_fn,
         enums::{Color::*, Icon::*},
-        state::ExecutionObs,
     };
 
     #[test]
