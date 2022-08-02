@@ -6,6 +6,7 @@ use generator::LocalGenerator;
 
 pub type FlowState<'c, 'g> = LocalGenerator<'g, RefChoice<'c, 'g>, ExecutionState<'c, 'g>>;
 
+// may consider Fn instead of fn
 pub type ShareFlow = for<'c, 'g> fn(&'g Player<'c>, &'g Players<'c>) -> FlowState<'c, 'g>;
 pub type DemandFlow =
     for<'c, 'g> fn(&'g Player<'c>, &'g Player<'c>, &'g Players<'c>) -> FlowState<'c, 'g>;
