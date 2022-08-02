@@ -4,7 +4,7 @@ use crate::{
     action::RefChoice,
     enums::{Icon, Splay},
     flow::{DemandFlow, ShareFlow},
-    logger::{Place, PlayerPlace, RemoveParam, AddParam},
+    structure::{Place, PlayerPlace, RemoveParam, AddParam},
     state::{Choose, ExecutionState},
 };
 
@@ -30,8 +30,8 @@ pub const ARCHERY: DemandFlow = |player, opponent, game| {
             .cards();
         // TODO should handle failure case
         game.transfer(
-            Place::Player(opponent.id(), PlayerPlace::Hand),
-            Place::Player(player.id(), PlayerPlace::Hand),
+            Place::hand(opponent),
+            Place::hand(player),
             RemoveParam::Card(cards[0]),
             AddParam::NoParam,
         ).expect("todo");

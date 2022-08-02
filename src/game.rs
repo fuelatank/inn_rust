@@ -5,10 +5,11 @@ use crate::containers::{Addable, BoxAchievementSet, BoxCardSet, CardSet, Removea
 use crate::enums::{Color, Splay};
 use crate::error::{InnResult, InnovationError};
 use crate::flow::FlowState;
-use crate::logger::{AddParam, Logger, Operation, Place, PlayerPlace, RemoveParam};
+use crate::logger::{Logger, Operation};
 use crate::observation::{ObsType, Observation};
 use crate::player::Player;
 use crate::state::State;
+use crate::structure::{AddParam, Place, PlayerPlace, RemoveParam};
 use generator::Gn;
 use ouroboros::self_referencing;
 use std::cell::RefCell;
@@ -67,12 +68,8 @@ impl<'c> Players<'c> {
         achievements: BoxAchievementSet<'c>,
     ) {
         let id = self.players.len();
-        self.players.push(Player::new(
-            id,
-            hand,
-            score_pile,
-            achievements,
-        ))
+        self.players
+            .push(Player::new(id, hand, score_pile, achievements))
     }
 
     pub fn num_players(&self) -> usize {
