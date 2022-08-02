@@ -2,9 +2,9 @@ use generator::{done, Gn, Scope};
 
 use crate::{
     action::RefChoice,
-    containers::transfer,
     enums::{Icon, Splay},
     flow::{DemandFlow, ShareFlow},
+    logger::{Place, PlayerPlace, RemoveParam, AddParam},
     state::{Choose, ExecutionState},
 };
 
@@ -19,8 +19,7 @@ pub const ARCHERY: DemandFlow = |player, opponent, game| {
                     min_num: 1,
                     max_num: Some(1),
                     from: opponent
-                        .hand
-                        .borrow()
+                        .hand()
                         .as_vec()
                         .into_iter()
                         .filter(|c| c.age() == age)
@@ -29,8 +28,14 @@ pub const ARCHERY: DemandFlow = |player, opponent, game| {
             ))
             .expect("Generator got None")
             .cards();
-        transfer(&opponent.hand, &player.hand, cards[0]);
-        generator::done!()
+        // TODO should handle failure case
+        game.transfer(
+            Place::Player(opponent.id(), PlayerPlace::Hand),
+            Place::Player(player.id(), PlayerPlace::Hand),
+            RemoveParam::Card(cards[0]),
+            AddParam::NoParam,
+        ).expect("todo");
+        done!()
     })
 };
 
@@ -60,7 +65,12 @@ pub const OPTICS: ShareFlow = |player, game| {
                 .yield_(ExecutionState::new(player, Choose::Opponent))
                 .expect("Generator got None")
                 .player();
-            transfer(&player.score_pile, &opponent.score_pile, card);
+            game.transfer(
+                Place::Player(player.id(), PlayerPlace::Score),
+                Place::Player(opponent.id(), PlayerPlace::Score),
+                RemoveParam::Card(card),
+                AddParam::NoParam,
+            ).unwrap();
             done!()
         }
     })
@@ -75,8 +85,7 @@ pub const CODE_OF_LAWS: ShareFlow = |player, game| {
                     min_num: 0,
                     max_num: Some(1),
                     from: player
-                        .hand
-                        .borrow()
+                        .hand()
                         .as_vec()
                         .into_iter()
                         .filter(|card| !player.board().borrow().get_stack(card.color()).is_empty())

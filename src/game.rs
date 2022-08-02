@@ -230,7 +230,7 @@ impl<'c> Players<'c> {
         })
     }
 
-    fn transfer(
+    pub fn transfer(
         &self,
         from: Place,
         to: Place,
@@ -388,7 +388,7 @@ impl<'c> OuterGame<'c> {
             MainAction::Draw => true,
             MainAction::Meld(c) => {
                 let player = &fields.players.players[fields.turn.player_id()];
-                player.hand.borrow().as_vec().contains(c)
+                player.hand().as_vec().contains(c)
             }
             MainAction::Achieve(_) => todo!(),
             MainAction::Execute(c) => {
