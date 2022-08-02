@@ -77,6 +77,7 @@ impl<'c> Game<'c> {
 }
 
 // should also have the initial arrangement etc.
+#[derive(Default)]
 pub struct Logger<'c> {
     history: Vec<Game<'c>>,
     current_game: Option<Game<'c>>,

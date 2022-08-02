@@ -337,8 +337,8 @@ impl Turn {
     fn new(num_players: usize, first_player: usize) -> Turn {
         Turn {
             action: 0,
-            num_players: num_players,
-            first_player: first_player,
+            num_players,
+            first_player,
         }
     }
 
@@ -377,7 +377,7 @@ impl<'c> OuterGame<'c> {
         let logger = Rc::new(RefCell::new(Logger::new()));
         OuterGameBuilder {
             players: Players::new::<C, A>(num_players, cards, Rc::clone(&logger)),
-            players_ref_builder: |players| &players,
+            players_ref_builder: |players| players,
             turn: Turn::new(num_players, 0),
             logger,
             state: State::Main,

@@ -36,7 +36,7 @@ pub enum RefChoice<'c, 'g> {
 impl<'c, 'g> RefChoice<'c, 'g> {
     pub fn card(self) -> Option<&'c Card> {
         if let RefChoice::Card(cards) = self {
-            if cards.len() == 0 {
+            if cards.is_empty() {
                 None
             } else if cards.len() == 1 {
                 Some(cards[0])
