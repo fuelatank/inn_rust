@@ -51,7 +51,6 @@ impl<'c> Players<'c> {
                 .map(|i| {
                     Player::new(
                         i,
-                        Rc::clone(&pile),
                         Box::new(C::default()),
                         Box::new(C::default()),
                         Box::new(A::default()),
@@ -70,7 +69,6 @@ impl<'c> Players<'c> {
         let id = self.players.len();
         self.players.push(Player::new(
             id,
-            Rc::clone(&self.main_card_pile),
             hand,
             score_pile,
             achievements,
@@ -403,17 +401,18 @@ impl<'c> OuterGame<'c> {
     pub fn step(&mut self, action: Action<'c>) -> Observation {
         let (player, obs_type) = self.with_mut(|fields| {
             fields.logger.borrow_mut().act(action.clone());
+            let game = *fields.players_ref;
             match action {
                 Action::Step(action) => match fields.state {
                     State::Main => {
-                        let player = (*fields.players_ref).player_at(fields.turn.player_id());
+                        let player = game.player_at(fields.turn.player_id());
                         match action {
                             MainAction::Draw => {
-                                player.draw(player.age());
+                                game.draw(player, player.age());
                                 fields.turn.next();
                             }
                             MainAction::Meld(card) => {
-                                player.meld(card);
+                                game.meld(player, card);
                                 fields.turn.next();
                             }
                             MainAction::Achieve(_age) => {
@@ -433,7 +432,7 @@ impl<'c> OuterGame<'c> {
                 Action::Executing(action) => match fields.state {
                     State::Main => panic!("State and action mismatched"),
                     State::Executing(state) => {
-                        state.set_para(action.to_ref(*fields.players_ref));
+                        state.set_para(action.to_ref(game));
                     }
                 },
             }
