@@ -12,6 +12,7 @@ use crate::{
     structure::Place,
 };
 
+// wrapper of Scope
 // which lifetime in Scope???
 struct Context<'a, 'c, 'g> {
     s: Scope<'a, RefChoice<'c, 'g>, ExecutionState<'c, 'g>>,
@@ -94,16 +95,33 @@ where
     }))
 }
 
-pub fn agriculture() -> Vec<Dogma> {
-    vec![shared(|player, game, mut ctx| {
-        let card = ctx.may(player, |ctx| {
-            ctx.choose_one_card(player, player.hand().as_vec())
-        });
-        if let Some(card) = card.flatten() {
-            game.r#return(player, card);
-            game.draw_and_score(player, card.age());
-        }
-    })]
+// TODO: simplify
+pub fn archery() -> Vec<Dogma> {
+    vec![Dogma::Demand(Box::new(|player, opponent, game| {
+        Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
+            game.draw(opponent, 1);
+            let age = opponent.age();
+            let cards = s
+                .yield_(ExecutionState::new(
+                    opponent,
+                    Choose::Card {
+                        min_num: 1,
+                        max_num: Some(1),
+                        from: opponent
+                            .hand()
+                            .as_iter()
+                            .filter(|c| c.age() == age)
+                            .collect(),
+                    },
+                ))
+                .expect("Generator got None")
+                .cards();
+            // TODO should handle failure case
+            game.transfer_card(Place::hand(opponent), Place::hand(player), cards[0])
+                .expect("todo");
+            done!()
+        })
+    }))]
 }
 
 // inner state
@@ -134,53 +152,19 @@ pub fn oars() -> Vec<Dogma> {
     ]
 }
 
-/*
-// OR STRUCT?
-// create one in every execution
-// but that will cause waste
-// so what about RcCell?
-
-struct Oars { transferred: bool }
-impl Oars {
+pub fn agriculture() -> Vec<Dogma> {
+    vec![shared(|player, game, mut ctx| {
+        let card = ctx.may(player, |ctx| {
+            ctx.choose_one_card(player, player.hand().as_vec())
+        });
+        if let Some(card) = card.flatten() {
+            game.r#return(player, card);
+            game.draw_and_score(player, card.age());
+        }
+    })]
 }
 
-pub const OARS_1: DemandFlow = demand(|player, opponent, game, ctx| {
-    let card = yield ctx.chooseOneCard(opponent, opponent.hand.has(crown));
-    card.then(|card| {
-        game.transfer(opponent.hand, player.score, card);
-        env.set(true);
-    });
-})
-*/
-
-pub fn archery() -> Vec<Dogma> {
-    vec![Dogma::Demand(Box::new(|player, opponent, game| {
-        Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
-            game.draw(opponent, 1);
-            let age = opponent.age();
-            let cards = s
-                .yield_(ExecutionState::new(
-                    opponent,
-                    Choose::Card {
-                        min_num: 1,
-                        max_num: Some(1),
-                        from: opponent
-                            .hand()
-                            .as_iter()
-                            .filter(|c| c.age() == age)
-                            .collect(),
-                    },
-                ))
-                .expect("Generator got None")
-                .cards();
-            // TODO should handle failure case
-            game.transfer_card(Place::hand(opponent), Place::hand(player), cards[0])
-                .expect("todo");
-            done!()
-        })
-    }))]
-}
-
+// TODO: simplify
 pub fn code_of_laws() -> Vec<Dogma> {
     vec![Dogma::Share(Box::new(|player, game| {
         Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
@@ -220,6 +204,7 @@ pub fn code_of_laws() -> Vec<Dogma> {
     }))]
 }
 
+// TODO: simplify
 pub fn optics() -> Vec<Dogma> {
     vec![Dogma::Share(Box::new(|player, game| {
         Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
