@@ -484,7 +484,6 @@ mod tests {
     use super::*;
     use crate::{
         action::IdChoice,
-        card::Dogma::*,
         containers::VecSet,
         dogma_fn,
         enums::{Color::*, Icon::*},

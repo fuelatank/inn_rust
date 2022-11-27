@@ -84,7 +84,7 @@ where
 
 fn demand<F>(f: F) -> DemandFlow
 where
-    F: for<'c, 'g> Fn(&'g Player, &'g Player, &'g Players, Context) + 'static,
+    F: for<'a, 'c, 'g> Fn(&'g Player<'c>, &'g Player<'c>, &'g Players<'c>, Context<'a, 'c, 'g>) + 'static,
 {
     let rcf = Rc::new(f);
     Box::new(move |player, opponent, game| {
@@ -121,18 +121,18 @@ pub fn oars() -> Vec<Dogma> {
     let transferred: RcCell<bool> = Rc::new(RefCell::new(false));
     let view = Rc::clone(&transferred);
     vec![
-        Dogma::Demand(demand(|player, opponent, game, ctx| {
-            todo!()
-            /*let card = ctx.chooseOneCard(opponent, opponent.hand.has(crown));
+        Dogma::Demand(demand(move |player, opponent, game, mut ctx| {
+            let card = ctx.choose_one_card(opponent, opponent.hand().has_icon(Icon::Crown));
             card.and_then(|card| {
-                // game.transfer(opponent.hand, player.score, card);
+                // TODO: handle the Result
+                game.transfer_card(Place::hand(opponent), Place::score(player), card).unwrap();
                 *transferred.borrow_mut() = true;
                 Some(())
-            });*/
+            });
         })),
-        Dogma::Share(shared(move |player, game, ctx| {
+        Dogma::Share(shared(move |player, game, _ctx| {
             if !*view.borrow() {
-                // player.draw(1);
+                game.draw(player, 1);
             }
         })),
     ]
