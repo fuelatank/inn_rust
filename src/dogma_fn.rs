@@ -99,11 +99,10 @@ pub fn agriculture() -> Vec<Dogma> {
         let card = ctx.may(player, |ctx| {
             ctx.choose_one_card(player, player.hand().as_vec())
         });
-        card.flatten().and_then(|card| {
+        if let Some(card) = card.flatten() {
             game.r#return(player, card);
             game.draw_and_score(player, card.age());
-            Some(())
-        });
+        }
     })]
 }
 
@@ -120,13 +119,12 @@ pub fn oars() -> Vec<Dogma> {
     vec![
         demand(move |player, opponent, game, mut ctx| {
             let card = ctx.choose_one_card(opponent, opponent.hand().has_icon(Icon::Crown));
-            card.and_then(|card| {
+            if let Some(card) = card {
                 // TODO: handle the Result
                 game.transfer_card(Place::hand(opponent), Place::score(player), card)
                     .unwrap();
                 *transferred.borrow_mut() = true;
-                Some(())
-            });
+            }
         }),
         shared(move |player, game, _ctx| {
             if !*view.borrow() {
