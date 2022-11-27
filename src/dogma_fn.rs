@@ -1,7 +1,4 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 use generator::{done, Gn, Scope};
 
@@ -9,7 +6,6 @@ use crate::{
     action::RefChoice,
     card::{Card, Dogma},
     enums::{Icon, Splay},
-    flow::{DemandFlow, ShareFlow},
     game::{Players, RcCell},
     player::Player,
     state::{Choose, ExecutionState},
@@ -62,7 +58,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
     }
 }
 
-fn shared<F>(f: F) -> ShareFlow
+fn shared<F>(f: F) -> Dogma
 where
     F: for<'a, 'c, 'g> Fn(&'g Player<'c>, &'g Players<'c>, Context<'a, 'c, 'g>) + 'static,
 {
@@ -72,33 +68,34 @@ where
     // so Rc is used
     // TODO: check if there's some relationship between Rc and Box here
     let rcf = Rc::new(f);
-    Box::new(move |player, game| {
+    Dogma::Share(Box::new(move |player, game| {
         let cloned = Rc::clone(&rcf);
         Gn::new_scoped_local(move |s| {
             let ctx = Context::new(s);
             cloned(player, game, ctx);
             done!()
         })
-    })
+    }))
 }
 
-fn demand<F>(f: F) -> DemandFlow
+fn demand<F>(f: F) -> Dogma
 where
-    F: for<'a, 'c, 'g> Fn(&'g Player<'c>, &'g Player<'c>, &'g Players<'c>, Context<'a, 'c, 'g>) + 'static,
+    F: for<'a, 'c, 'g> Fn(&'g Player<'c>, &'g Player<'c>, &'g Players<'c>, Context<'a, 'c, 'g>)
+        + 'static,
 {
     let rcf = Rc::new(f);
-    Box::new(move |player, opponent, game| {
+    Dogma::Demand(Box::new(move |player, opponent, game| {
         let cloned = Rc::clone(&rcf);
         Gn::new_scoped_local(move |s| {
             let ctx = Context::new(s);
             cloned(player, opponent, game, ctx);
             done!()
         })
-    })
+    }))
 }
 
 pub fn agriculture() -> Vec<Dogma> {
-    vec![Dogma::Share(shared(|player, game, mut ctx| {
+    vec![shared(|player, game, mut ctx| {
         let card = ctx.may(player, |ctx| {
             ctx.choose_one_card(player, player.hand().as_vec())
         });
@@ -107,7 +104,7 @@ pub fn agriculture() -> Vec<Dogma> {
             game.draw_and_score(player, card.age());
             Some(())
         });
-    }))]
+    })]
 }
 
 // inner state
@@ -121,20 +118,21 @@ pub fn oars() -> Vec<Dogma> {
     let transferred: RcCell<bool> = Rc::new(RefCell::new(false));
     let view = Rc::clone(&transferred);
     vec![
-        Dogma::Demand(demand(move |player, opponent, game, mut ctx| {
+        demand(move |player, opponent, game, mut ctx| {
             let card = ctx.choose_one_card(opponent, opponent.hand().has_icon(Icon::Crown));
             card.and_then(|card| {
                 // TODO: handle the Result
-                game.transfer_card(Place::hand(opponent), Place::score(player), card).unwrap();
+                game.transfer_card(Place::hand(opponent), Place::score(player), card)
+                    .unwrap();
                 *transferred.borrow_mut() = true;
                 Some(())
             });
-        })),
-        Dogma::Share(shared(move |player, game, _ctx| {
+        }),
+        shared(move |player, game, _ctx| {
             if !*view.borrow() {
                 game.draw(player, 1);
             }
-        })),
+        }),
     ]
 }
 
