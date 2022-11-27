@@ -540,7 +540,7 @@ mod tests {
             1,
             Red,
             [Castle, Lightblub, Empty, Castle],
-            vec![Demand(dogma_fn::ARCHERY)],
+            dogma_fn::archery(),
             String::from(""),
         );
         let code_of_laws = Card::new(
@@ -548,7 +548,7 @@ mod tests {
             1,
             Purple,
             [Empty, Crown, Crown, Leaf],
-            vec![Share(dogma_fn::CODE_OF_LAWS)],
+            dogma_fn::code_of_laws(),
             String::from("this is the doc of the card 'code of laws'"),
         );
         let optics = Card::new(
@@ -556,7 +556,7 @@ mod tests {
             3,
             Red,
             [Crown, Crown, Crown, Empty],
-            vec![Share(dogma_fn::OPTICS)],
+            dogma_fn::optics(),
             String::from("this is the doc of the card 'optics'"),
         );
         let cards = vec![&archery, &code_of_laws, &optics];
