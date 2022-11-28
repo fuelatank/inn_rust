@@ -1,15 +1,16 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, convert::TryInto, rc::Rc};
 
 use generator::{done, Gn, Scope};
+use strum::IntoEnumIterator;
 
 use crate::{
     action::RefChoice,
     card::{Card, Dogma},
-    enums::{Icon, Splay},
+    enums::{Color, Icon, Splay},
     game::{Players, RcCell},
     player::Player,
     state::{Choose, ExecutionState},
-    structure::Place,
+    structure::{AddParam, Place, RemoveParam},
 };
 
 // wrapper of Scope
@@ -21,6 +22,10 @@ struct Context<'a, 'c, 'g> {
 impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
     fn new(s: Scope<'a, RefChoice<'c, 'g>, ExecutionState<'c, 'g>>) -> Context<'a, 'c, 'g> {
         Context { s }
+    }
+
+    fn raw(&mut self) -> &mut Scope<'a, RefChoice<'c, 'g>, ExecutionState<'c, 'g>> {
+        &mut self.s
     }
 
     fn choose_one_card(&mut self, player: &'g Player<'c>, from: Vec<&'c Card>) -> Option<&'c Card> {
@@ -44,6 +49,77 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         }
     }
 
+    fn choose_card_at_most(
+        &mut self,
+        player: &'g Player<'c>,
+        from: Vec<&'c Card>,
+        max_num: Option<u8>,
+    ) -> Option<Vec<&'c Card>> {
+        // choose at least one if possible
+        let cards = self
+            .s
+            .yield_(ExecutionState::new(
+                player,
+                Choose::Card {
+                    min_num: 1,
+                    max_num,
+                    from,
+                },
+            ))
+            .expect("Generator got None")
+            .cards();
+        if !cards.is_empty() {
+            Some(cards)
+        } else {
+            None
+        }
+    }
+
+    fn choose_any_cards_up_to(
+        &mut self,
+        player: &'g Player<'c>,
+        from: Vec<&'c Card>,
+        max_num: Option<u8>,
+    ) -> Vec<&'c Card> {
+        // can choose 0 to max_num cards
+        self.s
+            .yield_(ExecutionState::new(
+                player,
+                Choose::Card {
+                    min_num: 0,
+                    max_num,
+                    from,
+                },
+            ))
+            .expect("Generator got None")
+            .cards()
+    }
+
+    fn choose_cards_exact(
+        &mut self,
+        player: &'g Player<'c>,
+        from: Vec<&'c Card>,
+        num: u8,
+    ) -> Option<Vec<&'c Card>> {
+        let cards = self
+            .s
+            .yield_(ExecutionState::new(
+                player,
+                Choose::Card {
+                    min_num: num,
+                    max_num: Some(num),
+                    from,
+                },
+            ))
+            .expect("Generator got None")
+            .cards();
+        if cards.is_empty() {
+            None
+        } else {
+            Some(cards)
+        }
+    }
+
     fn choose_yn(&mut self, player: &'g Player<'c>) -> bool {
         self.s
             .yield_(ExecutionState::new(player, Choose::Yn))
@@ -56,6 +132,48 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         F: FnOnce(&mut Context<'a, 'c, 'g>) -> T,
     {
         self.choose_yn(player).then(|| f(self))
+    }
+
+    fn may_splay(
+        &mut self,
+        player: &'g Player<'c>,
+        game: &'g Players<'c>,
+        color: Color,
+        direction: Splay,
+    ) -> bool {
+        let board = player.board().borrow();
+        if board.get_stack(color).len() <= 1 || board.is_splayed(color, direction) {
+            return false;
+        }
+        self.may(player, |_| {
+            game.splay(player, color, direction);
+        })
+        .is_some()
+    }
+    fn may_splays(
+        &mut self,
+        player: &'g Player<'c>,
+        game: &'g Players<'c>,
+        colors: Vec<Color>,
+        direction: Splay,
+    ) -> bool {
+        let board = player.board().borrow();
+        let available_top_cards: Vec<_> = colors
+            .into_iter()
+            .filter(|&color| board.get_stack(color).can_splay(direction))
+            .map(|color| board.get_stack(color).top_card().unwrap())
+            .collect();
+        if available_top_cards.is_empty() {
+            return false;
+        }
+        self.may(player, |ctx| {
+            let color = ctx
+                .choose_one_card(player, available_top_cards)
+                .unwrap()
+                .color();
+            game.splay(player, color, direction);
+        })
+        .is_some()
     }
 }
 
@@ -93,6 +211,56 @@ where
             done!()
         })
     }))
+}
+
+pub fn pottery() -> Vec<Dogma> {
+    vec![
+        shared(|player, game, mut ctx| {
+            if let Some(cards) = ctx
+                .may(player, |ctx| {
+                    ctx.choose_card_at_most(player, player.hand().as_vec(), Some(3))
+                })
+                .flatten()
+            {
+                let n = cards.len();
+                for card in cards {
+                    game.r#return(player, card);
+                }
+                game.draw(player, n.try_into().unwrap());
+            }
+        }),
+        shared(|player, game, _ctx| {
+            game.draw(player, 1);
+        }),
+    ]
+}
+
+pub fn tools() -> Vec<Dogma> {
+    vec![
+        shared(|player, game, mut ctx| {
+            // need confirmation of rule, any or exact 3 cards?
+            let cards = ctx
+                .may(player, |ctx| {
+                    ctx.choose_cards_exact(player, player.hand().as_vec(), 3)
+                })
+                .flatten();
+            if cards.is_some() {
+                game.draw_and_meld(player, 3);
+            }
+        }),
+        shared(|player, game, mut ctx| {
+            let card = ctx
+                .may(player, |ctx| {
+                    ctx.choose_one_card(player, player.hand().filtered_vec(|&c| c.age() == 3))
+                })
+                .flatten();
+            if card.is_some() {
+                game.draw(player, 1);
+                game.draw(player, 1);
+                game.draw(player, 1);
+            }
+        }),
+    ]
 }
 
 // TODO: simplify
@@ -202,6 +370,52 @@ pub fn code_of_laws() -> Vec<Dogma> {
             done!()
         })
     }))]
+}
+
+pub fn monotheism() -> Vec<Dogma> {
+    vec![
+        demand(|player, opponent, game, mut ctx| {
+            let available_cards: Vec<_> = opponent
+                .board()
+                .borrow()
+                .top_cards()
+                .into_iter()
+                .filter(|&card| player.board().borrow().get_stack(card.color()).is_empty())
+                .collect();
+            // you must transfer a top card in available_cards
+            // from your board to my score pile! If you do, draw and tuck a 1!
+            let chosen = ctx.choose_one_card(opponent, available_cards);
+            if chosen.is_some() {
+                game.transfer(
+                    Place::board(opponent),
+                    Place::score(player),
+                    RemoveParam::Top(true),
+                    AddParam::NoParam,
+                )
+                .unwrap();
+                game.draw_and_tuck(opponent, 1);
+            }
+        }),
+        shared(|player, game, _ctx| {
+            game.draw_and_tuck(player, 1);
+        }),
+    ]
+}
+
+pub fn philosophy() -> Vec<Dogma> {
+    vec![
+        shared(|player, game, mut ctx| {
+            ctx.may_splays(player, game, Color::iter().collect(), Splay::Left);
+        }),
+        shared(|player, game, mut ctx| {
+            if !player.score_pile().as_vec().is_empty() && ctx.choose_yn(player) {
+                let card = ctx
+                    .choose_one_card(player, player.score_pile().as_vec())
+                    .unwrap();
+                game.score(player, card);
+            }
+        }),
+    ]
 }
 
 // TODO: simplify
