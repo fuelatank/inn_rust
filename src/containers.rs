@@ -1,4 +1,5 @@
 use crate::card::{Achievement, Card};
+use crate::enums::Icon;
 use std::cell::RefCell;
 use std::ops::Deref;
 
@@ -23,6 +24,9 @@ pub trait Removeable<'a, T, P> {
 
 pub trait CardSet<'a, T>: Addable<'a, T> + Removeable<'a, T, T> {
     fn as_vec(&'_ self) -> Vec<&'a T>;
+    fn as_iter(&self) -> Box<dyn Iterator<Item = &'a T> + 'a> {
+        Box::new(self.as_vec().into_iter())
+    }
 }
 
 impl<'a, T> Addable<'a, T> for Box<dyn CardSet<'a, T> + 'a> {
@@ -34,6 +38,20 @@ impl<'a, T> Addable<'a, T> for Box<dyn CardSet<'a, T> + 'a> {
 impl<'a, T> Removeable<'a, T, T> for Box<dyn CardSet<'a, T> + 'a> {
     fn remove(&mut self, elem: &T) -> Option<&'a T> {
         (**self).remove(elem)
+    }
+}
+
+impl<'a, 'b, T> dyn CardSet<'a, T> + 'b {
+    pub fn filtered_vec<P>(&self, predicate: P) -> Vec<&'a T>
+    where P: FnMut(&&'a T) -> bool
+    {
+        self.as_iter().filter(predicate).collect()
+    }
+}
+
+impl<'a, 'b> dyn CardSet<'a, Card> + 'b {
+    pub fn has_icon(&self, icon: Icon) -> Vec<&'a Card> {
+        self.filtered_vec(|&c| c.contains(icon))
     }
 }
 

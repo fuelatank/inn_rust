@@ -5,10 +5,11 @@ use crate::containers::{Addable, BoxAchievementSet, BoxCardSet, CardSet, Removea
 use crate::enums::{Color, Splay};
 use crate::error::{InnResult, InnovationError};
 use crate::flow::FlowState;
-use crate::logger::{AddParam, Logger, Operation, Place, PlayerPlace, RemoveParam};
+use crate::logger::{Logger, Operation};
 use crate::observation::{ObsType, Observation};
 use crate::player::Player;
 use crate::state::State;
+use crate::structure::{AddParam, Place, PlayerPlace, RemoveParam};
 use generator::Gn;
 use ouroboros::self_referencing;
 use std::cell::RefCell;
@@ -67,12 +68,8 @@ impl<'c> Players<'c> {
         achievements: BoxAchievementSet<'c>,
     ) {
         let id = self.players.len();
-        self.players.push(Player::new(
-            id,
-            hand,
-            score_pile,
-            achievements,
-        ))
+        self.players
+            .push(Player::new(id, hand, score_pile, achievements))
     }
 
     pub fn num_players(&self) -> usize {
@@ -129,6 +126,17 @@ impl<'c> Players<'c> {
         )
         .ok()
     }
+
+    pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+        self.transfer(
+            Place::MainCardPile,
+            Place::Player(player.id(), PlayerPlace::Board),
+            RemoveParam::Age(age),
+            AddParam::Top(false),
+        )
+        .ok()
+    }
+
 
     pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
@@ -230,7 +238,7 @@ impl<'c> Players<'c> {
         })
     }
 
-    fn transfer(
+    pub fn transfer(
         &self,
         from: Place,
         to: Place,
@@ -322,6 +330,11 @@ impl<'c> Players<'c> {
             None => Err(InnovationError::CardNotFound),
         }
     }
+
+    pub fn transfer_card(&self, from: Place, to: Place, card: &'c Card) -> InnResult<()> {
+        self.transfer(from, to, RemoveParam::Card(card), AddParam::NoParam)
+            .map(|_| ())
+    }
 }
 
 #[derive(Debug)]
@@ -388,7 +401,7 @@ impl<'c> OuterGame<'c> {
             MainAction::Draw => true,
             MainAction::Meld(c) => {
                 let player = &fields.players.players[fields.turn.player_id()];
-                player.hand.borrow().as_vec().contains(c)
+                player.hand().as_vec().contains(c)
             }
             MainAction::Achieve(_) => todo!(),
             MainAction::Execute(c) => {
@@ -482,7 +495,6 @@ mod tests {
     use super::*;
     use crate::{
         action::IdChoice,
-        card::Dogma::*,
         containers::VecSet,
         dogma_fn,
         enums::{Color::*, Icon::*},
@@ -538,7 +550,7 @@ mod tests {
             1,
             Red,
             [Castle, Lightblub, Empty, Castle],
-            vec![Demand(dogma_fn::ARCHERY)],
+            dogma_fn::archery(),
             String::from(""),
         );
         let code_of_laws = Card::new(
@@ -546,7 +558,7 @@ mod tests {
             1,
             Purple,
             [Empty, Crown, Crown, Leaf],
-            vec![Share(dogma_fn::CODE_OF_LAWS)],
+            dogma_fn::code_of_laws(),
             String::from("this is the doc of the card 'code of laws'"),
         );
         let optics = Card::new(
@@ -554,7 +566,7 @@ mod tests {
             3,
             Red,
             [Crown, Crown, Crown, Empty],
-            vec![Share(dogma_fn::OPTICS)],
+            dogma_fn::optics(),
             String::from("this is the doc of the card 'optics'"),
         );
         let cards = vec![&archery, &code_of_laws, &optics];

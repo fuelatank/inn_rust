@@ -3,48 +3,9 @@ use crate::{
     card::Card,
     card_pile::CardOrder,
     enums::{Color, Splay},
-    error::{InnResult, InnovationError},
     game::PlayerId,
+    structure::Place,
 };
-
-#[derive(Copy, Clone)]
-pub enum PlayerPlace {
-    Hand,
-    Score,
-    Board,
-}
-
-#[derive(Copy, Clone)]
-pub enum Place {
-    MainCardPile,
-    Player(usize, PlayerPlace),
-}
-
-pub enum RemoveParam<'c> {
-    Age(u8),
-    Card(&'c Card),
-    Top(bool),
-    ColoredTop(Color, bool),
-    Index(usize),
-    ColoredIndex(Color, usize),
-    NoParam,
-}
-
-pub enum AddParam {
-    Top(bool),
-    Index(usize),
-    NoParam,
-}
-
-impl<'c> RemoveParam<'c> {
-    pub fn age(self) -> InnResult<u8> {
-        if let RemoveParam::Age(age) = self {
-            Ok(age)
-        } else {
-            Err(InnovationError::ParamUnwrapError)
-        }
-    }
-}
 
 pub enum Operation<'c> {
     Splay(PlayerId, Color, Splay),

@@ -1,4 +1,6 @@
-#[derive(Copy, Clone)]
+use strum_macros::EnumIter;
+
+#[derive(Copy, Clone, EnumIter)]
 pub enum Color {
     Blue,
     Red,
@@ -30,7 +32,7 @@ pub enum Icon {
     Empty,
 }
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq, Default, Clone, Copy, EnumIter)]
 pub enum Splay {
     #[default]
     NoSplay,

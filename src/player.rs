@@ -2,7 +2,7 @@ use crate::board::Board;
 use crate::containers::{BoxAchievementSet, BoxCardSet};
 use crate::enums::{Color, Splay};
 use crate::observation::{MainPlayerView, OtherPlayerView};
-use std::cell::RefCell;
+use std::cell::{RefCell, Ref};
 
 pub struct Player<'c> {
     id: usize,
@@ -36,6 +36,14 @@ impl<'c> Player<'c> {
         self.main_board.borrow().highest_age()
     }
 
+    pub fn hand(&self) -> Ref<BoxCardSet<'c>> {
+        self.hand.borrow()
+    }
+
+    pub fn score_pile(&self) -> Ref<BoxCardSet<'c>> {
+        self.score_pile.borrow()
+    }
+
     pub fn board(&self) -> &RefCell<Board<'c>> {
         &self.main_board
     }
@@ -62,15 +70,13 @@ impl<'c> Player<'c> {
     pub fn other_view(&self) -> OtherPlayerView {
         OtherPlayerView {
             hand: self
-                .hand
-                .borrow()
+                .hand()
                 .as_vec()
                 .into_iter()
                 .map(|c| c.age())
                 .collect(),
             score: self
-                .score_pile
-                .borrow()
+                .score_pile()
                 .as_vec()
                 .into_iter()
                 .map(|c| c.age())
