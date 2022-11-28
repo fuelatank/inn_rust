@@ -59,7 +59,15 @@ impl<'a> Stack<'a> {
         self.cards.contains(&card)
     }
 
-    fn top_card(&self) -> Option<&'a Card> {
+    pub fn len(&self) -> usize {
+        self.cards.len()
+    }
+
+    pub fn can_splay(&self, direction: Splay) -> bool {
+        self.cards.len() >= 2 && !self.is_splayed(direction)
+    }
+
+    pub fn top_card(&self) -> Option<&'a Card> {
         match self.cards.front() {
             Some(v) => Some(*v),
             None => None,
@@ -114,7 +122,7 @@ impl<'a> Board<'a> {
         self.stacks[card.color().as_usize()].insert(card, index)
     }
 
-    fn top_cards(&self) -> Vec<&Card> {
+    pub fn top_cards(&self) -> Vec<&'a Card> {
         let mut r: Vec<&Card> = Vec::new();
         for stack in self.stacks.iter() {
             match stack.top_card() {
@@ -125,7 +133,7 @@ impl<'a> Board<'a> {
         r
     }
 
-    fn highest_top_card(&self) -> Option<&Card> {
+    fn highest_top_card(&self) -> Option<&'a Card> {
         let top_cards = self.top_cards();
         top_cards.into_iter().max_by_key(|card| card.age())
     }

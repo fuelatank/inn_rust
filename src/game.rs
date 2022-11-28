@@ -127,6 +127,17 @@ impl<'c> Players<'c> {
         .ok()
     }
 
+    pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+        self.transfer(
+            Place::MainCardPile,
+            Place::Player(player.id(), PlayerPlace::Board),
+            RemoveParam::Age(age),
+            AddParam::Top(false),
+        )
+        .ok()
+    }
+
+
     pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
         self.transfer(
