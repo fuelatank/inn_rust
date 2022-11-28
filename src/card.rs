@@ -2,6 +2,7 @@ use crate::enums::{Color, Icon};
 use crate::flow::{DemandFlow, ShareFlow};
 use crate::observation::SingleAchievementView;
 use counter::Counter;
+use serde::Serialize;
 use std::fmt::Debug;
 
 pub enum Dogma {
@@ -9,6 +10,19 @@ pub enum Dogma {
     Demand(DemandFlow),
 }
 
+impl Serialize for Dogma {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Dogma::Share(_) => serializer.serialize_str("share"),
+            Dogma::Demand(_) => serializer.serialize_str("demand"),
+        }
+    }
+}
+
+#[derive(Serialize)]
 pub struct Card {
     name: String,
     age: u8,
@@ -70,7 +84,7 @@ impl Debug for Card {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Serialize)]
 pub enum SpecialAchievement {
     Universe,
     Wonder,

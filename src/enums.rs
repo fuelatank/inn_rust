@@ -1,6 +1,7 @@
+use serde::Serialize;
 use strum_macros::EnumIter;
 
-#[derive(Copy, Clone, EnumIter)]
+#[derive(Copy, Clone, EnumIter, Serialize)]
 pub enum Color {
     Blue,
     Red,
@@ -21,7 +22,7 @@ impl Color {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Copy, Clone)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Serialize)]
 pub enum Icon {
     Castle,
     Factory,
@@ -32,7 +33,7 @@ pub enum Icon {
     Empty,
 }
 
-#[derive(Debug, PartialEq, Default, Clone, Copy, EnumIter)]
+#[derive(Debug, PartialEq, Default, Clone, Copy, EnumIter, Serialize)]
 pub enum Splay {
     #[default]
     NoSplay,

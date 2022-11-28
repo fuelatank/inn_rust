@@ -12,6 +12,7 @@ use crate::state::State;
 use crate::structure::{AddParam, Place, PlayerPlace, RemoveParam};
 use generator::Gn;
 use ouroboros::self_referencing;
+use serde::Serialize;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -337,7 +338,7 @@ impl<'c> Players<'c> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Turn {
     action: usize,
     num_players: usize,

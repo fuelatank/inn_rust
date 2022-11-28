@@ -1,5 +1,7 @@
 use std::cell::Ref;
 
+use serde::{Serialize, Serializer};
+
 use crate::{
     board::Board,
     card::{Card, SpecialAchievement},
@@ -13,7 +15,11 @@ type BoardView<'a> = Ref<'a, Board<'a>>;
 type CardView<'a> = Vec<&'a Card>;
 type AgeView = Vec<u8>;
 
-#[derive(Debug)]
+fn serialize_board<S: Serializer>(board: &BoardView, serializer: S) -> Result<S::Ok, S::Error> {
+    board.serialize(serializer)
+}
+
+#[derive(Debug, Serialize)]
 pub enum SingleAchievementView<'a> {
     Special(&'a SpecialAchievement),
     Normal(u8),
@@ -31,29 +37,31 @@ impl TurnView {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct MainPlayerView<'a> {
     pub hand: CardView<'a>,
     pub score: CardView<'a>,
+    #[serde(serialize_with = "serialize_board")]
     pub board: BoardView<'a>,
     pub achievements: AchievementView<'a>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct OtherPlayerView<'a> {
     pub hand: AgeView,
     pub score: AgeView,
+    #[serde(serialize_with = "serialize_board")]
     pub board: BoardView<'a>,
     pub achievements: AchievementView<'a>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum ObsType<'a> {
     Main,
     Executing(ExecutionObs<'a>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Observation<'a> {
     pub main_player: MainPlayerView<'a>,
     pub other_players: Vec<OtherPlayerView<'a>>,

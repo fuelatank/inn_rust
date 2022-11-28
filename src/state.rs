@@ -1,8 +1,10 @@
+use serde::Serialize;
+
 use crate::card::Card;
 use crate::flow::FlowState;
 use crate::player::Player;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum Choose<'a> {
     Card {
         min_num: u8,
@@ -46,7 +48,7 @@ impl<'c, 'g> ExecutionState<'c, 'g> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct ExecutionObs<'c> {
     pub state: Choose<'c>,
     pub card: &'c Card,
