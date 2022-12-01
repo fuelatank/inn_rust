@@ -69,7 +69,7 @@ impl<'c> Players<'c> {
         self.cards
             .iter()
             .find(|&&card| card.name() == name)
-            .expect(&format!("no card named {name}"))
+            .unwrap_or_else(|| panic!("no card named {}", name))
     }
 
     pub fn add_player(
@@ -418,7 +418,7 @@ impl<'c> OuterGame<'c> {
             NoRefStepAction::Execute(c) => {
                 let players = fields.players;
                 let player = &fields.players.players[fields.turn.player_id()];
-                player.board().borrow().contains(&players.find_card(c))
+                player.board().borrow().contains(players.find_card(c))
             }
         })
     }
@@ -447,7 +447,7 @@ impl<'c> OuterGame<'c> {
                             }
                             RefStepAction::Execute(card) => {
                                 *fields.state =
-                                    State::Executing((*fields.players_ref).execute(player, card));
+                                    State::Executing(game.execute(player, card));
                             }
                         }
                     }
