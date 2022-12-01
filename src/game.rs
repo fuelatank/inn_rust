@@ -1,4 +1,4 @@
-use crate::action::{Action, MainAction};
+use crate::action::{Action, NoRefStepAction, RefAction, RefStepAction};
 use crate::card::{Achievement, Card, Dogma};
 use crate::card_pile::MainCardPile;
 use crate::containers::{Addable, BoxAchievementSet, BoxCardSet, CardSet, Removeable};
@@ -20,6 +20,7 @@ pub type RcCell<T> = Rc<RefCell<T>>;
 pub type PlayerId = usize;
 
 pub struct Players<'c> {
+    cards: Vec<&'c Card>,
     logger: RcCell<Logger<'c>>,
     main_card_pile: RcCell<MainCardPile<'c>>,
     players: Vec<Player<'c>>,
@@ -28,6 +29,7 @@ pub struct Players<'c> {
 impl<'c> Players<'c> {
     pub fn empty(logger: RcCell<Logger<'c>>) -> Players<'c> {
         Players {
+            cards: Vec::new(),
             logger,
             main_card_pile: Rc::new(RefCell::new(MainCardPile::empty())),
             players: vec![],
@@ -43,10 +45,11 @@ impl<'c> Players<'c> {
         C: CardSet<'c, Card> + Default + 'c,
         A: CardSet<'c, Achievement> + Default + 'c,
     {
-        let pile = Rc::new(RefCell::new(MainCardPile::new(cards)));
+        let pile = Rc::new(RefCell::new(MainCardPile::new(cards.clone())));
         // Should logger cards be initialized here, or in other methods?
         logger.borrow_mut().start(pile.borrow().contents());
         Players {
+            cards,
             logger: Rc::clone(&logger),
             main_card_pile: Rc::clone(&pile),
             players: (0..num_players)
@@ -60,6 +63,13 @@ impl<'c> Players<'c> {
                 })
                 .collect(),
         }
+    }
+
+    pub fn find_card(&self, name: &str) -> &'c Card {
+        self.cards
+            .iter()
+            .find(|&&card| card.name() == name)
+            .expect(&format!("no card named {name}"))
     }
 
     pub fn add_player(
@@ -137,7 +147,6 @@ impl<'c> Players<'c> {
         )
         .ok()
     }
-
 
     pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
@@ -397,43 +406,46 @@ impl<'c> OuterGame<'c> {
         .build()
     }
 
-    fn _is_available_step_action(&self, action: &MainAction<'c>) -> bool {
+    fn _is_available_step_action(&self, action: &NoRefStepAction) -> bool {
         self.with(|fields| match action {
-            MainAction::Draw => true,
-            MainAction::Meld(c) => {
-                let player = &fields.players.players[fields.turn.player_id()];
-                player.hand().as_vec().contains(c)
+            NoRefStepAction::Draw => true,
+            NoRefStepAction::Meld(c) => {
+                let players = fields.players;
+                let player = &players.players[fields.turn.player_id()];
+                player.hand().as_vec().contains(&players.find_card(c))
             }
-            MainAction::Achieve(_) => todo!(),
-            MainAction::Execute(c) => {
+            NoRefStepAction::Achieve(_) => todo!(),
+            NoRefStepAction::Execute(c) => {
+                let players = fields.players;
                 let player = &fields.players.players[fields.turn.player_id()];
-                player.board().borrow().contains(c)
+                player.board().borrow().contains(&players.find_card(c))
             }
         })
     }
 
-    pub fn step(&mut self, action: Action<'c>) -> Observation {
+    pub fn step(&mut self, action: Action) -> Observation {
         let (player, obs_type) = self.with_mut(|fields| {
             fields.logger.borrow_mut().act(action.clone());
             let game = *fields.players_ref;
+            let action = action.to_ref(game);
             match action {
-                Action::Step(action) => match fields.state {
+                RefAction::Step(action) => match fields.state {
                     State::Main => {
                         let player = game.player_at(fields.turn.player_id());
                         match action {
-                            MainAction::Draw => {
+                            RefStepAction::Draw => {
                                 game.draw(player, player.age());
                                 fields.turn.next();
                             }
-                            MainAction::Meld(card) => {
+                            RefStepAction::Meld(card) => {
                                 game.meld(player, card);
                                 fields.turn.next();
                             }
-                            MainAction::Achieve(_age) => {
+                            RefStepAction::Achieve(_age) => {
                                 fields.turn.next();
                                 todo!()
                             }
-                            MainAction::Execute(card) => {
+                            RefStepAction::Execute(card) => {
                                 *fields.state =
                                     State::Executing((*fields.players_ref).execute(player, card));
                             }
@@ -443,10 +455,10 @@ impl<'c> OuterGame<'c> {
                         panic!("State and action mismatched");
                     }
                 },
-                Action::Executing(action) => match fields.state {
+                RefAction::Executing(action) => match fields.state {
                     State::Main => panic!("State and action mismatched"),
                     State::Executing(state) => {
-                        state.set_para(action.to_ref(game));
+                        state.set_para(action);
                     }
                 },
             }
@@ -495,7 +507,7 @@ impl<'c> OuterGame<'c> {
 mod tests {
     use super::*;
     use crate::{
-        action::IdChoice,
+        action::NoRefChoice,
         containers::VecSet,
         dogma_fn,
         enums::{Color::*, Icon::*},
@@ -572,16 +584,16 @@ mod tests {
         );
         let cards = vec![&archery, &code_of_laws, &optics];
         let mut game = OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards);
-        game.step(Action::Step(MainAction::Draw));
-        game.step(Action::Step(MainAction::Draw));
-        println!("{:#?}", game.step(Action::Step(MainAction::Draw)));
-        println!("{:#?}", game.step(Action::Step(MainAction::Meld(&archery))));
+        game.step(Action::Step(NoRefStepAction::Draw));
+        game.step(Action::Step(NoRefStepAction::Draw));
+        println!("{:#?}", game.step(Action::Step(NoRefStepAction::Draw)));
+        println!("{:#?}", game.step(Action::Step(NoRefStepAction::Meld(String::from("Archery")))));
         {
-            let obs = game.step(Action::Step(MainAction::Execute(&archery)));
+            let obs = game.step(Action::Step(NoRefStepAction::Execute(String::from("Archery"))));
             assert!(matches!(obs.obstype, ObsType::Executing(_)))
         }
         {
-            let obs = game.step(Action::Executing(IdChoice::Card(vec![&optics])));
+            let obs = game.step(Action::Executing(NoRefChoice::Card(vec![String::from("Optics")])));
             println!("{:#?}", obs);
             assert_eq!(obs.turn.player_id(), 1);
             assert!(matches!(obs.obstype, ObsType::Main));

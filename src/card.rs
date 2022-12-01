@@ -70,6 +70,9 @@ impl Card {
     pub fn main_icon(&self) -> Icon {
         self.main_icon
     }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl PartialEq for Card {
