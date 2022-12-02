@@ -446,8 +446,7 @@ impl<'c> OuterGame<'c> {
                                 todo!()
                             }
                             RefStepAction::Execute(card) => {
-                                *fields.state =
-                                    State::Executing(game.execute(player, card));
+                                *fields.state = State::Executing(game.execute(player, card));
                             }
                         }
                     }
@@ -587,13 +586,20 @@ mod tests {
         game.step(Action::Step(NoRefStepAction::Draw));
         game.step(Action::Step(NoRefStepAction::Draw));
         println!("{:#?}", game.step(Action::Step(NoRefStepAction::Draw)));
-        println!("{:#?}", game.step(Action::Step(NoRefStepAction::Meld(String::from("Archery")))));
+        println!(
+            "{:#?}",
+            game.step(Action::Step(NoRefStepAction::Meld(String::from("Archery"))))
+        );
         {
-            let obs = game.step(Action::Step(NoRefStepAction::Execute(String::from("Archery"))));
+            let obs = game.step(Action::Step(NoRefStepAction::Execute(String::from(
+                "Archery",
+            ))));
             assert!(matches!(obs.obstype, ObsType::Executing(_)))
         }
         {
-            let obs = game.step(Action::Executing(NoRefChoice::Card(vec![String::from("Optics")])));
+            let obs = game.step(Action::Executing(NoRefChoice::Card(vec![String::from(
+                "Optics",
+            )])));
             println!("{:#?}", obs);
             assert_eq!(obs.turn.player_id(), 1);
             assert!(matches!(obs.obstype, ObsType::Main));
