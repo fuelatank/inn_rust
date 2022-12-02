@@ -2,7 +2,7 @@ use crate::board::Board;
 use crate::containers::{BoxAchievementSet, BoxCardSet};
 use crate::enums::{Color, Splay};
 use crate::observation::{MainPlayerView, OtherPlayerView};
-use std::cell::{RefCell, Ref};
+use std::cell::{Ref, RefCell};
 
 pub struct Player<'c> {
     id: usize,
@@ -69,12 +69,7 @@ impl<'c> Player<'c> {
 
     pub fn other_view(&self) -> OtherPlayerView {
         OtherPlayerView {
-            hand: self
-                .hand()
-                .as_vec()
-                .into_iter()
-                .map(|c| c.age())
-                .collect(),
+            hand: self.hand().as_vec().into_iter().map(|c| c.age()).collect(),
             score: self
                 .score_pile()
                 .as_vec()

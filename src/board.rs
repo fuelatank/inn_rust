@@ -1,9 +1,11 @@
+use serde::Serialize;
+
 use crate::card::Card;
 use crate::containers::{Addable, Removeable};
 use crate::enums::{Color, Splay};
 use std::collections::VecDeque;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Stack<'a> {
     cards: VecDeque<&'a Card>,
     splay: Splay,
@@ -75,7 +77,7 @@ impl<'a> Stack<'a> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Board<'a> {
     stacks: [Stack<'a>; 5],
 }

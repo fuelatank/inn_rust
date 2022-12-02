@@ -13,7 +13,7 @@ pub enum Operation<'c> {
 }
 
 pub enum Item<'c> {
-    Action(Action<'c>),
+    Action(Action),
     Operation(Operation<'c>),
 }
 
@@ -53,7 +53,7 @@ impl<'c> Logger<'c> {
             .push(item);
     }
 
-    pub fn act(&mut self, action: Action<'c>) {
+    pub fn act(&mut self, action: Action) {
         self.log(Item::Action(action));
     }
 

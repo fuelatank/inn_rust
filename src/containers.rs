@@ -43,7 +43,8 @@ impl<'a, T> Removeable<'a, T, T> for Box<dyn CardSet<'a, T> + 'a> {
 
 impl<'a, 'b, T> dyn CardSet<'a, T> + 'b {
     pub fn filtered_vec<P>(&self, predicate: P) -> Vec<&'a T>
-    where P: FnMut(&&'a T) -> bool
+    where
+        P: FnMut(&&'a T) -> bool,
     {
         self.as_iter().filter(predicate).collect()
     }
