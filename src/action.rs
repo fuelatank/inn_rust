@@ -1,3 +1,5 @@
+use serde::Deserialize;
+
 use crate::card::Card;
 use crate::game::Players;
 use crate::player::Player;
@@ -10,7 +12,7 @@ pub enum RefStepAction<'c> {
     Execute(&'c Card),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 pub enum NoRefStepAction {
     Draw,
     Meld(String),
@@ -18,7 +20,7 @@ pub enum NoRefStepAction {
     Execute(String),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 pub enum NoRefChoice {
     Card(Vec<String>),
     Opponent(usize),
@@ -76,7 +78,7 @@ pub enum RefAction<'c, 'g> {
     Executing(RefChoice<'c, 'g>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 pub enum Action {
     Step(NoRefStepAction),
     Executing(NoRefChoice),
