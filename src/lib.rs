@@ -3,6 +3,7 @@ pub mod board;
 pub mod card;
 pub mod card_pile;
 pub mod containers;
+pub mod default_cards;
 pub mod dogma_fn;
 pub mod enums;
 pub mod error;
