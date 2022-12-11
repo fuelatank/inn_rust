@@ -13,6 +13,7 @@ pub enum RefStepAction<'c> {
 }
 
 #[derive(Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum NoRefStepAction {
     Draw,
     Meld(String),
@@ -21,6 +22,7 @@ pub enum NoRefStepAction {
 }
 
 #[derive(Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum NoRefChoice {
     Card(Vec<String>),
     Opponent(usize),
@@ -79,6 +81,7 @@ pub enum RefAction<'c, 'g> {
 }
 
 #[derive(Clone, Deserialize)]
+#[serde(untagged)]
 pub enum Action {
     Step(NoRefStepAction),
     Executing(NoRefChoice),
