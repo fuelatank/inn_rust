@@ -65,3 +65,26 @@ impl<'c, 'g> Default for State<'c, 'g> {
         State::Main
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::{to_value, json};
+
+    #[test]
+    fn choose_serialization() {
+        // println!("{}", to_string(&Choose::Card { min_num: 3, max_num: None, from: vec![] }).unwrap());
+        assert_eq!(to_value(Choose::Card { min_num: 3, max_num: None, from: vec![] }).unwrap(), json!({
+            "type": "card",
+            "min_num": 3,
+            "max_num": null,
+            "from": [],
+        }));
+        assert_eq!(to_value(Choose::Card { min_num: 3, max_num: Some(4), from: vec![] }).unwrap(), json!({
+            "type": "card",
+            "min_num": 3,
+            "max_num": 4,
+            "from": [],
+        }));
+    }
+}
