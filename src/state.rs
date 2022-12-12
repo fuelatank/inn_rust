@@ -5,6 +5,7 @@ use crate::flow::FlowState;
 use crate::player::Player;
 
 #[derive(Debug, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum Choose<'a> {
     Card {
         min_num: u8,
