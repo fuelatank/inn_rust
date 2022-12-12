@@ -20,6 +20,7 @@ fn serialize_board<S: Serializer>(board: &BoardView, serializer: S) -> Result<S:
 }
 
 #[derive(Debug, Serialize)]
+#[serde(tag = "t", content = "c", rename_all = "snake_case")]
 pub enum SingleAchievementView<'a> {
     Special(&'a SpecialAchievement),
     Normal(u8),
@@ -56,6 +57,7 @@ pub struct OtherPlayerView<'a> {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ObsType<'a> {
     Main,
     Executing(ExecutionObs<'a>),
