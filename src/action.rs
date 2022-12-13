@@ -12,7 +12,8 @@ pub enum RefStepAction<'c> {
     Execute(&'c Card),
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum NoRefStepAction {
     Draw,
     Meld(String),
@@ -20,7 +21,8 @@ pub enum NoRefStepAction {
     Execute(String),
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum NoRefChoice {
     Card(Vec<String>),
     Opponent(usize),
@@ -78,7 +80,8 @@ pub enum RefAction<'c, 'g> {
     Executing(RefChoice<'c, 'g>),
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(untagged)]
 pub enum Action {
     Step(NoRefStepAction),
     Executing(NoRefChoice),
@@ -104,5 +107,25 @@ impl Action {
                 NoRefChoice::Yn(yn) => RefChoice::Yn(yn),
             }),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::from_str;
+    use Action::*;
+    use NoRefChoice::*;
+    use NoRefStepAction::*;
+
+    #[test]
+    fn action_deserialization() {
+        matches!(from_str("draw"), Ok(Step(Draw)));
+        matches!(from_str("{ \"meld\": \"Agriculture\" }"), Ok(Step(Meld(x))) if x == "Agriculture");
+        matches!(from_str("{ \"achieve\": 8 }"), Ok(Step(Achieve(8))));
+        matches!(from_str("{ \"execute\": \"Tools\" }"), Ok(Step(Execute(x))) if x == "Tools");
+        matches!(from_str("{ \"card\": [\"Pottery\"] }"), Ok(Executing(Card(x))) if x == vec!["Pottery"]);
+        matches!(from_str("{ \"opponent\": 1 }"), Ok(Executing(Opponent(1))));
+        matches!(from_str("{ \"yn\": true }"), Ok(Executing(Yn(true))));
     }
 }

@@ -20,6 +20,7 @@ fn serialize_board<S: Serializer>(board: &BoardView, serializer: S) -> Result<S:
 }
 
 #[derive(Debug, Serialize)]
+#[serde(tag = "type", content = "view", rename_all = "snake_case")]
 pub enum SingleAchievementView<'a> {
     Special(&'a SpecialAchievement),
     Normal(u8),
@@ -56,6 +57,7 @@ pub struct OtherPlayerView<'a> {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ObsType<'a> {
     Main,
     Executing(ExecutionObs<'a>),
@@ -68,4 +70,28 @@ pub struct Observation<'a> {
     pub main_pile: [usize; 10],
     pub turn: &'a Turn,
     pub obstype: ObsType<'a>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::{to_value, json};
+
+    #[test]
+    fn obstype_serialization() {
+        assert_eq!(to_value(&ObsType::Main).unwrap(), json!("main"));
+        // todo: test for Executing, actual Card needed
+    }
+
+    #[test]
+    fn achievement_serialization() {
+        assert_eq!(to_value(&SingleAchievementView::Normal(8)).unwrap(), json!({
+            "type": "normal",
+            "view": 8
+        }));
+        assert_eq!(to_value(&SingleAchievementView::Special(&SpecialAchievement::Wonder)).unwrap(), json!({
+            "type": "special",
+            "view": "Wonder",
+        }));
+    }
 }
