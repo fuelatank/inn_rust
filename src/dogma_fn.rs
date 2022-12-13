@@ -24,8 +24,10 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         Context { s }
     }
 
-    fn raw(&mut self) -> &mut Scope<'a, RefChoice<'c, 'g>, ExecutionState<'c, 'g>> {
-        &mut self.s
+    fn yield_(&mut self, player: &'g Player<'c>, choose: Choose<'c>) -> RefChoice<'c, 'g> {
+        self.s
+            .yield_(ExecutionState::new(player, choose))
+            .expect("Generator got None")
     }
 
     fn choose_one_card(&mut self, player: &'g Player<'c>, from: Vec<&'c Card>) -> Option<&'c Card> {
@@ -265,31 +267,28 @@ pub fn tools() -> Vec<Dogma> {
 
 // TODO: simplify
 pub fn archery() -> Vec<Dogma> {
-    vec![Dogma::Demand(Box::new(|player, opponent, game| {
-        Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
-            game.draw(opponent, 1);
-            let age = opponent.age();
-            let cards = s
-                .yield_(ExecutionState::new(
-                    opponent,
-                    Choose::Card {
-                        min_num: 1,
-                        max_num: Some(1),
-                        from: opponent
-                            .hand()
-                            .as_iter()
-                            .filter(|c| c.age() == age)
-                            .collect(),
-                    },
-                ))
-                .expect("Generator got None")
-                .cards();
-            // TODO should handle failure case
-            game.transfer_card(Place::hand(opponent), Place::hand(player), cards[0])
-                .expect("todo");
-            done!()
-        })
-    }))]
+    vec![demand(|player, opponent, game, mut ctx| {
+        game.draw(opponent, 1);
+        let age = opponent.age();
+        let cards = ctx
+            .yield_(
+                opponent,
+                Choose::Card {
+                    min_num: 1,
+                    max_num: Some(1),
+                    from: opponent
+                        .hand()
+                        .as_iter()
+                        .filter(|c| c.age() == age)
+                        .collect(),
+                },
+            )
+            .cards();
+        // TODO should handle failure case
+        game.transfer_card(Place::hand(opponent), Place::hand(player), cards[0])
+            .expect("todo");
+        done!()
+    })]
 }
 
 // inner state
