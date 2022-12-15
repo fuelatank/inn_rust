@@ -269,7 +269,12 @@ pub fn tools() -> Vec<Dogma> {
 pub fn archery() -> Vec<Dogma> {
     vec![demand(|player, opponent, game, mut ctx| {
         game.draw(opponent, 1);
-        let age = opponent.age();
+        let age = opponent
+            .hand()
+            .as_iter()
+            .max_by_key(|c| c.age())
+            .expect("After drawn a 1, opponent should have at least one card.")
+            .age();
         let cards = ctx
             .yield_(
                 opponent,
