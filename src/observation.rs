@@ -56,7 +56,7 @@ pub struct OtherPlayerView<'a> {
     pub achievements: AchievementView<'a>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ObsType<'a> {
     Main,

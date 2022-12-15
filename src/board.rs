@@ -181,3 +181,12 @@ impl<'a> Removeable<'a, Card, usize> for Stack<'a> {
         self.cards.remove(*param)
     }
 }
+
+impl<'a, P> Removeable<'a, Card, (Color, P)> for Board<'a>
+where
+    Stack<'a>: Removeable<'a, Card, P>,
+{
+    fn remove(&mut self, param: &(Color, P)) -> Option<&'a Card> {
+        <Stack as Removeable<Card, P>>::remove(self.get_stack_mut(param.0), &param.1)
+    }
+}

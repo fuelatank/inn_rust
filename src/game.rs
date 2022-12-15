@@ -1,20 +1,26 @@
-use crate::action::{Action, NoRefStepAction, RefAction, RefStepAction};
-use crate::card::{Achievement, Card, Dogma};
-use crate::card_pile::MainCardPile;
-use crate::containers::{Addable, BoxAchievementSet, BoxCardSet, CardSet, Removeable};
-use crate::enums::{Color, Splay};
-use crate::error::{InnResult, InnovationError};
-use crate::flow::FlowState;
-use crate::logger::{Logger, Operation};
-use crate::observation::{ObsType, Observation};
-use crate::player::Player;
-use crate::state::State;
-use crate::structure::{AddParam, Place, PlayerPlace, RemoveParam};
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use generator::Gn;
 use ouroboros::self_referencing;
 use serde::Serialize;
-use std::cell::RefCell;
-use std::rc::Rc;
+
+use crate::{
+    action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefStepAction},
+    card::{Achievement, Card, Dogma},
+    card_pile::MainCardPile,
+    containers::{BoxAchievementSet, BoxCardSet, CardSet},
+    enums::{Color, Splay},
+    error::{InnResult, InnovationError},
+    flow::FlowState,
+    logger::{Logger, Operation},
+    observation::{ObsType, Observation},
+    player::Player,
+    state::{Choose, State},
+    structure::{
+        AddToGame, Board, Hand, MainCardPile as MainCardPile_, Place, RemoveFromGame, Score,
+    },
+};
 
 pub type RcCell<T> = Rc<RefCell<T>>;
 pub type PlayerId = usize;
@@ -105,80 +111,49 @@ impl<'c> Players<'c> {
         (0..len).map(move |i| (i + main_player_id) % len)
     }
 
+    pub fn main_card_pile(&self) -> &RcCell<MainCardPile<'c>> {
+        &self.main_card_pile
+    }
+
     pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.hand, &age)
-        self.transfer(
-            Place::MainCardPile,
-            Place::Player(player.id(), PlayerPlace::Hand),
-            RemoveParam::Age(age),
-            AddParam::NoParam,
-        )
-        .ok()
+        self.transfer(MainCardPile_, player.with_id(Hand), age, ())
+            .ok()
     }
 
     pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.main_board, &age)
-        self.transfer(
-            Place::MainCardPile,
-            Place::Player(player.id(), PlayerPlace::Board),
-            RemoveParam::Age(age),
-            AddParam::Top(true),
-        )
-        .ok()
+        self.transfer(MainCardPile_, player.with_id(Board), age, true)
+            .ok()
     }
 
     pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.score_pile, &age)
-        self.transfer(
-            Place::MainCardPile,
-            Place::Player(player.id(), PlayerPlace::Score),
-            RemoveParam::Age(age),
-            AddParam::NoParam,
-        )
-        .ok()
+        self.transfer(MainCardPile_, player.with_id(Score), age, ())
+            .ok()
     }
 
     pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
-        self.transfer(
-            Place::MainCardPile,
-            Place::Player(player.id(), PlayerPlace::Board),
-            RemoveParam::Age(age),
-            AddParam::Top(false),
-        )
-        .ok()
+        self.transfer(MainCardPile_, player.with_id(Board), age, false)
+            .ok()
     }
 
     pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
-        self.transfer(
-            Place::Player(player.id(), PlayerPlace::Hand),
-            Place::Player(player.id(), PlayerPlace::Board),
-            RemoveParam::Card(card),
-            AddParam::Top(true),
-        )
-        .ok()
+        self.transfer(player.with_id(Hand), player.with_id(Board), card, true)
+            .ok()
     }
 
     pub fn score<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
         // transfer(&self.hand, &self.score_pile, card)
-        self.transfer(
-            Place::Player(player.id(), PlayerPlace::Hand),
-            Place::Player(player.id(), PlayerPlace::Score),
-            RemoveParam::Card(card),
-            AddParam::NoParam,
-        )
-        .ok()
+        self.transfer(player.with_id(Hand), player.with_id(Score), card, ())
+            .ok()
     }
 
     pub fn tuck<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
-        self.transfer(
-            Place::Player(player.id(), PlayerPlace::Hand),
-            Place::Player(player.id(), PlayerPlace::Score),
-            RemoveParam::Card(card),
-            AddParam::Top(false),
-        )
-        .ok()
+        self.transfer(player.with_id(Hand), player.with_id(Board), card, false)
+            .ok()
     }
 
     pub fn splay<'g>(&'g self, player: &'g Player<'c>, color: Color, direction: Splay) {
@@ -200,13 +175,8 @@ impl<'c> Players<'c> {
 
     pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
         // transfer(&self.hand, Rc::clone(&self.main_pile), card)
-        self.transfer(
-            Place::Player(player.id(), PlayerPlace::Hand),
-            Place::MainCardPile,
-            RemoveParam::Card(card),
-            AddParam::NoParam,
-        )
-        .ok()
+        self.transfer(player.with_id(Hand), MainCardPile_, card, ())
+            .ok()
     }
 
     pub fn execute<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> FlowState<'c, 'g> {
@@ -248,102 +218,35 @@ impl<'c> Players<'c> {
         })
     }
 
-    pub fn transfer(
+    pub fn transfer<Fr, To, RP, AP>(
         &self,
-        from: Place,
-        to: Place,
-        remove_param: RemoveParam,
-        add_param: AddParam,
-    ) -> InnResult<&'c Card> {
-        let card = match from {
-            Place::MainCardPile => self
-                .main_card_pile
+        from: Fr,
+        to: To,
+        remove_param: RP,
+        add_param: AP,
+    ) -> InnResult<&'c Card>
+    where
+        Fr: RemoveFromGame<'c, RP> + Into<Place>,
+        To: AddToGame<'c, AP> + Into<Place>,
+    {
+        let card = from.remove_from(self, remove_param);
+        if let Some(card) = card {
+            to.add_to(card, self, add_param);
+            self.logger
                 .borrow_mut()
-                .remove(&remove_param.age()?),
-            Place::Player(id, pplace) => {
-                let player = self.player_at(id);
-                match pplace {
-                    PlayerPlace::Board => {
-                        let mut board = player.board().borrow_mut();
-                        match remove_param {
-                            RemoveParam::Card(card) => board.remove(card),
-                            RemoveParam::ColoredTop(color, is_top) => {
-                                board.get_stack_mut(color).remove(&is_top)
-                            }
-                            RemoveParam::ColoredIndex(color, index) => {
-                                board.get_stack_mut(color).remove(&index)
-                            }
-                            _ => return Err(InnovationError::ParamUnwrapError),
-                        }
-                    }
-                    _ => {
-                        let mut pile = if let PlayerPlace::Hand = pplace {
-                            player.hand.borrow_mut()
-                        } else {
-                            player.score_pile.borrow_mut()
-                        };
-                        match remove_param {
-                            RemoveParam::Card(card) => pile.remove(card),
-                            _ => return Err(InnovationError::ParamUnwrapError),
-                        }
-                    }
-                }
-            }
-        };
-        match card {
-            Some(c) => {
-                // log
-                self.logger
-                    .borrow_mut()
-                    .operate(Operation::Transfer(from, to, c));
-                match to {
-                    Place::MainCardPile => {
-                        // return a card
-                        self.main_card_pile.borrow_mut().add(c);
-                    }
-                    Place::Player(id, pplace) => {
-                        let player = self.player_at(id);
-                        match pplace {
-                            PlayerPlace::Board => {
-                                let mut board = player.board().borrow_mut();
-                                match add_param {
-                                    AddParam::Top(is_top) => {
-                                        if is_top {
-                                            board.meld(c);
-                                        } else {
-                                            board.tuck(c);
-                                        }
-                                    }
-                                    AddParam::Index(index) => {
-                                        board.insert(c, index);
-                                    }
-                                    _ => return Err(InnovationError::ParamUnwrapError),
-                                }
-                            }
-                            _ => {
-                                if let AddParam::NoParam = add_param {
-                                    let mut pile = if let PlayerPlace::Hand = pplace {
-                                        player.hand.borrow_mut()
-                                    } else {
-                                        player.score_pile.borrow_mut()
-                                    };
-                                    pile.add(c);
-                                } else {
-                                    return Err(InnovationError::ParamUnwrapError);
-                                }
-                            }
-                        }
-                    }
-                }
-                Ok(c)
-            }
-            None => Err(InnovationError::CardNotFound),
+                .operate(Operation::Transfer(from.into(), to.into(), card));
+            Ok(card)
+        } else {
+            Err(InnovationError::CardNotFound)
         }
     }
 
-    pub fn transfer_card(&self, from: Place, to: Place, card: &'c Card) -> InnResult<()> {
-        self.transfer(from, to, RemoveParam::Card(card), AddParam::NoParam)
-            .map(|_| ())
+    pub fn transfer_card<Fr, To>(&self, from: Fr, to: To, card: &'c Card) -> InnResult<()>
+    where
+        Fr: RemoveFromGame<'c, &'c Card> + Into<Place>,
+        To: AddToGame<'c, ()> + Into<Place>,
+    {
+        self.transfer(from, to, card, ()).map(|_| ())
     }
 }
 
@@ -387,6 +290,7 @@ pub struct OuterGame<'c> {
     #[borrows()]
     #[covariant]
     state: State<'c, 'this>,
+    next_action_type: ObsType<'c>,
 }
 
 impl<'c> OuterGame<'c> {
@@ -402,28 +306,62 @@ impl<'c> OuterGame<'c> {
             turn: Turn::new(num_players, 0),
             logger,
             state: State::Main,
+            next_action_type: ObsType::Main,
         }
         .build()
     }
 
-    fn _is_available_step_action(&self, action: &NoRefStepAction) -> bool {
-        self.with(|fields| match action {
-            NoRefStepAction::Draw => true,
-            NoRefStepAction::Meld(c) => {
-                let players = fields.players;
-                let player = &players.players[fields.turn.player_id()];
-                player.hand().as_vec().contains(&players.find_card(c))
-            }
-            NoRefStepAction::Achieve(_) => todo!(),
-            NoRefStepAction::Execute(c) => {
-                let players = fields.players;
-                let player = &fields.players.players[fields.turn.player_id()];
-                player.board().borrow().contains(players.find_card(c))
-            }
+    fn is_available_action(&self, action: &Action) -> bool {
+        self.with(|fields| match (action, fields.next_action_type) {
+            (Action::Step(step), ObsType::Main) => match step {
+                NoRefStepAction::Draw => true,
+                NoRefStepAction::Meld(c) => {
+                    let players = fields.players;
+                    let player = &players.players[fields.turn.player_id()];
+                    player.hand().as_vec().contains(&players.find_card(c))
+                }
+                NoRefStepAction::Achieve(_) => todo!(),
+                NoRefStepAction::Execute(c) => {
+                    let players = fields.players;
+                    let player = &fields.players.players[fields.turn.player_id()];
+                    player.board().borrow().contains(players.find_card(c))
+                }
+            },
+            (Action::Executing(choice), ObsType::Executing(obs)) => match (choice, &obs.state) {
+                (
+                    NoRefChoice::Card(cards),
+                    Choose::Card {
+                        min_num,
+                        max_num,
+                        from,
+                    },
+                ) => {
+                    let len = cards.len() as u8;
+                    len >= *min_num
+                        && match max_num {
+                            Some(max) => len <= *max,
+                            None => true,
+                        }
+                        && {
+                            // performance?
+                            // check if `cards` is a subset of `from`
+                            cards
+                                .iter()
+                                .all(|name| from.iter().any(|c| c.name() == name))
+                        }
+                }
+                (NoRefChoice::Opponent(_), Choose::Opponent) => true,
+                (NoRefChoice::Yn(_), Choose::Yn) => true,
+                _ => false,
+            },
+            _ => false,
         })
     }
 
-    pub fn step(&mut self, action: Action) -> Observation {
+    pub fn step(&mut self, action: Action) -> InnResult<Observation> {
+        if !self.is_available_action(&action) {
+            return Err(InnovationError::InvalidAction);
+        }
         let (player, obs_type) = self.with_mut(|fields| {
             fields.logger.borrow_mut().act(action.clone());
             let game = *fields.players_ref;
@@ -483,7 +421,8 @@ impl<'c> OuterGame<'c> {
                 (fields.turn.player_id(), ObsType::Main)
             }
         });
-        self.observe(player, obs_type)
+        self.with_next_action_type_mut(|field| *field = obs_type.clone());
+        Ok(self.observe(player, obs_type))
     }
 
     fn observe<'a>(&'a self, id: usize, obs_type: ObsType<'a>) -> Observation {
@@ -583,8 +522,8 @@ mod tests {
         );
         let cards = vec![&archery, &code_of_laws, &optics];
         let mut game = OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards);
-        game.step(Action::Step(NoRefStepAction::Draw));
-        game.step(Action::Step(NoRefStepAction::Draw));
+        game.step(Action::Step(NoRefStepAction::Draw)).expect("Action should be valid");
+        game.step(Action::Step(NoRefStepAction::Draw)).expect("Action should be valid");
         println!("{:#?}", game.step(Action::Step(NoRefStepAction::Draw)));
         println!(
             "{:#?}",
@@ -593,13 +532,13 @@ mod tests {
         {
             let obs = game.step(Action::Step(NoRefStepAction::Execute(String::from(
                 "Archery",
-            ))));
+            )))).expect("Action should be valid");
             assert!(matches!(obs.obstype, ObsType::Executing(_)))
         }
         {
             let obs = game.step(Action::Executing(NoRefChoice::Card(vec![String::from(
                 "Optics",
-            )])));
+            )]))).expect("Action should be valid");
             println!("{:#?}", obs);
             assert_eq!(obs.turn.player_id(), 1);
             assert!(matches!(obs.obstype, ObsType::Main));
