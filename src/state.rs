@@ -4,7 +4,7 @@ use crate::card::Card;
 use crate::flow::FlowState;
 use crate::player::Player;
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Choose<'a> {
     Card {
@@ -49,7 +49,7 @@ impl<'c, 'g> ExecutionState<'c, 'g> {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ExecutionObs<'c> {
     pub state: Choose<'c>,
     pub card: &'c Card,

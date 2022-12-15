@@ -6,7 +6,7 @@ use ouroboros::self_referencing;
 use serde::Serialize;
 
 use crate::{
-    action::{Action, NoRefStepAction, RefAction, RefStepAction},
+    action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefStepAction},
     card::{Achievement, Card, Dogma},
     card_pile::MainCardPile,
     containers::{BoxAchievementSet, BoxCardSet, CardSet},
@@ -16,7 +16,7 @@ use crate::{
     logger::{Logger, Operation},
     observation::{ObsType, Observation},
     player::Player,
-    state::State,
+    state::{Choose, State},
     structure::{
         AddToGame, Board, Hand, MainCardPile as MainCardPile_, Place, RemoveFromGame, Score,
     },
@@ -290,6 +290,7 @@ pub struct OuterGame<'c> {
     #[borrows()]
     #[covariant]
     state: State<'c, 'this>,
+    next_action_type: ObsType<'c>,
 }
 
 impl<'c> OuterGame<'c> {
@@ -305,28 +306,62 @@ impl<'c> OuterGame<'c> {
             turn: Turn::new(num_players, 0),
             logger,
             state: State::Main,
+            next_action_type: ObsType::Main,
         }
         .build()
     }
 
-    fn _is_available_step_action(&self, action: &NoRefStepAction) -> bool {
-        self.with(|fields| match action {
-            NoRefStepAction::Draw => true,
-            NoRefStepAction::Meld(c) => {
-                let players = fields.players;
-                let player = &players.players[fields.turn.player_id()];
-                player.hand().as_vec().contains(&players.find_card(c))
-            }
-            NoRefStepAction::Achieve(_) => todo!(),
-            NoRefStepAction::Execute(c) => {
-                let players = fields.players;
-                let player = &fields.players.players[fields.turn.player_id()];
-                player.board().borrow().contains(players.find_card(c))
-            }
+    fn is_available_action(&self, action: &Action) -> bool {
+        self.with(|fields| match (action, fields.next_action_type) {
+            (Action::Step(step), ObsType::Main) => match step {
+                NoRefStepAction::Draw => true,
+                NoRefStepAction::Meld(c) => {
+                    let players = fields.players;
+                    let player = &players.players[fields.turn.player_id()];
+                    player.hand().as_vec().contains(&players.find_card(c))
+                }
+                NoRefStepAction::Achieve(_) => todo!(),
+                NoRefStepAction::Execute(c) => {
+                    let players = fields.players;
+                    let player = &fields.players.players[fields.turn.player_id()];
+                    player.board().borrow().contains(players.find_card(c))
+                }
+            },
+            (Action::Executing(choice), ObsType::Executing(obs)) => match (choice, &obs.state) {
+                (
+                    NoRefChoice::Card(cards),
+                    Choose::Card {
+                        min_num,
+                        max_num,
+                        from,
+                    },
+                ) => {
+                    let len = cards.len() as u8;
+                    len >= *min_num
+                        && match max_num {
+                            Some(max) => len <= *max,
+                            None => true,
+                        }
+                        && {
+                            // performance?
+                            // check if `cards` is a subset of `from`
+                            cards
+                                .iter()
+                                .all(|name| from.iter().any(|c| c.name() == name))
+                        }
+                }
+                (NoRefChoice::Opponent(_), Choose::Opponent) => true,
+                (NoRefChoice::Yn(_), Choose::Yn) => true,
+                _ => false,
+            },
+            _ => false,
         })
     }
 
-    pub fn step(&mut self, action: Action) -> Observation {
+    pub fn step(&mut self, action: Action) -> InnResult<Observation> {
+        if !self.is_available_action(&action) {
+            return Err(InnovationError::InvalidAction);
+        }
         let (player, obs_type) = self.with_mut(|fields| {
             fields.logger.borrow_mut().act(action.clone());
             let game = *fields.players_ref;
@@ -386,7 +421,8 @@ impl<'c> OuterGame<'c> {
                 (fields.turn.player_id(), ObsType::Main)
             }
         });
-        self.observe(player, obs_type)
+        self.with_next_action_type_mut(|field| *field = obs_type.clone());
+        Ok(self.observe(player, obs_type))
     }
 
     fn observe<'a>(&'a self, id: usize, obs_type: ObsType<'a>) -> Observation {
@@ -486,8 +522,8 @@ mod tests {
         );
         let cards = vec![&archery, &code_of_laws, &optics];
         let mut game = OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards);
-        game.step(Action::Step(NoRefStepAction::Draw));
-        game.step(Action::Step(NoRefStepAction::Draw));
+        game.step(Action::Step(NoRefStepAction::Draw)).expect("Action should be valid");
+        game.step(Action::Step(NoRefStepAction::Draw)).expect("Action should be valid");
         println!("{:#?}", game.step(Action::Step(NoRefStepAction::Draw)));
         println!(
             "{:#?}",
@@ -496,13 +532,13 @@ mod tests {
         {
             let obs = game.step(Action::Step(NoRefStepAction::Execute(String::from(
                 "Archery",
-            ))));
+            )))).expect("Action should be valid");
             assert!(matches!(obs.obstype, ObsType::Executing(_)))
         }
         {
             let obs = game.step(Action::Executing(NoRefChoice::Card(vec![String::from(
                 "Optics",
-            )])));
+            )]))).expect("Action should be valid");
             println!("{:#?}", obs);
             assert_eq!(obs.turn.player_id(), 1);
             assert!(matches!(obs.obstype, ObsType::Main));
