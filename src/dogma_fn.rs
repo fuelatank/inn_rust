@@ -10,7 +10,7 @@ use crate::{
     game::{Players, RcCell},
     player::Player,
     state::{Choose, ExecutionState},
-    structure::{AddParam, Place, RemoveParam},
+    structure::{Hand, Score, Board},
 };
 
 // wrapper of Scope
@@ -285,7 +285,7 @@ pub fn archery() -> Vec<Dogma> {
             )
             .cards();
         // TODO should handle failure case
-        game.transfer_card(Place::hand(opponent), Place::hand(player), cards[0])
+        game.transfer_card(opponent.with_id(Hand), player.with_id(Hand), cards[0])
             .expect("todo");
         done!()
     })]
@@ -306,7 +306,7 @@ pub fn oars() -> Vec<Dogma> {
             let card = ctx.choose_one_card(opponent, opponent.hand().has_icon(Icon::Crown));
             if let Some(card) = card {
                 // TODO: handle the Result
-                game.transfer_card(Place::hand(opponent), Place::score(player), card)
+                game.transfer_card(opponent.with_id(Hand), player.with_id(Score), card)
                     .unwrap();
                 *transferred.borrow_mut() = true;
             }
@@ -384,12 +384,12 @@ pub fn monotheism() -> Vec<Dogma> {
             // you must transfer a top card in available_cards
             // from your board to my score pile! If you do, draw and tuck a 1!
             let chosen = ctx.choose_one_card(opponent, available_cards);
-            if chosen.is_some() {
+            if let Some(card) = chosen {
                 game.transfer(
-                    Place::board(opponent),
-                    Place::score(player),
-                    RemoveParam::Top(true),
-                    AddParam::NoParam,
+                    opponent.with_id(Board),
+                    player.with_id(Score),
+                    (card.color(), true),
+                    (),
                 )
                 .unwrap();
                 game.draw_and_tuck(opponent, 1);
@@ -445,7 +445,7 @@ pub fn optics() -> Vec<Dogma> {
                     .yield_(ExecutionState::new(player, Choose::Opponent))
                     .expect("Generator got None")
                     .player();
-                game.transfer_card(Place::score(player), Place::score(opponent), card)
+                game.transfer_card(player.with_id(Score), opponent.with_id(Score), card)
                     .unwrap();
                 done!()
             }

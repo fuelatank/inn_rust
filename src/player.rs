@@ -32,6 +32,10 @@ impl<'c> Player<'c> {
         self.id
     }
 
+    pub fn with_id<T>(&self, t: T) -> (usize, T) {
+        (self.id(), t)
+    }
+
     pub fn age(&self) -> u8 {
         self.main_board.borrow().highest_age()
     }
