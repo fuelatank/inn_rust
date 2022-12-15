@@ -1,22 +1,26 @@
-use crate::action::{Action, NoRefStepAction, RefAction, RefStepAction};
-use crate::card::{Achievement, Card, Dogma};
-use crate::card_pile::MainCardPile;
-use crate::containers::{BoxAchievementSet, BoxCardSet, CardSet};
-use crate::enums::{Color, Splay};
-use crate::error::{InnResult, InnovationError};
-use crate::flow::FlowState;
-use crate::logger::{Logger, Operation};
-use crate::observation::{ObsType, Observation};
-use crate::player::Player;
-use crate::state::State;
-use crate::structure::{
-    AddToGame, Board, Hand, MainCardPile as MainCardPile_, Place, RemoveFromGame, Score,
-};
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use generator::Gn;
 use ouroboros::self_referencing;
 use serde::Serialize;
-use std::cell::RefCell;
-use std::rc::Rc;
+
+use crate::{
+    action::{Action, NoRefStepAction, RefAction, RefStepAction},
+    card::{Achievement, Card, Dogma},
+    card_pile::MainCardPile,
+    containers::{BoxAchievementSet, BoxCardSet, CardSet},
+    enums::{Color, Splay},
+    error::{InnResult, InnovationError},
+    flow::FlowState,
+    logger::{Logger, Operation},
+    observation::{ObsType, Observation},
+    player::Player,
+    state::State,
+    structure::{
+        AddToGame, Board, Hand, MainCardPile as MainCardPile_, Place, RemoveFromGame, Score,
+    },
+};
 
 pub type RcCell<T> = Rc<RefCell<T>>;
 pub type PlayerId = usize;

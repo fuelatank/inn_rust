@@ -1,7 +1,7 @@
 use crate::{
     board::Board as Board_,
     card::Card,
-    containers::{Removeable, Addable},
+    containers::{Addable, Removeable},
     enums::Color,
     error::{InnResult, InnovationError},
     game::Players,
@@ -156,7 +156,10 @@ impl Place {
     }
 }
 
-impl<T> From<(usize, T)> for Place where T: Into<PlayerPlace> {
+impl<T> From<(usize, T)> for Place
+where
+    T: Into<PlayerPlace>,
+{
     fn from(t: (usize, T)) -> Self {
         Place::Player(t.0, t.1.into())
     }

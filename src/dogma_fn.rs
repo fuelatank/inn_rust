@@ -10,7 +10,7 @@ use crate::{
     game::{Players, RcCell},
     player::Player,
     state::{Choose, ExecutionState},
-    structure::{Hand, Score, Board},
+    structure::{Board, Hand, Score},
 };
 
 // wrapper of Scope
