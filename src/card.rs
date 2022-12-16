@@ -52,7 +52,7 @@ impl Card {
             doc,
         }
     }
-    
+
     pub fn age(&self) -> u8 {
         self.age
     }
@@ -68,7 +68,7 @@ impl Card {
     pub fn doc(&self) -> &String {
         &self.doc
     }
-    
+
     pub fn dogmas(&self) -> &[Dogma] {
         &self.dogmas
     }
@@ -100,10 +100,11 @@ impl Debug for Card {
 
 #[derive(PartialEq, Debug, Serialize)]
 pub enum SpecialAchievement {
-    Universe,
-    Wonder,
+    Monument,
+    Empire,
     World,
-    // TODO: more
+    Wonder,
+    Universe,
 }
 
 #[derive(PartialEq, Debug)]
