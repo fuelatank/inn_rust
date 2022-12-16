@@ -1,8 +1,9 @@
+use counter::Counter;
 use serde::Serialize;
 
-use crate::card::Card;
 use crate::containers::{Addable, Removeable};
 use crate::enums::{Color, Splay};
+use crate::{card::Card, enums::Icon};
 use std::collections::VecDeque;
 
 #[derive(Debug, Default, Clone, Serialize)]
@@ -75,6 +76,28 @@ impl<'a> Stack<'a> {
             None => None,
         }
     }
+
+    pub fn icon_count(&self) -> Counter<Icon, usize> {
+        let mut counter = Counter::new();
+        let mask = self.splay.mask();
+        let mut card_iter = self.cards.iter();
+        match card_iter.next() {
+            Some(top_card) => {
+                for icon in top_card.icons() {
+                    counter[&icon] += 1;
+                }
+            }
+            None => return counter,
+        }
+        for card in card_iter {
+            for (icon, shown) in card.icons().iter().zip(mask) {
+                if shown {
+                    counter[icon] += 1;
+                }
+            }
+        }
+        counter
+    }
 }
 
 #[derive(Debug, Default, Clone, Serialize)]
@@ -145,6 +168,14 @@ impl<'a> Board<'a> {
             Some(card) => card.age(),
             None => 0,
         }
+    }
+
+    pub fn icon_count(&self) -> Counter<Icon> {
+        self.stacks
+            .iter()
+            .map(|stack| stack.icon_count())
+            .reduce(|accum, item| accum + item)
+            .unwrap()
     }
 }
 

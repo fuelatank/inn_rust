@@ -185,13 +185,24 @@ impl<'c> Players<'c> {
 
     pub fn execute<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s| {
-            let _main_icon = card.main_icon();
             let id = player.id();
+            let main_icon = card.main_icon();
+            let main_icon_count = player.board().borrow().icon_count()[&main_icon];
+            // check eligible players before actual execution
+            let players_from_next = self.players_from(id + 1);
+            let can_be_shared: Vec<_> = players_from_next
+                .map(|p| p.board().borrow().icon_count()[&main_icon] >= main_icon_count)
+                .collect();
+            // execution
             for dogma in card.dogmas() {
                 match dogma {
                     Dogma::Share(flow) => {
-                        // should filter out ineligible players
-                        for player in self.players_from(id + 1) {
+                        // filter out ineligible players
+                        for player in self
+                            .players_from(id + 1)
+                            .zip(can_be_shared.iter())
+                            .filter_map(|(p, mask)| mask.then(|| p))
+                        {
                             let mut gen = flow(player, self);
 
                             // s.yield_from(gen); but with or(card)
@@ -204,8 +215,13 @@ impl<'c> Players<'c> {
                         }
                     }
                     Dogma::Demand(flow) => {
-                        // should filter out ineligible players
-                        for player in self.players_from(id).skip(1) {
+                        // filter out ineligible players
+                        for player in self
+                            .players_from(id)
+                            .skip(1)
+                            .zip(can_be_shared.iter())
+                            .filter_map(|(p, mask)| (!mask).then(|| p))
+                        {
                             let mut gen = flow(self.player_at(id), player, self);
                             // s.yield_from(gen); but with or(card)
                             let mut state = gen.resume();

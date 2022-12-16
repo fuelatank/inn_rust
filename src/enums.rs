@@ -41,3 +41,15 @@ pub enum Splay {
     Right,
     Up,
 }
+
+impl Splay {
+    pub fn mask(&self) -> [bool; 4] {
+        // true means shown
+        match self {
+            Splay::NoSplay => [false, false, false, false],
+            Splay::Left => [false, false, false, true],
+            Splay::Right => [true, true, false, false],
+            Splay::Up => [false, true, true, true],
+        }
+    }
+}

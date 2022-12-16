@@ -52,24 +52,35 @@ impl Card {
             doc,
         }
     }
+    
     pub fn age(&self) -> u8 {
         self.age
     }
+
     pub fn color(&self) -> Color {
         self.color
     }
+
     pub fn contains(&self, icon: Icon) -> bool {
         self.icons.contains(&icon)
     }
+
     pub fn doc(&self) -> &String {
         &self.doc
     }
+    
     pub fn dogmas(&self) -> &[Dogma] {
         &self.dogmas
     }
+
+    pub fn icons(&self) -> [Icon; 4] {
+        self.icons
+    }
+
     pub fn main_icon(&self) -> Icon {
         self.main_icon
     }
+
     pub fn name(&self) -> &str {
         &self.name
     }
