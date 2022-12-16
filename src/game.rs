@@ -101,6 +101,10 @@ impl<'c> Players<'c> {
         &self.players[id]
     }
 
+    /// Creates an iterator containing all players once, starting from the
+    /// `main_player_id`th player.
+    ///
+    /// `main_player_id` can be any number, and the index will be rounded for convenience.
     pub fn players_from(&self, main_player_id: PlayerId) -> impl Iterator<Item = &Player<'c>> {
         (0..self.players.len())
             .map(move |i| &self.players[(i + main_player_id) % self.players.len()])
@@ -187,7 +191,7 @@ impl<'c> Players<'c> {
                 match dogma {
                     Dogma::Share(flow) => {
                         // should filter out ineligible players
-                        for player in self.players_from(id) {
+                        for player in self.players_from(id + 1) {
                             let mut gen = flow(player, self);
 
                             // s.yield_from(gen); but with or(card)
@@ -522,23 +526,29 @@ mod tests {
         );
         let cards = vec![&archery, &code_of_laws, &optics];
         let mut game = OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards);
-        game.step(Action::Step(NoRefStepAction::Draw)).expect("Action should be valid");
-        game.step(Action::Step(NoRefStepAction::Draw)).expect("Action should be valid");
+        game.step(Action::Step(NoRefStepAction::Draw))
+            .expect("Action should be valid");
+        game.step(Action::Step(NoRefStepAction::Draw))
+            .expect("Action should be valid");
         println!("{:#?}", game.step(Action::Step(NoRefStepAction::Draw)));
         println!(
             "{:#?}",
             game.step(Action::Step(NoRefStepAction::Meld(String::from("Archery"))))
         );
         {
-            let obs = game.step(Action::Step(NoRefStepAction::Execute(String::from(
-                "Archery",
-            )))).expect("Action should be valid");
+            let obs = game
+                .step(Action::Step(NoRefStepAction::Execute(String::from(
+                    "Archery",
+                ))))
+                .expect("Action should be valid");
             assert!(matches!(obs.obstype, ObsType::Executing(_)))
         }
         {
-            let obs = game.step(Action::Executing(NoRefChoice::Card(vec![String::from(
-                "Optics",
-            )]))).expect("Action should be valid");
+            let obs = game
+                .step(Action::Executing(NoRefChoice::Card(vec![String::from(
+                    "Optics",
+                )])))
+                .expect("Action should be valid");
             println!("{:#?}", obs);
             assert_eq!(obs.turn.player_id(), 1);
             assert!(matches!(obs.obstype, ObsType::Main));
