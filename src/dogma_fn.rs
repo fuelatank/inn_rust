@@ -218,12 +218,8 @@ where
 pub fn pottery() -> Vec<Dogma> {
     vec![
         shared(|player, game, mut ctx| {
-            if let Some(cards) = ctx
-                .may(player, |ctx| {
-                    ctx.choose_card_at_most(player, player.hand().as_vec(), Some(3))
-                })
-                .flatten()
-            {
+            let cards = ctx.choose_any_cards_up_to(player, player.hand().as_vec(), Some(3));
+            if !cards.is_empty() {
                 let n = cards.len();
                 for card in cards {
                     game.r#return(player, card);
