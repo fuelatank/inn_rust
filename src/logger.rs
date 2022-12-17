@@ -26,7 +26,7 @@ pub enum Item<'c> {
 
 pub struct Subject<'c> {
     observers: Vec<Weak<RefCell<dyn Observer<'c>>>>,
-    owned_observers: Vec<Box<dyn Observer<'c>>>,
+    owned_observers: Vec<Box<dyn Observer<'c> + 'c>>,
 }
 
 impl<'c> Subject<'c> {
@@ -45,7 +45,7 @@ impl<'c> Subject<'c> {
     }
 
     /// Register a permanent observer to the system.
-    pub fn register_owned(&mut self, new_observer: impl Observer<'c> + 'static) {
+    pub fn register_owned(&mut self, new_observer: impl Observer<'c> + 'c) {
         self.owned_observers.push(Box::new(new_observer));
     }
 
@@ -74,7 +74,13 @@ pub trait Observer<'c> {
     fn on_notify(&mut self, event: &Item<'c>, game: &Players<'c>);
 }
 
-struct FnObserver<'c>(Box<dyn FnMut(&Item<'c>, &Players<'c>)>);
+pub struct FnObserver<'c>(Box<dyn FnMut(&Item<'c>, &Players<'c>) + 'c>);
+
+impl<'c> FnObserver<'c> {
+    pub fn new(f: impl FnMut(&Item<'c>, &Players<'c>) + 'c) -> Self {
+        Self(Box::new(f))
+    }
+}
 
 impl<'c> Observer<'c> for FnObserver<'c> {
     fn on_notify(&mut self, event: &Item<'c>, game: &Players<'c>) {
@@ -140,5 +146,11 @@ impl<'c> Logger<'c> {
 
     pub fn history(&self) -> &[Game<'c>] {
         &self.history
+    }
+}
+
+impl<'c> Observer<'c> for Logger<'c> {
+    fn on_notify(&mut self, event: &Item<'c>, game: &Players<'c>) {
+        self.log(event.clone());
     }
 }

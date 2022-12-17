@@ -13,7 +13,7 @@ use crate::{
     enums::{Color, Splay},
     error::{InnResult, InnovationError},
     flow::FlowState,
-    logger::{Logger, Operation},
+    logger::{Logger, Subject, Operation, FnObserver},
     observation::{ObsType, Observation},
     player::Player,
     state::{Choose, State},
@@ -27,16 +27,16 @@ pub type PlayerId = usize;
 
 pub struct Players<'c> {
     cards: Vec<&'c Card>,
-    logger: RcCell<Logger<'c>>,
+    logger: RefCell<Subject<'c>>,
     main_card_pile: RcCell<MainCardPile<'c>>,
     players: Vec<Player<'c>>,
 }
 
 impl<'c> Players<'c> {
-    pub fn empty(logger: RcCell<Logger<'c>>) -> Players<'c> {
+    pub fn empty() -> Players<'c> {
         Players {
             cards: Vec::new(),
-            logger,
+            logger: RefCell::new(Subject::new()),
             main_card_pile: Rc::new(RefCell::new(MainCardPile::empty())),
             players: vec![],
         }
@@ -52,11 +52,13 @@ impl<'c> Players<'c> {
         A: CardSet<'c, Achievement> + Default + 'c,
     {
         let pile = Rc::new(RefCell::new(MainCardPile::new(cards.clone())));
+        let mut subject = Subject::new();
         // Should logger cards be initialized here, or in other methods?
         logger.borrow_mut().start(pile.borrow().contents());
+        subject.register_owned(FnObserver::new(move |ev, _| logger.borrow_mut().log(ev.clone())));
         Players {
             cards,
-            logger: Rc::clone(&logger),
+            logger: RefCell::new(subject),
             main_card_pile: Rc::clone(&pile),
             players: (0..num_players)
                 .map(|i| {
@@ -252,9 +254,10 @@ impl<'c> Players<'c> {
         let card = from.remove_from(self, remove_param);
         if let Some(card) = card {
             to.add_to(card, self, add_param);
+            // TODO: this does not allow observers to perform operations (log)
             self.logger
                 .borrow_mut()
-                .operate(Operation::Transfer(from.into(), to.into(), card));
+                .operate(Operation::Transfer(from.into(), to.into(), card), self);
             Ok(card)
         } else {
             Err(InnovationError::CardNotFound)
