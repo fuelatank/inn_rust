@@ -25,8 +25,10 @@ pub enum Item<'c> {
 }
 
 pub struct Subject<'c> {
-    observers: Vec<Weak<RefCell<dyn Observer<'c>>>>,
-    owned_observers: Vec<Box<dyn Observer<'c> + 'c>>,
+    observers: Vec<Weak<RefCell<dyn InternalObserver<'c>>>>,
+    owned_observers: Vec<Box<dyn InternalObserver<'c> + 'c>>,
+    ext_observers: Vec<Weak<RefCell<dyn Observer<'c>>>>,
+    owned_ext_observers: Vec<Box<dyn Observer<'c> + 'c>>,
 }
 
 impl<'c> Subject<'c> {
@@ -34,22 +36,45 @@ impl<'c> Subject<'c> {
         Self {
             observers: Vec::new(),
             owned_observers: Vec::new(),
+            ext_observers: Vec::new(),
+            owned_ext_observers: Vec::new(),
         }
     }
 
-    /// Register an observer to the system.
+    /// Register an external observer to the system.
     ///
     /// The caller should have a strong reference of the observer to prevent dropping.
-    pub fn register(&mut self, new_observer: &Rc<RefCell<dyn Observer<'c>>>) {
+    pub fn register_external(&mut self, new_observer: &Rc<RefCell<dyn Observer<'c>>>) {
+        self.ext_observers.push(Rc::downgrade(new_observer));
+    }
+
+    /// Register a permanent external observer to the system.
+    pub fn register_external_owned(&mut self, new_observer: impl Observer<'c> + 'c) {
+        self.owned_ext_observers.push(Box::new(new_observer));
+    }
+
+    /// Register an internal observer to the system.
+    ///
+    /// The caller should have a strong reference of the observer to prevent dropping.
+    pub fn register_internal(&mut self, new_observer: &Rc<RefCell<dyn InternalObserver<'c>>>) {
         self.observers.push(Rc::downgrade(new_observer));
     }
 
-    /// Register a permanent observer to the system.
-    pub fn register_owned(&mut self, new_observer: impl Observer<'c> + 'c) {
+    /// Register a permanent internal observer to the system.
+    pub fn register_internal_owned(&mut self, new_observer: impl InternalObserver<'c> + 'c) {
         self.owned_observers.push(Box::new(new_observer));
     }
 
     pub fn notify(&mut self, item: Item<'c>, game: &Players<'c>) {
+        for owned_observer in self.owned_ext_observers.iter_mut() {
+            owned_observer.on_notify(&item);
+        }
+        self.ext_observers.retain_mut(|observer| {
+            observer
+                .upgrade()
+                .map(|active_observer| active_observer.borrow_mut().on_notify(&item))
+                .is_some()
+        });
         for owned_observer in self.owned_observers.iter_mut() {
             owned_observer.on_notify(&item, game);
         }
@@ -70,8 +95,19 @@ impl<'c> Subject<'c> {
     }
 }
 
-pub trait Observer<'c> {
+pub trait InternalObserver<'c> {
     fn on_notify(&mut self, event: &Item<'c>, game: &Players<'c>);
+}
+
+pub trait Observer<'c> {
+    // doesn't modify game state
+    fn on_notify(&mut self, event: &Item<'c>);
+}
+
+impl<'c, T: Observer<'c>> InternalObserver<'c> for T {
+    fn on_notify(&mut self, event: &Item<'c>, _game: &Players<'c>) {
+        self.on_notify(event);
+    }
 }
 
 pub struct FnObserver<'c>(Box<dyn FnMut(&Item<'c>, &Players<'c>) + 'c>);
@@ -82,9 +118,23 @@ impl<'c> FnObserver<'c> {
     }
 }
 
-impl<'c> Observer<'c> for FnObserver<'c> {
+impl<'c> InternalObserver<'c> for FnObserver<'c> {
     fn on_notify(&mut self, event: &Item<'c>, game: &Players<'c>) {
         self.0(event, game);
+    }
+}
+
+pub struct FnPureObserver<'c>(Box<dyn FnMut(&Item<'c>) + 'c>);
+
+impl<'c> FnPureObserver<'c> {
+    pub fn new(f: impl FnMut(&Item<'c>) + 'c) -> Self {
+        Self(Box::new(f))
+    }
+}
+
+impl<'c> Observer<'c> for FnPureObserver<'c> {
+    fn on_notify(&mut self, event: &Item<'c>) {
+        self.0(event);
     }
 }
 
@@ -150,7 +200,7 @@ impl<'c> Logger<'c> {
 }
 
 impl<'c> Observer<'c> for Logger<'c> {
-    fn on_notify(&mut self, event: &Item<'c>, game: &Players<'c>) {
+    fn on_notify(&mut self, event: &Item<'c>) {
         self.log(event.clone());
     }
 }

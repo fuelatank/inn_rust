@@ -13,7 +13,7 @@ use crate::{
     enums::{Color, Splay},
     error::{InnResult, InnovationError},
     flow::FlowState,
-    logger::{Logger, Subject, Operation, FnObserver},
+    logger::{Logger, Subject, Operation, FnPureObserver},
     observation::{ObsType, Observation},
     player::Player,
     state::{Choose, State},
@@ -55,7 +55,7 @@ impl<'c> Players<'c> {
         let mut subject = Subject::new();
         // Should logger cards be initialized here, or in other methods?
         logger.borrow_mut().start(pile.borrow().contents());
-        subject.register_owned(FnObserver::new(move |ev, _| logger.borrow_mut().log(ev.clone())));
+        subject.register_external_owned(FnPureObserver::new(move |ev| logger.borrow_mut().log(ev.clone())));
         Players {
             cards,
             logger: RefCell::new(subject),
