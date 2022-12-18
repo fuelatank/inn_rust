@@ -1,3 +1,4 @@
+pub mod auto_achieve;
 pub mod action;
 pub mod board;
 pub mod card;

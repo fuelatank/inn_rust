@@ -3,6 +3,7 @@ use crate::flow::{DemandFlow, ShareFlow};
 use crate::observation::SingleAchievementView;
 use counter::Counter;
 use serde::Serialize;
+use strum_macros::EnumIter;
 use std::fmt::Debug;
 
 pub enum Dogma {
@@ -98,7 +99,7 @@ impl Debug for Card {
     }
 }
 
-#[derive(PartialEq, Debug, Serialize)]
+#[derive(PartialEq, Debug, Serialize, EnumIter)]
 pub enum SpecialAchievement {
     Monument,
     Empire,

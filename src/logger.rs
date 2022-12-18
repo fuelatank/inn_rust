@@ -13,15 +13,27 @@ use crate::{
 };
 
 #[derive(Clone)]
+pub enum SimpleOp {
+    Draw,
+    Meld,
+    Tuck,
+    Score,
+    Return,
+}
+
+#[derive(Clone)]
 pub enum Operation<'c> {
     Splay(PlayerId, Color, Splay),
     Transfer(Place, Place, &'c Card),
+    SimpleOp(SimpleOp, PlayerId, &'c Card),
 }
 
 #[derive(Clone)]
 pub enum Item<'c> {
     Action(Action),
     Operation(Operation<'c>),
+    NextAction(PlayerId),
+    ChangeTurn(PlayerId, PlayerId), // last player, next player
 }
 
 pub struct Subject<'c> {
@@ -66,6 +78,7 @@ impl<'c> Subject<'c> {
     }
 
     pub fn notify(&mut self, item: Item<'c>, game: &Players<'c>) {
+        // first notify external observers, who often log events and don't modify game state
         for owned_observer in self.owned_ext_observers.iter_mut() {
             owned_observer.on_notify(&item);
         }
@@ -75,6 +88,8 @@ impl<'c> Subject<'c> {
                 .map(|active_observer| active_observer.borrow_mut().on_notify(&item))
                 .is_some()
         });
+
+        // second notify internal observers, who may modify game state and send new events
         for owned_observer in self.owned_observers.iter_mut() {
             owned_observer.on_notify(&item, game);
         }
