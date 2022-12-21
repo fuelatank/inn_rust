@@ -542,6 +542,15 @@ mod tests {
 
     #[test]
     fn create_game_player() {
+        // will be used as achievement
+        let pottery = Card::new(
+            "Pottery".to_owned(),
+            1,
+            Blue,
+            [Empty, Leaf, Leaf, Leaf],
+            dogma_fn::pottery(),
+            "You may return up to three cards from your hand. If you returned any cards, draw and score a card of value equal to the number of cards you returned.".to_owned()
+        );
         let archery = Card::new(
             String::from("Archery"),
             1,
@@ -558,15 +567,25 @@ mod tests {
             dogma_fn::code_of_laws(),
             String::from("this is the doc of the card 'code of laws'"),
         );
-        let optics = Card::new(
-            String::from("Optics"),
-            3,
-            Red,
-            [Crown, Crown, Crown, Empty],
-            dogma_fn::optics(),
-            String::from("this is the doc of the card 'optics'"),
+        // will be used as achievement
+        let monotheism = Card::new(
+            "Monotheism".to_owned(),
+            2,
+            Purple,
+            [Empty, Castle, Castle, Castle],
+            dogma_fn::monotheism(),
+            "I demand you transfer a top card on your board of a different color from any card on my board to my score pile! If you do, draw and tuck a 1!\nDraw and tuck a 1.".to_owned(),
         );
-        let cards = vec![&archery, &code_of_laws, &optics];
+        let philosophy = Card::new(
+            "Philosophy".to_owned(),
+            2,
+            Purple,
+            [Empty, Lightblub, Lightblub, Lightblub],
+            dogma_fn::philosophy(),
+            "You may splay left any one color of your cards.\nYou may score a card from your hand."
+                .to_owned(),
+        );
+        let cards = vec![&pottery, &archery, &code_of_laws, &monotheism, &philosophy];
         let mut game = OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards);
         game.step(Action::Step(NoRefStepAction::Draw))
             .expect("Action should be valid");
@@ -588,7 +607,7 @@ mod tests {
         {
             let obs = game
                 .step(Action::Executing(NoRefChoice::Card(vec![String::from(
-                    "Optics",
+                    "Philosophy",
                 )])))
                 .expect("Action should be valid");
             println!("{:#?}", obs);
