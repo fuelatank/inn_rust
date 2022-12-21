@@ -1,6 +1,4 @@
-use strum::IntoEnumIterator;
-
-use crate::card::{Card, Achievement, SpecialAchievement};
+use crate::card::{Achievement, Card, SpecialAchievement};
 use crate::containers::{Addable, Removeable};
 use std::collections::VecDeque;
 
@@ -59,7 +57,10 @@ impl<'a> MainCardPile<'a> {
         }
     }
 
-    pub fn new(cards: Vec<&'a Card>) -> MainCardPile<'a> {
+    pub fn new(
+        cards: Vec<&'a Card>,
+        special_achievements: Vec<SpecialAchievement>,
+    ) -> MainCardPile<'a> {
         let mut pile = MainCardPile::empty();
         for card in cards {
             pile.add(card);
@@ -70,7 +71,8 @@ impl<'a> MainCardPile<'a> {
                 pile.achievements.push(Achievement::Normal(card));
             }
         }
-        pile.achievements.extend(SpecialAchievement::iter().map(Achievement::Special));
+        pile.achievements
+            .extend(special_achievements.into_iter().map(Achievement::Special));
         pile
     }
 

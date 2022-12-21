@@ -3,8 +3,8 @@ use crate::flow::{DemandFlow, ShareFlow};
 use crate::observation::SingleAchievementView;
 use counter::Counter;
 use serde::Serialize;
-use strum_macros::EnumIter;
 use std::fmt::Debug;
+use strum_macros::EnumIter;
 
 pub enum Dogma {
     Share(ShareFlow),

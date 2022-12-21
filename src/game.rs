@@ -4,16 +4,18 @@ use std::rc::Rc;
 use generator::Gn;
 use ouroboros::self_referencing;
 use serde::Serialize;
+use strum::IntoEnumIterator;
 
 use crate::{
     action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefStepAction},
-    card::{Achievement, Card, Dogma},
+    auto_achieve::AchievementManager,
+    card::{Achievement, Card, Dogma, SpecialAchievement},
     card_pile::MainCardPile,
     containers::{BoxAchievementSet, BoxCardSet, CardSet},
     enums::{Color, Splay},
     error::{InnResult, InnovationError},
     flow::FlowState,
-    logger::{Logger, Subject, Operation, FnPureObserver},
+    logger::{FnPureObserver, Logger, Operation, Subject},
     observation::{ObsType, Observation},
     player::Player,
     state::{Choose, State},
@@ -46,16 +48,26 @@ impl<'c> Players<'c> {
         num_players: usize,
         cards: Vec<&'c Card>,
         logger: RcCell<Logger<'c>>,
+        first_player: PlayerId,
     ) -> Players<'c>
     where
         C: CardSet<'c, Card> + Default + 'c,
         A: CardSet<'c, Achievement<'c>> + Default + 'c,
     {
-        let pile = Rc::new(RefCell::new(MainCardPile::new(cards.clone())));
+        let pile = Rc::new(RefCell::new(MainCardPile::new(
+            cards.clone(),
+            SpecialAchievement::iter().collect(),
+        )));
         let mut subject = Subject::new();
+        subject.register_internal_owned(AchievementManager::new(
+            SpecialAchievement::iter().collect(),
+            first_player,
+        ));
         // Should logger cards be initialized here, or in other methods?
         logger.borrow_mut().start(pile.borrow().contents());
-        subject.register_external_owned(FnPureObserver::new(move |ev| logger.borrow_mut().log(ev.clone())));
+        subject.register_external_owned(FnPureObserver::new(move |ev| {
+            logger.borrow_mut().log(ev.clone())
+        }));
         Players {
             cards,
             logger: RefCell::new(subject),
@@ -289,6 +301,10 @@ impl Turn {
         }
     }
 
+    pub fn first_player(&self) -> usize {
+        self.first_player
+    }
+
     pub fn is_second_action(&self) -> bool {
         self.action % 2 == 0
     }
@@ -323,10 +339,17 @@ impl<'c> OuterGame<'c> {
         A: CardSet<'c, Achievement<'c>> + Default + 'c,
     {
         let logger = Rc::new(RefCell::new(Logger::new()));
+        // TODO: structure not clear
+        let turn = Turn::new(num_players, 0);
         OuterGameBuilder {
-            players: Players::new::<C, A>(num_players, cards, Rc::clone(&logger)),
+            players: Players::new::<C, A>(
+                num_players,
+                cards,
+                Rc::clone(&logger),
+                turn.first_player(),
+            ),
             players_ref_builder: |players| players,
-            turn: Turn::new(num_players, 0),
+            turn,
             logger,
             state: State::Main,
             next_action_type: ObsType::Main,

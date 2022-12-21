@@ -15,18 +15,21 @@ pub struct AchievementManager<'c> {
 }
 
 impl<'c> AchievementManager<'c> {
-    pub fn new(first_player: PlayerId) -> Self {
+    pub fn new(special_achievements: Vec<SpecialAchievement>, first_player: PlayerId) -> Self {
         Self {
-            available_achievements: vec![
-                (
-                    SpecialAchievement::Monument,
-                    Box::new(Monument::new(first_player)),
-                ),
-                (SpecialAchievement::Empire, Box::new(Empire)),
-                (SpecialAchievement::World, Box::new(World)),
-                (SpecialAchievement::Wonder, Box::new(Wonder)),
-                (SpecialAchievement::Universe, Box::new(Universe)),
-            ],
+            available_achievements: special_achievements
+                .into_iter()
+                .map(|sa| {
+                    let condition: Box<dyn Achievement> = match &sa {
+                        SpecialAchievement::Monument => Box::new(Monument::new(first_player)),
+                        SpecialAchievement::Empire => Box::new(Empire),
+                        SpecialAchievement::World => Box::new(World),
+                        SpecialAchievement::Wonder => Box::new(Wonder),
+                        SpecialAchievement::Universe => Box::new(Universe),
+                    };
+                    (sa, condition)
+                })
+                .collect(),
             acting_player: first_player,
         }
     }
