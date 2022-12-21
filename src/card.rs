@@ -109,12 +109,12 @@ pub enum SpecialAchievement {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Achievement {
-    Normal(Card),
+pub enum Achievement<'a> {
+    Normal(&'a Card),
     Special(SpecialAchievement),
 }
 
-impl Achievement {
+impl<'a> Achievement<'a> {
     pub fn view(&self) -> SingleAchievementView {
         match self {
             Achievement::Normal(c) => SingleAchievementView::Normal(c.age),

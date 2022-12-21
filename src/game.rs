@@ -49,7 +49,7 @@ impl<'c> Players<'c> {
     ) -> Players<'c>
     where
         C: CardSet<'c, Card> + Default + 'c,
-        A: CardSet<'c, Achievement> + Default + 'c,
+        A: CardSet<'c, Achievement<'c>> + Default + 'c,
     {
         let pile = Rc::new(RefCell::new(MainCardPile::new(cards.clone())));
         let mut subject = Subject::new();
@@ -320,7 +320,7 @@ impl<'c> OuterGame<'c> {
     pub fn init<C, A>(num_players: usize, cards: Vec<&'c Card>) -> OuterGame<'c>
     where
         C: CardSet<'c, Card> + Default + 'c,
-        A: CardSet<'c, Achievement> + Default + 'c,
+        A: CardSet<'c, Achievement<'c>> + Default + 'c,
     {
         let logger = Rc::new(RefCell::new(Logger::new()));
         OuterGameBuilder {
