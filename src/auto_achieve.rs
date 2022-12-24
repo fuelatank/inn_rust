@@ -1,16 +1,18 @@
+use std::cell::RefCell;
+
 use strum::IntoEnumIterator;
 
 use crate::{
     card::SpecialAchievement,
     enums::{Color, Icon, Splay},
     game::{PlayerId, Players},
-    logger::{InternalObserver, Item, Operation, SimpleOp},
+    logger::{InternalObserver, Item, Operation, SimpleOp, Observer},
     player::Player,
     structure::{Place, PlayerPlace},
 };
 
 pub struct AchievementManager<'c> {
-    available_achievements: Vec<(SpecialAchievement, Box<dyn Achievement<'c>>)>,
+    available_achievements: Vec<(SpecialAchievement, RefCell<Box<dyn Achievement<'c>>>)>,
     acting_player: PlayerId, // may be a duplicated Turn?
 }
 
@@ -27,7 +29,7 @@ impl<'c> AchievementManager<'c> {
                         SpecialAchievement::Wonder => Box::new(Wonder),
                         SpecialAchievement::Universe => Box::new(Universe),
                     };
-                    (sa, condition)
+                    (sa, RefCell::new(condition))
                 })
                 .collect(),
             acting_player: first_player,
@@ -35,21 +37,26 @@ impl<'c> AchievementManager<'c> {
     }
 }
 
-impl<'c> InternalObserver<'c> for AchievementManager<'c> {
-    fn on_notify(&mut self, event: &Item<'c>, game: &Players<'c>) {
-        // TODO: who is the "current player" that gets the achievement if two players
-        // satisty the condition at exactly the same time?
+impl<'c> Observer<'c> for AchievementManager<'c> {
+    fn on_notify(&mut self, event: &Item<'c>) {
         if let Item::ChangeTurn(_prev, next) = event {
             self.acting_player = *next;
         }
-        for (_card, check) in self.available_achievements.iter_mut() {
-            let interesting_players = check.update_interested(event);
+    }
+}
+
+impl<'c> InternalObserver<'c> for AchievementManager<'c> {
+    fn update_game(&self, event: &Item<'c>, game: &Players<'c>) {
+        // TODO: who is the "current player" that gets the achievement if two players
+        // satisty the condition at exactly the same time?
+        for (_card, check) in self.available_achievements.iter() {
+            let interesting_players = check.borrow_mut().update_interested(event);
             let order = game.ids_from(self.acting_player);
             for player in order
                 .filter(|id| interesting_players.contains(id))
                 .map(|id| game.player_at(id))
             {
-                if check.further_check(game, player) {
+                if check.borrow().further_check(game, player) {
                     // TODO: achieve
                     break;
                 }
@@ -63,7 +70,7 @@ trait Achievement<'c> {
     fn further_check(&self, game: &Players<'c>, player: &Player<'c>) -> bool;
 }
 
-fn check_board<'c>(event: &Item<'c>) -> Vec<PlayerId> {
+fn check_board(event: &Item) -> Vec<PlayerId> {
     if let Item::Operation(Operation::Transfer(from, to, _card)) = event {
         let mut res = Vec::new();
         if let Place::Player(from_player, PlayerPlace::Board) = from {
@@ -121,7 +128,7 @@ impl<'c> Achievement<'c> for Monument {
             }
             _ => {}
         }
-        return Vec::new();
+        Vec::new()
     }
 
     fn further_check(&self, _game: &Players<'c>, _player: &Player<'c>) -> bool {

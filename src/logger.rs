@@ -36,6 +36,7 @@ pub enum Item<'c> {
     ChangeTurn(PlayerId, PlayerId), // last player, next player
 }
 
+#[derive(Default)]
 pub struct Subject<'c> {
     observers: Vec<Weak<RefCell<dyn InternalObserver<'c>>>>,
     owned_observers: Vec<Box<dyn InternalObserver<'c> + 'c>>,
@@ -78,7 +79,7 @@ impl<'c> Subject<'c> {
     }
 
     pub fn notify(&mut self, item: Item<'c>, game: &Players<'c>) {
-        // first notify external observers, who often log events and don't modify game state
+        // first notify external observers, which may log events and don't modify game state
         for owned_observer in self.owned_ext_observers.iter_mut() {
             owned_observer.on_notify(&item);
         }
@@ -89,14 +90,14 @@ impl<'c> Subject<'c> {
                 .is_some()
         });
 
-        // second notify internal observers, who may modify game state and send new events
-        for owned_observer in self.owned_observers.iter_mut() {
-            owned_observer.on_notify(&item, game);
+        // second notify internal observers, letting them modify the game state and send new events
+        for owned_observer in self.owned_observers.iter() {
+            owned_observer.update_game(&item, game);
         }
         self.observers.retain_mut(|observer| {
             observer
                 .upgrade()
-                .map(|active_observer| active_observer.borrow_mut().on_notify(&item, game))
+                .map(|active_observer| active_observer.borrow().update_game(&item, game))
                 .is_some()
         });
     }
@@ -110,31 +111,31 @@ impl<'c> Subject<'c> {
     }
 }
 
-pub trait InternalObserver<'c> {
-    fn on_notify(&mut self, event: &Item<'c>, game: &Players<'c>);
-}
-
 pub trait Observer<'c> {
     // doesn't modify game state
     fn on_notify(&mut self, event: &Item<'c>);
 }
 
-impl<'c, T: Observer<'c>> InternalObserver<'c> for T {
-    fn on_notify(&mut self, event: &Item<'c>, _game: &Players<'c>) {
-        self.on_notify(event);
-    }
+pub trait InternalObserver<'c> {
+    // can't be &mut self to prevent multiple borrow:
+    // may call a method in game, which triggers some log,
+    // which calls again the on_notify, then it'll be
+    // borrowed twice in the stack.
+    // How do these RefCell/mutable/immutable work and connect together?
+    fn update_game(&self, event: &Item<'c>, game: &Players<'c>);
 }
 
-pub struct FnObserver<'c>(Box<dyn FnMut(&Item<'c>, &Players<'c>) + 'c>);
+// can be used in observers modifying game without modifying self
+pub struct FnInternalObserver<'c>(Box<dyn Fn(&Item<'c>, &Players<'c>) + 'c>);
 
-impl<'c> FnObserver<'c> {
-    pub fn new(f: impl FnMut(&Item<'c>, &Players<'c>) + 'c) -> Self {
+impl<'c> FnInternalObserver<'c> {
+    pub fn new(f: impl Fn(&Item<'c>, &Players<'c>) + 'c) -> Self {
         Self(Box::new(f))
     }
 }
 
-impl<'c> InternalObserver<'c> for FnObserver<'c> {
-    fn on_notify(&mut self, event: &Item<'c>, game: &Players<'c>) {
+impl<'c> InternalObserver<'c> for FnInternalObserver<'c> {
+    fn update_game(&self, event: &Item<'c>, game: &Players<'c>) {
         self.0(event, game);
     }
 }
