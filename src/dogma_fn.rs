@@ -7,6 +7,7 @@ use crate::{
     action::RefChoice,
     card::{Card, Dogma},
     enums::{Color, Icon, Splay},
+    error::InnResult,
     game::{Players, RcCell},
     player::Player,
     state::{Choose, ExecutionState},
@@ -16,32 +17,32 @@ use crate::{
 // wrapper of Scope
 // which lifetime in Scope???
 struct Context<'a, 'c, 'g> {
-    s: Scope<'a, RefChoice<'c, 'g>, ExecutionState<'c, 'g>>,
+    s: Scope<'a, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>>,
 }
 
 impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
-    fn new(s: Scope<'a, RefChoice<'c, 'g>, ExecutionState<'c, 'g>>) -> Context<'a, 'c, 'g> {
+    fn new(
+        s: Scope<'a, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>>,
+    ) -> Context<'a, 'c, 'g> {
         Context { s }
     }
 
     fn yield_(&mut self, player: &'g Player<'c>, choose: Choose<'c>) -> RefChoice<'c, 'g> {
         self.s
-            .yield_(ExecutionState::new(player, choose))
+            .yield_(Ok(ExecutionState::new(player, choose)))
             .expect("Generator got None")
     }
 
     fn choose_one_card(&mut self, player: &'g Player<'c>, from: Vec<&'c Card>) -> Option<&'c Card> {
         let cards = self
-            .s
-            .yield_(ExecutionState::new(
+            .yield_(
                 player,
                 Choose::Card {
                     min_num: 1,
                     max_num: Some(1),
                     from,
                 },
-            ))
-            .expect("Generator got None")
+            )
             .cards();
         debug_assert!(cards.len() <= 1);
         if !cards.is_empty() {
@@ -59,16 +60,14 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
     ) -> Option<Vec<&'c Card>> {
         // choose at least one if possible
         let cards = self
-            .s
-            .yield_(ExecutionState::new(
+            .yield_(
                 player,
                 Choose::Card {
                     min_num: 1,
                     max_num,
                     from,
                 },
-            ))
-            .expect("Generator got None")
+            )
             .cards();
         if !cards.is_empty() {
             Some(cards)
@@ -84,17 +83,15 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         max_num: Option<u8>,
     ) -> Vec<&'c Card> {
         // can choose 0 to max_num cards
-        self.s
-            .yield_(ExecutionState::new(
-                player,
-                Choose::Card {
-                    min_num: 0,
-                    max_num,
-                    from,
-                },
-            ))
-            .expect("Generator got None")
-            .cards()
+        self.yield_(
+            player,
+            Choose::Card {
+                min_num: 0,
+                max_num,
+                from,
+            },
+        )
+        .cards()
     }
 
     fn choose_cards_exact(
@@ -104,16 +101,14 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         num: u8,
     ) -> Option<Vec<&'c Card>> {
         let cards = self
-            .s
-            .yield_(ExecutionState::new(
+            .yield_(
                 player,
                 Choose::Card {
                     min_num: num,
                     max_num: Some(num),
                     from,
                 },
-            ))
-            .expect("Generator got None")
+            )
             .cards();
         if cards.is_empty() {
             None
@@ -123,10 +118,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
     }
 
     fn choose_yn(&mut self, player: &'g Player<'c>) -> bool {
-        self.s
-            .yield_(ExecutionState::new(player, Choose::Yn))
-            .expect("Generator got None")
-            .yn()
+        self.yield_(player, Choose::Yn).yn()
     }
 
     fn may<T, F>(&mut self, player: &'g Player<'c>, f: F) -> Option<T>
@@ -337,7 +329,7 @@ pub fn code_of_laws() -> Vec<Dogma> {
     vec![Dogma::Share(Box::new(|player, game| {
         Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
             let opt_card = s
-                .yield_(ExecutionState::new(
+                .yield_(Ok(ExecutionState::new(
                     player,
                     Choose::Card {
                         min_num: 0,
@@ -350,7 +342,7 @@ pub fn code_of_laws() -> Vec<Dogma> {
                             })
                             .collect(),
                     },
-                ))
+                )))
                 .expect("Generator got None")
                 .card();
             let card = match opt_card {
@@ -361,7 +353,7 @@ pub fn code_of_laws() -> Vec<Dogma> {
             if game.is_splayed(player, card.color(), Splay::Left) {
                 done!()
             }
-            if s.yield_(ExecutionState::new(player, Choose::Yn))
+            if s.yield_(Ok(ExecutionState::new(player, Choose::Yn)))
                 .expect("Generator got None")
                 .yn()
             {
@@ -428,14 +420,14 @@ pub fn optics() -> Vec<Dogma> {
                 done!()
             } else {
                 let opt_card = s
-                    .yield_(ExecutionState::new(
+                    .yield_(Ok(ExecutionState::new(
                         player,
                         Choose::Card {
                             min_num: 1,
                             max_num: Some(1),
                             from: player.score_pile.borrow().as_vec(),
                         },
-                    ))
+                    )))
                     .expect("Generator got None")
                     .card();
                 let card = match opt_card {
@@ -443,7 +435,7 @@ pub fn optics() -> Vec<Dogma> {
                     None => done!(),
                 };
                 let opponent = s
-                    .yield_(ExecutionState::new(player, Choose::Opponent))
+                    .yield_(Ok(ExecutionState::new(player, Choose::Opponent)))
                     .expect("Generator got None")
                     .player();
                 game.transfer_card(player.with_id(Score), opponent.with_id(Score), card)

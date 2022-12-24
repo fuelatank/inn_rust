@@ -222,7 +222,9 @@ impl<'c> Players<'c> {
                             // s.yield_from(gen); but with or(card)
                             let mut state = gen.resume();
                             while let Some(st) = state {
-                                let a = s.yield_(st.or(card)).expect("Generator got None");
+                                let a = s
+                                    .yield_(st.map(|st| st.or(card)))
+                                    .expect("Generator got None");
                                 gen.set_para(a);
                                 state = gen.resume();
                             }
@@ -240,7 +242,9 @@ impl<'c> Players<'c> {
                             // s.yield_from(gen); but with or(card)
                             let mut state = gen.resume();
                             while let Some(st) = state {
-                                let a = s.yield_(st.or(card)).expect("Generator got None");
+                                let a = s
+                                    .yield_(st.map(|st| st.or(card)))
+                                    .expect("Generator got None");
                                 gen.set_para(a);
                                 state = gen.resume();
                             }
@@ -450,21 +454,24 @@ impl<'c> OuterGame<'c> {
 
             if let State::Executing(state) = fields.state {
                 match state.resume() {
-                    Some(st) => {
+                    Some(Ok(st)) => {
                         let (p, o) = st.to_obs();
                         let id = p.id();
-                        (id, ObsType::Executing(o))
+                        Ok((id, ObsType::Executing(o)))
+                    }
+                    Some(Err(e)) => {
+                        Err(e)
                     }
                     None => {
                         *fields.state = State::Main;
                         fields.turn.next();
-                        (fields.turn.player_id(), ObsType::Main)
+                        Ok((fields.turn.player_id(), ObsType::Main))
                     }
                 }
             } else {
-                (fields.turn.player_id(), ObsType::Main)
+                Ok((fields.turn.player_id(), ObsType::Main))
             }
-        });
+        })?;
         self.with_next_action_type_mut(|field| *field = obs_type.clone());
         Ok(self.observe(player, obs_type))
     }
