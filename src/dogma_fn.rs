@@ -27,6 +27,10 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         Context { s }
     }
 
+    fn into_raw(self) -> Scope<'a, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>> {
+        self.s
+    }
+
     fn yield_(&mut self, player: &'g Player<'c>, choose: Choose<'c>) -> RefChoice<'c, 'g> {
         self.s
             .yield_(Ok(ExecutionState::new(player, choose)))
@@ -173,7 +177,12 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
 
 fn shared<F>(f: F) -> Dogma
 where
-    F: for<'a, 'c, 'g> Fn(&'g Player<'c>, &'g Players<'c>, Context<'a, 'c, 'g>) + 'static,
+    F: for<'a, 'c, 'g> Fn(
+            &'g Player<'c>,
+            &'g Players<'c>,
+            &mut Context<'a, 'c, 'g>,
+        ) -> InnResult<()>
+        + 'static,
 {
     // convert a ctx-based dogma draft into a real ((player, game) -> generator) dogma
     // but several generators may exist at one time, each has a reference to f
@@ -184,8 +193,15 @@ where
     Dogma::Share(Box::new(move |player, game| {
         let cloned = Rc::clone(&rcf);
         Gn::new_scoped_local(move |s| {
-            let ctx = Context::new(s);
-            cloned(player, game, ctx);
+            let mut ctx = Context::new(s);
+            if let Err(e) = cloned(player, game, &mut ctx) {
+                ctx.into_raw().yield_(Err(e));
+                panic!(
+                    "Error happened but an progress of execution has been made!\n\
+                    So the same execution process can't be touched.\n\
+                    This can be caused by unknown internal error OR winning."
+                )
+            };
             done!()
         })
     }))
@@ -193,15 +209,27 @@ where
 
 fn demand<F>(f: F) -> Dogma
 where
-    F: for<'a, 'c, 'g> Fn(&'g Player<'c>, &'g Player<'c>, &'g Players<'c>, Context<'a, 'c, 'g>)
+    F: for<'a, 'c, 'g> Fn(
+            &'g Player<'c>,
+            &'g Player<'c>,
+            &'g Players<'c>,
+            &mut Context<'a, 'c, 'g>,
+        ) -> InnResult<()>
         + 'static,
 {
     let rcf = Rc::new(f);
     Dogma::Demand(Box::new(move |player, opponent, game| {
         let cloned = Rc::clone(&rcf);
         Gn::new_scoped_local(move |s| {
-            let ctx = Context::new(s);
-            cloned(player, opponent, game, ctx);
+            let mut ctx = Context::new(s);
+            if let Err(e) = cloned(player, opponent, game, &mut ctx) {
+                ctx.into_raw().yield_(Err(e));
+                panic!(
+                    "Error happened but an progress of execution has been made!\n\
+                    So the same execution process can't be touched.\n\
+                    This can be caused by unknown internal error OR winning."
+                )
+            };
             done!()
         })
     }))
@@ -209,25 +237,27 @@ where
 
 pub fn pottery() -> Vec<Dogma> {
     vec![
-        shared(|player, game, mut ctx| {
+        shared(|player, game, ctx| {
             let cards = ctx.choose_any_cards_up_to(player, player.hand().as_vec(), Some(3));
             if !cards.is_empty() {
                 let n = cards.len();
                 for card in cards {
-                    game.r#return(player, card);
+                    game.r#return(player, card)?;
                 }
-                game.draw(player, n.try_into().unwrap());
+                game.draw(player, n.try_into().unwrap())?;
             }
+            Ok(())
         }),
         shared(|player, game, _ctx| {
-            game.draw(player, 1);
+            game.draw(player, 1)?;
+            Ok(())
         }),
     ]
 }
 
 pub fn tools() -> Vec<Dogma> {
     vec![
-        shared(|player, game, mut ctx| {
+        shared(|player, game, ctx| {
             // need confirmation of rule, any or exact 3 cards?
             let cards = ctx
                 .may(player, |ctx| {
@@ -235,28 +265,30 @@ pub fn tools() -> Vec<Dogma> {
                 })
                 .flatten();
             if cards.is_some() {
-                game.draw_and_meld(player, 3);
+                game.draw_and_meld(player, 3)?;
             }
+            Ok(())
         }),
-        shared(|player, game, mut ctx| {
+        shared(|player, game, ctx| {
             let card = ctx
                 .may(player, |ctx| {
                     ctx.choose_one_card(player, player.hand().filtered_vec(|&c| c.age() == 3))
                 })
                 .flatten();
             if card.is_some() {
-                game.draw(player, 1);
-                game.draw(player, 1);
-                game.draw(player, 1);
+                game.draw(player, 1)?;
+                game.draw(player, 1)?;
+                game.draw(player, 1)?;
             }
+            Ok(())
         }),
     ]
 }
 
 // TODO: simplify
 pub fn archery() -> Vec<Dogma> {
-    vec![demand(|player, opponent, game, mut ctx| {
-        game.draw(opponent, 1);
+    vec![demand(|player, opponent, game, ctx| {
+        game.draw(opponent, 1)?;
         let age = opponent
             .hand()
             .as_iter()
@@ -295,32 +327,34 @@ pub fn oars() -> Vec<Dogma> {
     let transferred: RcCell<bool> = Rc::new(RefCell::new(false));
     let view = Rc::clone(&transferred);
     vec![
-        demand(move |player, opponent, game, mut ctx| {
+        demand(move |player, opponent, game, ctx| {
             let card = ctx.choose_one_card(opponent, opponent.hand().has_icon(Icon::Crown));
             if let Some(card) = card {
-                // TODO: handle the Result
-                game.transfer_card(opponent.with_id(Hand), player.with_id(Score), card)
-                    .unwrap();
+                // MAYRESOLVED: TODO: handle the Result
+                game.transfer_card(opponent.with_id(Hand), player.with_id(Score), card)?;
                 *transferred.borrow_mut() = true;
             }
+            Ok(())
         }),
         shared(move |player, game, _ctx| {
             if !*view.borrow() {
-                game.draw(player, 1);
+                game.draw(player, 1)?;
             }
+            Ok(())
         }),
     ]
 }
 
 pub fn agriculture() -> Vec<Dogma> {
-    vec![shared(|player, game, mut ctx| {
+    vec![shared(|player, game, ctx| {
         let card = ctx.may(player, |ctx| {
             ctx.choose_one_card(player, player.hand().as_vec())
         });
         if let Some(card) = card.flatten() {
-            game.r#return(player, card);
-            game.draw_and_score(player, card.age());
+            game.r#return(player, card)?;
+            game.draw_and_score(player, card.age())?;
         }
+        Ok(())
     })]
 }
 
@@ -349,7 +383,10 @@ pub fn code_of_laws() -> Vec<Dogma> {
                 Some(c) => c,
                 None => done!(),
             };
-            game.tuck(player, card);
+            game.tuck(player, card).unwrap_or_else(|e| {
+                s.yield_(Err(e));
+                panic!("shortened message")
+            });
             if game.is_splayed(player, card.color(), Splay::Left) {
                 done!()
             }
@@ -366,7 +403,7 @@ pub fn code_of_laws() -> Vec<Dogma> {
 
 pub fn monotheism() -> Vec<Dogma> {
     vec![
-        demand(|player, opponent, game, mut ctx| {
+        demand(|player, opponent, game, ctx| {
             let available_cards: Vec<_> = opponent
                 .board()
                 .borrow()
@@ -385,27 +422,31 @@ pub fn monotheism() -> Vec<Dogma> {
                     (),
                 )
                 .unwrap();
-                game.draw_and_tuck(opponent, 1);
+                game.draw_and_tuck(opponent, 1)?;
             }
+            Ok(())
         }),
         shared(|player, game, _ctx| {
-            game.draw_and_tuck(player, 1);
+            game.draw_and_tuck(player, 1)?;
+            Ok(())
         }),
     ]
 }
 
 pub fn philosophy() -> Vec<Dogma> {
     vec![
-        shared(|player, game, mut ctx| {
+        shared(|player, game, ctx| {
             ctx.may_splays(player, game, Color::iter().collect(), Splay::Left);
+            Ok(())
         }),
-        shared(|player, game, mut ctx| {
+        shared(|player, game, ctx| {
             if !player.score_pile().as_vec().is_empty() && ctx.choose_yn(player) {
                 let card = ctx
                     .choose_one_card(player, player.score_pile().as_vec())
                     .unwrap();
-                game.score(player, card);
+                game.score(player, card)?;
             }
+            Ok(())
         }),
     ]
 }
@@ -416,7 +457,7 @@ pub fn optics() -> Vec<Dogma> {
         Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
             let card = game.draw_and_meld(player, 3).unwrap();
             if card.contains(Icon::Crown) {
-                game.draw_and_score(player, 4);
+                game.draw_and_score(player, 4)?;
                 done!()
             } else {
                 let opt_card = s

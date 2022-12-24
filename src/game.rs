@@ -133,45 +133,38 @@ impl<'c> Players<'c> {
         &self.main_card_pile
     }
 
-    pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+    pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.hand, &age)
         self.transfer(MainCardPile_, player.with_id(Hand), age, ())
-            .ok()
     }
 
-    pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+    pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.main_board, &age)
         self.transfer(MainCardPile_, player.with_id(Board), age, true)
-            .ok()
     }
 
-    pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+    pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.score_pile, &age)
         self.transfer(MainCardPile_, player.with_id(Score), age, ())
-            .ok()
     }
 
-    pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+    pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         self.transfer(MainCardPile_, player.with_id(Board), age, false)
-            .ok()
     }
 
-    pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+    pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
         self.transfer(player.with_id(Hand), player.with_id(Board), card, true)
-            .ok()
     }
 
-    pub fn score<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+    pub fn score<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.score_pile, card)
         self.transfer(player.with_id(Hand), player.with_id(Score), card, ())
-            .ok()
     }
 
-    pub fn tuck<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+    pub fn tuck<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
         self.transfer(player.with_id(Hand), player.with_id(Board), card, false)
-            .ok()
     }
 
     pub fn splay<'g>(&'g self, player: &'g Player<'c>, color: Color, direction: Splay) {
@@ -191,10 +184,9 @@ impl<'c> Players<'c> {
         player.board().borrow().is_splayed(color, direction)
     }
 
-    pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+    pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, Rc::clone(&self.main_pile), card)
         self.transfer(player.with_id(Hand), MainCardPile_, card, ())
-            .ok()
     }
 
     pub fn execute<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> FlowState<'c, 'g> {
@@ -420,11 +412,11 @@ impl<'c> OuterGame<'c> {
                         let player = game.player_at(fields.turn.player_id());
                         match action {
                             RefStepAction::Draw => {
-                                game.draw(player, player.age());
+                                game.draw(player, player.age())?;
                                 fields.turn.next();
                             }
                             RefStepAction::Meld(card) => {
-                                game.meld(player, card);
+                                game.meld(player, card)?;
                                 fields.turn.next();
                             }
                             RefStepAction::Achieve(_age) => {
