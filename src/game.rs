@@ -29,7 +29,7 @@ pub type PlayerId = usize;
 
 pub struct Players<'c> {
     cards: Vec<&'c Card>,
-    logger: RefCell<Subject<'c>>,
+    logger: Subject<'c>,
     main_card_pile: RcCell<MainCardPile<'c>>,
     players: Vec<Player<'c>>,
 }
@@ -38,7 +38,7 @@ impl<'c> Players<'c> {
     pub fn empty() -> Players<'c> {
         Players {
             cards: Vec::new(),
-            logger: RefCell::new(Subject::new()),
+            logger: Subject::new(),
             main_card_pile: Rc::new(RefCell::new(MainCardPile::empty())),
             players: vec![],
         }
@@ -70,7 +70,7 @@ impl<'c> Players<'c> {
         }));
         Players {
             cards,
-            logger: RefCell::new(subject),
+            logger: subject,
             main_card_pile: Rc::clone(&pile),
             players: (0..num_players)
                 .map(|i| {
@@ -268,7 +268,6 @@ impl<'c> Players<'c> {
             to.add_to(card, self, add_param);
             // TODO: this does not allow observers to perform operations (log)
             self.logger
-                .borrow_mut()
                 .operate(Operation::Transfer(from.into(), to.into(), card), self);
             Ok(card)
         } else {
