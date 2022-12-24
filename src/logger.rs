@@ -38,10 +38,10 @@ pub enum Item<'c> {
 
 #[derive(Default)]
 pub struct Subject<'c> {
-    observers: Vec<Weak<RefCell<dyn InternalObserver<'c>>>>,
+    observers: Vec<Weak<dyn InternalObserver<'c>>>,
     owned_observers: Vec<Box<dyn InternalObserver<'c> + 'c>>,
     ext_observers: Vec<Weak<RefCell<dyn Observer<'c>>>>,
-    owned_ext_observers: Vec<Box<dyn Observer<'c> + 'c>>,
+    owned_ext_observers: Vec<RefCell<Box<dyn Observer<'c> + 'c>>>,
 }
 
 impl<'c> Subject<'c> {
@@ -63,13 +63,13 @@ impl<'c> Subject<'c> {
 
     /// Register a permanent external observer to the system.
     pub fn register_external_owned(&mut self, new_observer: impl Observer<'c> + 'c) {
-        self.owned_ext_observers.push(Box::new(new_observer));
+        self.owned_ext_observers.push(RefCell::new(Box::new(new_observer)));
     }
 
     /// Register an internal observer to the system.
     ///
     /// The caller should have a strong reference of the observer to prevent dropping.
-    pub fn register_internal(&mut self, new_observer: &Rc<RefCell<dyn InternalObserver<'c>>>) {
+    pub fn register_internal(&mut self, new_observer: &Rc<dyn InternalObserver<'c>>) {
         self.observers.push(Rc::downgrade(new_observer));
     }
 
@@ -78,35 +78,35 @@ impl<'c> Subject<'c> {
         self.owned_observers.push(Box::new(new_observer));
     }
 
-    pub fn notify(&mut self, item: Item<'c>, game: &Players<'c>) {
-        // first notify external observers, which may log events and don't modify game state
-        for owned_observer in self.owned_ext_observers.iter_mut() {
-            owned_observer.on_notify(&item);
+    // must be immutable &self, because there may be multiple calls in the stack
+    pub fn notify(&self, item: Item<'c>, game: &Players<'c>) {
+        // first notify external observers, which may log events and don't modify game state,
+        // so we won't worry about multiple RefCell borrow_mut
+        for owned_observer in self.owned_ext_observers.iter() {
+            owned_observer.borrow_mut().on_notify(&item);
         }
-        self.ext_observers.retain_mut(|observer| {
+        for observer in self.ext_observers.iter() {
             observer
                 .upgrade()
-                .map(|active_observer| active_observer.borrow_mut().on_notify(&item))
-                .is_some()
-        });
+                .map(|active_observer| active_observer.borrow_mut().on_notify(&item));
+        };
 
         // second notify internal observers, letting them modify the game state and send new events
         for owned_observer in self.owned_observers.iter() {
             owned_observer.update_game(&item, game);
         }
-        self.observers.retain_mut(|observer| {
+        for observer in self.observers.iter() {
             observer
                 .upgrade()
-                .map(|active_observer| active_observer.borrow().update_game(&item, game))
-                .is_some()
-        });
+                .map(|active_observer| active_observer.update_game(&item, game));
+        };
     }
 
-    pub fn act(&mut self, action: Action, game: &Players<'c>) {
+    pub fn act(&self, action: Action, game: &Players<'c>) {
         self.notify(Item::Action(action), game);
     }
 
-    pub fn operate(&mut self, operation: Operation<'c>, game: &Players<'c>) {
+    pub fn operate(&self, operation: Operation<'c>, game: &Players<'c>) {
         self.notify(Item::Operation(operation), game);
     }
 }
