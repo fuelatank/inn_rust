@@ -4,7 +4,6 @@ use crate::game::PlayerId;
 pub enum WinningSituation {
     SomeOne(PlayerId),
     ByScore,
-    ByExecutor,
 }
 
 #[derive(Debug)]

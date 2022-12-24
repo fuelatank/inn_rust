@@ -502,7 +502,6 @@ impl<'c> OuterGame<'c> {
                                         })
                                         .collect()
                                 }
-                                _ => todo!(),
                             };
                             Ok((current_player.unwrap(), Info::End(winners)))
                         } else {
