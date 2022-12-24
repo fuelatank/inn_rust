@@ -264,16 +264,14 @@ impl<'c> Players<'c> {
         To: AddToGame<'c, AP> + Into<Place>,
     {
         let card = from.remove_from(self, remove_param);
-        if let Some(card) = card {
+        card.map(|card| {
             to.add_to(card, self, add_param);
             // TODO: this does not allow observers to perform operations (log)
             self.logger
                 .borrow_mut()
                 .operate(Operation::Transfer(from.into(), to.into(), card), self);
-            Ok(card)
-        } else {
-            Err(InnovationError::CardNotFound)
-        }
+            card
+        })
     }
 
     pub fn transfer_card<Fr, To>(&self, from: Fr, to: To, card: &'c Card) -> InnResult<()>
