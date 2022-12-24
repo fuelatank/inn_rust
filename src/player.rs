@@ -52,6 +52,14 @@ impl<'c> Player<'c> {
         &self.main_board
     }
 
+    pub fn total_score(&self) -> usize {
+        self.score_pile().as_iter().map(|i| i.age() as usize).sum()
+    }
+
+    pub fn achievements(&self) -> Ref<BoxAchievementSet<'c>> {
+        self.achievements.borrow()
+    }
+
     pub fn is_splayed(&self, color: Color, direction: Splay) -> bool {
         self.main_board.borrow().is_splayed(color, direction)
     }

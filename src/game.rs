@@ -13,10 +13,10 @@ use crate::{
     card_pile::MainCardPile,
     containers::{BoxAchievementSet, BoxCardSet, CardSet},
     enums::{Color, Splay},
-    error::{InnResult, InnovationError},
+    error::{InnResult, InnovationError, WinningSituation},
     flow::FlowState,
     logger::{FnPureObserver, Logger, Operation, Subject},
-    observation::{ObsType, Observation},
+    observation::{EndObservation, GameState, ObsType, Observation},
     player::Player,
     state::{Choose, State},
     structure::{
@@ -215,7 +215,10 @@ impl<'c> Players<'c> {
                             let mut state = gen.resume();
                             while let Some(st) = state {
                                 let a = s
-                                    .yield_(st.map(|st| st.or(card)))
+                                    .yield_(
+                                        st.map(|st| st.or(card))
+                                            .map_err(|e| e.or_set_current_player(player.id())),
+                                    )
                                     .expect("Generator got None");
                                 gen.set_para(a);
                                 state = gen.resume();
@@ -235,7 +238,10 @@ impl<'c> Players<'c> {
                             let mut state = gen.resume();
                             while let Some(st) = state {
                                 let a = s
-                                    .yield_(st.map(|st| st.or(card)))
+                                    .yield_(
+                                        st.map(|st| st.or(card))
+                                            .map_err(|e| e.or_set_current_player(player.id())),
+                                    )
                                     .expect("Generator got None");
                                 gen.set_para(a);
                                 state = gen.resume();
@@ -398,11 +404,19 @@ impl<'c> OuterGame<'c> {
         })
     }
 
-    pub fn step(&mut self, action: Action) -> InnResult<Observation> {
+    pub fn step(&mut self, action: Action) -> InnResult<GameState> {
         if !self.is_available_action(&action) {
             return Err(InnovationError::InvalidAction);
         }
-        let (player, obs_type) = self.with_mut(|fields| {
+        // helper enums/functions
+        enum Info<'a> {
+            Normal(ObsType<'a>),
+            End(Vec<PlayerId>),
+        }
+        fn ok_normal(player: PlayerId, obs_type: ObsType) -> InnResult<(PlayerId, Info)> {
+            Ok((player, Info::Normal(obs_type)))
+        }
+        match self.with_mut(|fields| {
             fields.logger.borrow_mut().act(action.clone());
             let game = *fields.players_ref;
             let action = action.to_ref(game);
@@ -412,7 +426,10 @@ impl<'c> OuterGame<'c> {
                         let player = game.player_at(fields.turn.player_id());
                         match action {
                             RefStepAction::Draw => {
-                                game.draw(player, player.age())?;
+                                // This current executor finder appears here and in Players.execute
+                                // because either he's executing something or not.
+                                game.draw(player, player.age())
+                                    .map_err(|e| e.or_set_current_player(player.id()))?;
                                 fields.turn.next();
                             }
                             RefStepAction::Meld(card) => {
@@ -449,23 +466,65 @@ impl<'c> OuterGame<'c> {
                     Some(Ok(st)) => {
                         let (p, o) = st.to_obs();
                         let id = p.id();
-                        Ok((id, ObsType::Executing(o)))
+                        ok_normal(id, ObsType::Executing(o))
                     }
                     Some(Err(e)) => {
-                        Err(e)
+                        if let InnovationError::Win {
+                            current_player,
+                            situation,
+                        } = e
+                        {
+                            let winners = match situation {
+                                WinningSituation::SomeOne(p) => vec![p],
+                                WinningSituation::ByScore => {
+                                    let max_score = game
+                                        .players_from(0)
+                                        .map(|player| {
+                                            // sort order
+                                            (
+                                                player.total_score(),
+                                                player.achievements().as_vec().len(),
+                                            )
+                                        })
+                                        .max()
+                                        .unwrap();
+                                    game.players_from(0)
+                                        .filter_map(|player| {
+                                            if (
+                                                player.total_score(),
+                                                player.achievements().as_vec().len(),
+                                            ) == max_score
+                                            {
+                                                Some(player.id())
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                        .collect()
+                                }
+                                _ => todo!(),
+                            };
+                            Ok((current_player.unwrap(), Info::End(winners)))
+                        } else {
+                            Err(e)
+                        }
                     }
                     None => {
                         *fields.state = State::Main;
                         fields.turn.next();
-                        Ok((fields.turn.player_id(), ObsType::Main))
+                        ok_normal(fields.turn.player_id(), ObsType::Main)
                     }
                 }
             } else {
-                Ok((fields.turn.player_id(), ObsType::Main))
+                ok_normal(fields.turn.player_id(), ObsType::Main)
             }
-        })?;
-        self.with_next_action_type_mut(|field| *field = obs_type.clone());
-        Ok(self.observe(player, obs_type))
+        })? {
+            (player, Info::Normal(obs_type)) => {
+                self.with_next_action_type_mut(|field| *field = obs_type.clone());
+                Ok(GameState::Normal(self.observe(player, obs_type)))
+            }
+            (player, Info::End(winners)) => Ok(GameState::End(self.observe_end(player, winners))),
+        }
     }
 
     fn observe<'a>(&'a self, id: usize, obs_type: ObsType<'a>) -> Observation {
@@ -480,6 +539,23 @@ impl<'c> OuterGame<'c> {
             main_pile: players.main_card_pile.borrow().view(),
             turn: self.borrow_turn(),
             obstype: obs_type,
+        }
+    }
+
+    fn observe_end<'a>(
+        &'a self,
+        current_player: PlayerId,
+        winners: Vec<PlayerId>,
+    ) -> EndObservation {
+        let players = *self.borrow_players_ref();
+        EndObservation {
+            players_from_current: players
+                .ids_from(current_player)
+                .map(|id| players.player_at(id).self_view())
+                .collect(),
+            main_pile: players.main_card_pile().borrow().view(),
+            turn: self.borrow_turn(),
+            winners,
         }
     }
 }
@@ -599,7 +675,10 @@ mod tests {
                     "Archery",
                 ))))
                 .expect("Action should be valid");
-            assert!(matches!(obs.obstype, ObsType::Executing(_)))
+            assert!(matches!(
+                obs.as_normal().unwrap().obstype,
+                ObsType::Executing(_)
+            ))
         }
         {
             let obs = game
@@ -608,8 +687,8 @@ mod tests {
                 )])))
                 .expect("Action should be valid");
             println!("{:#?}", obs);
-            assert_eq!(obs.turn.player_id(), 1);
-            assert!(matches!(obs.obstype, ObsType::Main));
+            assert_eq!(obs.as_normal().unwrap().turn.player_id(), 1);
+            assert!(matches!(obs.as_normal().unwrap().obstype, ObsType::Main));
         }
     }
 }

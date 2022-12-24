@@ -3,7 +3,7 @@ use crate::{
     card::Card,
     containers::{Addable, Removeable},
     enums::Color,
-    error::{InnResult, InnovationError},
+    error::{InnResult, InnovationError, WinningSituation},
     game::Players,
     player::Player,
 };
@@ -101,7 +101,7 @@ pub struct MainCardPile;
 
 impl<'c> RemoveFromGame<'c, u8> for MainCardPile {
     fn remove_from(&self, game: &Players<'c>, param: u8) -> InnResult<&'c Card> {
-        game.main_card_pile().borrow_mut().remove(&param).ok_or(InnovationError::Win(None))
+        game.main_card_pile().borrow_mut().remove(&param).ok_or(InnovationError::Win { current_player: None, situation: WinningSituation::ByScore })
     }
 }
 

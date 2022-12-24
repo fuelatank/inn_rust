@@ -5,7 +5,7 @@ use serde::{Serialize, Serializer};
 use crate::{
     board::Board,
     card::{Card, SpecialAchievement},
-    game::Turn,
+    game::{Turn, PlayerId},
     state::ExecutionObs,
 };
 
@@ -70,6 +70,40 @@ pub struct Observation<'a> {
     pub main_pile: [usize; 10],
     pub turn: &'a Turn,
     pub obstype: ObsType<'a>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EndObservation<'a> {
+    // todo: reveal achievement
+    pub players_from_current: Vec<MainPlayerView<'a>>,
+    pub main_pile: [usize; 10],
+    pub turn: &'a Turn,
+    pub winners: Vec<PlayerId>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum GameState<'a> {
+    Normal(Observation<'a>),
+    End(EndObservation<'a>),
+}
+
+impl<'a> GameState<'a> {
+    pub fn as_normal(&self) -> Option<&Observation<'a>> {
+        if let Self::Normal(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_end(&self) -> Option<&EndObservation<'a>> {
+        if let Self::End(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
