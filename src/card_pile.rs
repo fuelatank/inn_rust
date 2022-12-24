@@ -1,4 +1,4 @@
-use crate::card::Card;
+use crate::card::{Achievement, Card, SpecialAchievement};
 use crate::containers::{Addable, Removeable};
 use std::collections::VecDeque;
 
@@ -35,6 +35,7 @@ impl<'a> Removeable<'a, Card, ()> for CardPile<'a> {
 
 pub struct MainCardPile<'a> {
     piles: [CardPile<'a>; 10],
+    achievements: Vec<Achievement<'a>>,
 }
 
 impl<'a> MainCardPile<'a> {
@@ -52,14 +53,26 @@ impl<'a> MainCardPile<'a> {
                 CardPile::new(),
                 CardPile::new(),
             ],
+            achievements: Vec::new(),
         }
     }
 
-    pub fn new(cards: Vec<&'a Card>) -> MainCardPile<'a> {
+    pub fn new(
+        cards: Vec<&'a Card>,
+        special_achievements: Vec<SpecialAchievement>,
+    ) -> MainCardPile<'a> {
         let mut pile = MainCardPile::empty();
         for card in cards {
             pile.add(card);
         }
+        // pick one (if exists) card of each age as achievement
+        for age in pile.piles.iter_mut() {
+            if let Some(card) = age.remove(&()) {
+                pile.achievements.push(Achievement::Normal(card));
+            }
+        }
+        pile.achievements
+            .extend(special_achievements.into_iter().map(Achievement::Special));
         pile
     }
 

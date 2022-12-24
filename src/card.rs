@@ -4,6 +4,7 @@ use crate::observation::SingleAchievementView;
 use counter::Counter;
 use serde::Serialize;
 use std::fmt::Debug;
+use strum_macros::EnumIter;
 
 pub enum Dogma {
     Share(ShareFlow),
@@ -98,7 +99,7 @@ impl Debug for Card {
     }
 }
 
-#[derive(PartialEq, Debug, Serialize)]
+#[derive(PartialEq, Debug, Serialize, EnumIter)]
 pub enum SpecialAchievement {
     Monument,
     Empire,
@@ -108,12 +109,12 @@ pub enum SpecialAchievement {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Achievement {
-    Normal(Card),
+pub enum Achievement<'a> {
+    Normal(&'a Card),
     Special(SpecialAchievement),
 }
 
-impl Achievement {
+impl<'a> Achievement<'a> {
     pub fn view(&self) -> SingleAchievementView {
         match self {
             Achievement::Normal(c) => SingleAchievementView::Normal(c.age),

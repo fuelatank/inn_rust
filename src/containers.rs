@@ -89,7 +89,7 @@ impl<'a, T: PartialEq> CardSet<'a, T> for VecSet<'a, T> {
 }
 
 pub type BoxCardSet<'a> = Box<dyn CardSet<'a, Card> + 'a>;
-pub type BoxAchievementSet<'a> = Box<dyn CardSet<'a, Achievement> + 'a>;
+pub type BoxAchievementSet<'a> = Box<dyn CardSet<'a, Achievement<'a>> + 'a>;
 
 pub fn transfer<'a, T, P, R, S, A, B>(from: A, to: B, param: &P) -> Option<&'a T>
 where

@@ -4,16 +4,18 @@ use std::rc::Rc;
 use generator::Gn;
 use ouroboros::self_referencing;
 use serde::Serialize;
+use strum::IntoEnumIterator;
 
 use crate::{
     action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefStepAction},
-    card::{Achievement, Card, Dogma},
+    auto_achieve::AchievementManager,
+    card::{Achievement, Card, Dogma, SpecialAchievement},
     card_pile::MainCardPile,
     containers::{BoxAchievementSet, BoxCardSet, CardSet},
     enums::{Color, Splay},
     error::{InnResult, InnovationError},
     flow::FlowState,
-    logger::{Logger, Operation},
+    logger::{FnPureObserver, Logger, Operation, Subject},
     observation::{ObsType, Observation},
     player::Player,
     state::{Choose, State},
@@ -27,16 +29,16 @@ pub type PlayerId = usize;
 
 pub struct Players<'c> {
     cards: Vec<&'c Card>,
-    logger: RcCell<Logger<'c>>,
+    logger: RefCell<Subject<'c>>,
     main_card_pile: RcCell<MainCardPile<'c>>,
     players: Vec<Player<'c>>,
 }
 
 impl<'c> Players<'c> {
-    pub fn empty(logger: RcCell<Logger<'c>>) -> Players<'c> {
+    pub fn empty() -> Players<'c> {
         Players {
             cards: Vec::new(),
-            logger,
+            logger: RefCell::new(Subject::new()),
             main_card_pile: Rc::new(RefCell::new(MainCardPile::empty())),
             players: vec![],
         }
@@ -46,17 +48,29 @@ impl<'c> Players<'c> {
         num_players: usize,
         cards: Vec<&'c Card>,
         logger: RcCell<Logger<'c>>,
+        first_player: PlayerId,
     ) -> Players<'c>
     where
         C: CardSet<'c, Card> + Default + 'c,
-        A: CardSet<'c, Achievement> + Default + 'c,
+        A: CardSet<'c, Achievement<'c>> + Default + 'c,
     {
-        let pile = Rc::new(RefCell::new(MainCardPile::new(cards.clone())));
+        let pile = Rc::new(RefCell::new(MainCardPile::new(
+            cards.clone(),
+            SpecialAchievement::iter().collect(),
+        )));
+        let mut subject = Subject::new();
+        subject.register_internal_owned(AchievementManager::new(
+            SpecialAchievement::iter().collect(),
+            first_player,
+        ));
         // Should logger cards be initialized here, or in other methods?
         logger.borrow_mut().start(pile.borrow().contents());
+        subject.register_external_owned(FnPureObserver::new(move |ev| {
+            logger.borrow_mut().log(ev.clone())
+        }));
         Players {
             cards,
-            logger: Rc::clone(&logger),
+            logger: RefCell::new(subject),
             main_card_pile: Rc::clone(&pile),
             players: (0..num_players)
                 .map(|i| {
@@ -110,7 +124,7 @@ impl<'c> Players<'c> {
             .map(move |i| &self.players[(i + main_player_id) % self.players.len()])
     }
 
-    fn _ids_from(&self, main_player_id: PlayerId) -> impl Iterator<Item = PlayerId> {
+    pub fn ids_from(&self, main_player_id: PlayerId) -> impl Iterator<Item = PlayerId> {
         let len = self.players.len();
         (0..len).map(move |i| (i + main_player_id) % len)
     }
@@ -252,9 +266,10 @@ impl<'c> Players<'c> {
         let card = from.remove_from(self, remove_param);
         if let Some(card) = card {
             to.add_to(card, self, add_param);
+            // TODO: this does not allow observers to perform operations (log)
             self.logger
                 .borrow_mut()
-                .operate(Operation::Transfer(from.into(), to.into(), card));
+                .operate(Operation::Transfer(from.into(), to.into(), card), self);
             Ok(card)
         } else {
             Err(InnovationError::CardNotFound)
@@ -284,6 +299,10 @@ impl Turn {
             num_players,
             first_player,
         }
+    }
+
+    pub fn first_player(&self) -> usize {
+        self.first_player
     }
 
     pub fn is_second_action(&self) -> bool {
@@ -317,13 +336,20 @@ impl<'c> OuterGame<'c> {
     pub fn init<C, A>(num_players: usize, cards: Vec<&'c Card>) -> OuterGame<'c>
     where
         C: CardSet<'c, Card> + Default + 'c,
-        A: CardSet<'c, Achievement> + Default + 'c,
+        A: CardSet<'c, Achievement<'c>> + Default + 'c,
     {
         let logger = Rc::new(RefCell::new(Logger::new()));
+        // TODO: structure not clear
+        let turn = Turn::new(num_players, 0);
         OuterGameBuilder {
-            players: Players::new::<C, A>(num_players, cards, Rc::clone(&logger)),
+            players: Players::new::<C, A>(
+                num_players,
+                cards,
+                Rc::clone(&logger),
+                turn.first_player(),
+            ),
             players_ref_builder: |players| players,
-            turn: Turn::new(num_players, 0),
+            turn,
             logger,
             state: State::Main,
             next_action_type: ObsType::Main,
@@ -516,6 +542,15 @@ mod tests {
 
     #[test]
     fn create_game_player() {
+        // will be used as achievement
+        let pottery = Card::new(
+            "Pottery".to_owned(),
+            1,
+            Blue,
+            [Empty, Leaf, Leaf, Leaf],
+            dogma_fn::pottery(),
+            "You may return up to three cards from your hand. If you returned any cards, draw and score a card of value equal to the number of cards you returned.".to_owned()
+        );
         let archery = Card::new(
             String::from("Archery"),
             1,
@@ -532,15 +567,25 @@ mod tests {
             dogma_fn::code_of_laws(),
             String::from("this is the doc of the card 'code of laws'"),
         );
-        let optics = Card::new(
-            String::from("Optics"),
-            3,
-            Red,
-            [Crown, Crown, Crown, Empty],
-            dogma_fn::optics(),
-            String::from("this is the doc of the card 'optics'"),
+        // will be used as achievement
+        let monotheism = Card::new(
+            "Monotheism".to_owned(),
+            2,
+            Purple,
+            [Empty, Castle, Castle, Castle],
+            dogma_fn::monotheism(),
+            "I demand you transfer a top card on your board of a different color from any card on my board to my score pile! If you do, draw and tuck a 1!\nDraw and tuck a 1.".to_owned(),
         );
-        let cards = vec![&archery, &code_of_laws, &optics];
+        let philosophy = Card::new(
+            "Philosophy".to_owned(),
+            2,
+            Purple,
+            [Empty, Lightblub, Lightblub, Lightblub],
+            dogma_fn::philosophy(),
+            "You may splay left any one color of your cards.\nYou may score a card from your hand."
+                .to_owned(),
+        );
+        let cards = vec![&pottery, &archery, &code_of_laws, &monotheism, &philosophy];
         let mut game = OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards);
         game.step(Action::Step(NoRefStepAction::Draw))
             .expect("Action should be valid");
@@ -562,7 +607,7 @@ mod tests {
         {
             let obs = game
                 .step(Action::Executing(NoRefChoice::Card(vec![String::from(
-                    "Optics",
+                    "Philosophy",
                 )])))
                 .expect("Action should be valid");
             println!("{:#?}", obs);
