@@ -13,10 +13,10 @@ use crate::{
     card_pile::MainCardPile,
     containers::{BoxAchievementSet, BoxCardSet, CardSet},
     enums::{Color, Splay},
-    error::{InnResult, InnovationError},
+    error::{InnResult, InnovationError, WinningSituation},
     flow::FlowState,
     logger::{FnPureObserver, Logger, Operation, Subject},
-    observation::{ObsType, Observation},
+    observation::{EndObservation, GameState, ObsType, Observation},
     player::Player,
     state::{Choose, State},
     structure::{
@@ -133,45 +133,38 @@ impl<'c> Players<'c> {
         &self.main_card_pile
     }
 
-    pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+    pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.hand, &age)
         self.transfer(MainCardPile_, player.with_id(Hand), age, ())
-            .ok()
     }
 
-    pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+    pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.main_board, &age)
         self.transfer(MainCardPile_, player.with_id(Board), age, true)
-            .ok()
     }
 
-    pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+    pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.score_pile, &age)
         self.transfer(MainCardPile_, player.with_id(Score), age, ())
-            .ok()
     }
 
-    pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> Option<&'c Card> {
+    pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         self.transfer(MainCardPile_, player.with_id(Board), age, false)
-            .ok()
     }
 
-    pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+    pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
         self.transfer(player.with_id(Hand), player.with_id(Board), card, true)
-            .ok()
     }
 
-    pub fn score<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+    pub fn score<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.score_pile, card)
         self.transfer(player.with_id(Hand), player.with_id(Score), card, ())
-            .ok()
     }
 
-    pub fn tuck<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+    pub fn tuck<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
         self.transfer(player.with_id(Hand), player.with_id(Board), card, false)
-            .ok()
     }
 
     pub fn splay<'g>(&'g self, player: &'g Player<'c>, color: Color, direction: Splay) {
@@ -191,10 +184,9 @@ impl<'c> Players<'c> {
         player.board().borrow().is_splayed(color, direction)
     }
 
-    pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> Option<&'c Card> {
+    pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, Rc::clone(&self.main_pile), card)
         self.transfer(player.with_id(Hand), MainCardPile_, card, ())
-            .ok()
     }
 
     pub fn execute<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> FlowState<'c, 'g> {
@@ -222,7 +214,12 @@ impl<'c> Players<'c> {
                             // s.yield_from(gen); but with or(card)
                             let mut state = gen.resume();
                             while let Some(st) = state {
-                                let a = s.yield_(st.or(card)).expect("Generator got None");
+                                let a = s
+                                    .yield_(
+                                        st.map(|st| st.or(card))
+                                            .map_err(|e| e.or_set_current_player(player.id())),
+                                    )
+                                    .expect("Generator got None");
                                 gen.set_para(a);
                                 state = gen.resume();
                             }
@@ -240,7 +237,12 @@ impl<'c> Players<'c> {
                             // s.yield_from(gen); but with or(card)
                             let mut state = gen.resume();
                             while let Some(st) = state {
-                                let a = s.yield_(st.or(card)).expect("Generator got None");
+                                let a = s
+                                    .yield_(
+                                        st.map(|st| st.or(card))
+                                            .map_err(|e| e.or_set_current_player(player.id())),
+                                    )
+                                    .expect("Generator got None");
                                 gen.set_para(a);
                                 state = gen.resume();
                             }
@@ -264,15 +266,13 @@ impl<'c> Players<'c> {
         To: AddToGame<'c, AP> + Into<Place>,
     {
         let card = from.remove_from(self, remove_param);
-        if let Some(card) = card {
+        card.map(|card| {
             to.add_to(card, self, add_param);
             // TODO: this does not allow observers to perform operations (log)
             self.logger
                 .operate(Operation::Transfer(from.into(), to.into(), card), self);
-            Ok(card)
-        } else {
-            Err(InnovationError::CardNotFound)
-        }
+            card
+        })
     }
 
     pub fn transfer_card<Fr, To>(&self, from: Fr, to: To, card: &'c Card) -> InnResult<()>
@@ -403,11 +403,19 @@ impl<'c> OuterGame<'c> {
         })
     }
 
-    pub fn step(&mut self, action: Action) -> InnResult<Observation> {
+    pub fn step(&mut self, action: Action) -> InnResult<GameState> {
         if !self.is_available_action(&action) {
             return Err(InnovationError::InvalidAction);
         }
-        let (player, obs_type) = self.with_mut(|fields| {
+        // helper enums/functions
+        enum Info<'a> {
+            Normal(ObsType<'a>),
+            End(Vec<PlayerId>),
+        }
+        fn ok_normal(player: PlayerId, obs_type: ObsType) -> InnResult<(PlayerId, Info)> {
+            Ok((player, Info::Normal(obs_type)))
+        }
+        match self.with_mut(|fields| {
             fields.logger.borrow_mut().act(action.clone());
             let game = *fields.players_ref;
             let action = action.to_ref(game);
@@ -417,11 +425,14 @@ impl<'c> OuterGame<'c> {
                         let player = game.player_at(fields.turn.player_id());
                         match action {
                             RefStepAction::Draw => {
-                                game.draw(player, player.age());
+                                // This current executor finder appears here and in Players.execute
+                                // because either he's executing something or not.
+                                game.draw(player, player.age())
+                                    .map_err(|e| e.or_set_current_player(player.id()))?;
                                 fields.turn.next();
                             }
                             RefStepAction::Meld(card) => {
-                                game.meld(player, card);
+                                game.meld(player, card)?;
                                 fields.turn.next();
                             }
                             RefStepAction::Achieve(_age) => {
@@ -451,23 +462,67 @@ impl<'c> OuterGame<'c> {
 
             if let State::Executing(state) = fields.state {
                 match state.resume() {
-                    Some(st) => {
+                    Some(Ok(st)) => {
                         let (p, o) = st.to_obs();
                         let id = p.id();
-                        (id, ObsType::Executing(o))
+                        ok_normal(id, ObsType::Executing(o))
+                    }
+                    Some(Err(e)) => {
+                        if let InnovationError::Win {
+                            current_player,
+                            situation,
+                        } = e
+                        {
+                            let winners = match situation {
+                                WinningSituation::SomeOne(p) => vec![p],
+                                WinningSituation::ByScore => {
+                                    let max_score = game
+                                        .players_from(0)
+                                        .map(|player| {
+                                            // sort order
+                                            (
+                                                player.total_score(),
+                                                player.achievements().as_vec().len(),
+                                            )
+                                        })
+                                        .max()
+                                        .unwrap();
+                                    game.players_from(0)
+                                        .filter_map(|player| {
+                                            if (
+                                                player.total_score(),
+                                                player.achievements().as_vec().len(),
+                                            ) == max_score
+                                            {
+                                                Some(player.id())
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                        .collect()
+                                }
+                            };
+                            Ok((current_player.unwrap(), Info::End(winners)))
+                        } else {
+                            Err(e)
+                        }
                     }
                     None => {
                         *fields.state = State::Main;
                         fields.turn.next();
-                        (fields.turn.player_id(), ObsType::Main)
+                        ok_normal(fields.turn.player_id(), ObsType::Main)
                     }
                 }
             } else {
-                (fields.turn.player_id(), ObsType::Main)
+                ok_normal(fields.turn.player_id(), ObsType::Main)
             }
-        });
-        self.with_next_action_type_mut(|field| *field = obs_type.clone());
-        Ok(self.observe(player, obs_type))
+        })? {
+            (player, Info::Normal(obs_type)) => {
+                self.with_next_action_type_mut(|field| *field = obs_type.clone());
+                Ok(GameState::Normal(self.observe(player, obs_type)))
+            }
+            (player, Info::End(winners)) => Ok(GameState::End(self.observe_end(player, winners))),
+        }
     }
 
     fn observe<'a>(&'a self, id: usize, obs_type: ObsType<'a>) -> Observation {
@@ -482,6 +537,23 @@ impl<'c> OuterGame<'c> {
             main_pile: players.main_card_pile.borrow().view(),
             turn: self.borrow_turn(),
             obstype: obs_type,
+        }
+    }
+
+    fn observe_end<'a>(
+        &'a self,
+        current_player: PlayerId,
+        winners: Vec<PlayerId>,
+    ) -> EndObservation {
+        let players = *self.borrow_players_ref();
+        EndObservation {
+            players_from_current: players
+                .ids_from(current_player)
+                .map(|id| players.player_at(id).self_view())
+                .collect(),
+            main_pile: players.main_card_pile().borrow().view(),
+            turn: self.borrow_turn(),
+            winners,
         }
     }
 }
@@ -601,7 +673,10 @@ mod tests {
                     "Archery",
                 ))))
                 .expect("Action should be valid");
-            assert!(matches!(obs.obstype, ObsType::Executing(_)))
+            assert!(matches!(
+                obs.as_normal().unwrap().obstype,
+                ObsType::Executing(_)
+            ))
         }
         {
             let obs = game
@@ -610,8 +685,8 @@ mod tests {
                 )])))
                 .expect("Action should be valid");
             println!("{:#?}", obs);
-            assert_eq!(obs.turn.player_id(), 1);
-            assert!(matches!(obs.obstype, ObsType::Main));
+            assert_eq!(obs.as_normal().unwrap().turn.player_id(), 1);
+            assert!(matches!(obs.as_normal().unwrap().obstype, ObsType::Main));
         }
     }
 }

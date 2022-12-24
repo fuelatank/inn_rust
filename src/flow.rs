@@ -1,10 +1,10 @@
-use crate::action::RefChoice;
+use crate::{action::RefChoice, error::InnResult};
 use crate::game::Players;
 use crate::player::Player;
 use crate::state::ExecutionState;
 use generator::LocalGenerator;
 
-pub type FlowState<'c, 'g> = LocalGenerator<'g, RefChoice<'c, 'g>, ExecutionState<'c, 'g>>;
+pub type FlowState<'c, 'g> = LocalGenerator<'g, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>>;
 
 // may consider Fn instead of fn
 pub type ShareFlow = Box<dyn for<'c, 'g> Fn(&'g Player<'c>, &'g Players<'c>) -> FlowState<'c, 'g>>;
