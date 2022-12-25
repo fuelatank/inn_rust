@@ -8,18 +8,18 @@ use crate::{
     game::{PlayerId, Players},
     logger::{InternalObserver, Item, Operation, SimpleOp, Observer},
     player::Player,
-    structure::{Place, PlayerPlace},
+    structure::{Place, PlayerPlace}, observation::SingleAchievementView,
 };
 
 pub struct AchievementManager<'c> {
-    available_achievements: Vec<(SpecialAchievement, RefCell<Box<dyn Achievement<'c>>>)>,
+    available_achievements: RefCell<Vec<(SpecialAchievement, RefCell<Box<dyn Achievement<'c>>>)>>,
     acting_player: PlayerId, // may be a duplicated Turn?
 }
 
 impl<'c> AchievementManager<'c> {
     pub fn new(special_achievements: Vec<SpecialAchievement>, first_player: PlayerId) -> Self {
         Self {
-            available_achievements: special_achievements
+            available_achievements: RefCell::new(special_achievements
                 .into_iter()
                 .map(|sa| {
                     let condition: Box<dyn Achievement> = match &sa {
@@ -31,7 +31,7 @@ impl<'c> AchievementManager<'c> {
                     };
                     (sa, RefCell::new(condition))
                 })
-                .collect(),
+                .collect()),
             acting_player: first_player,
         }
     }
@@ -49,7 +49,8 @@ impl<'c> InternalObserver<'c> for AchievementManager<'c> {
     fn update_game(&self, event: &Item<'c>, game: &Players<'c>) {
         // TODO: who is the "current player" that gets the achievement if two players
         // satisty the condition at exactly the same time?
-        for (_card, check) in self.available_achievements.iter() {
+        let mut should_remove = Vec::new();
+        for (card, check) in self.available_achievements.borrow().iter() {
             let interesting_players = check.borrow_mut().update_interested(event);
             let order = game.ids_from(self.acting_player);
             for player in order
@@ -57,11 +58,15 @@ impl<'c> InternalObserver<'c> for AchievementManager<'c> {
                 .map(|id| game.player_at(id))
             {
                 if check.borrow().further_check(game, player) {
-                    // TODO: achieve
+                    // MAYRESOLVED: TODO: achieve
+                    // TODO: how to pass winning message?
+                    game.achieve(player, &SingleAchievementView::Special(*card)).expect("Achieve could only happen when achievement is available; otherwise it will be removed from the manager. Or winning is unimplemented.");
+                    should_remove.push(*card);
                     break;
                 }
             }
         }
+        self.available_achievements.borrow_mut().retain(|a| !should_remove.contains(&a.0));
     }
 }
 
