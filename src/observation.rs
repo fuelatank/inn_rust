@@ -4,7 +4,7 @@ use serde::{Serialize, Serializer};
 
 use crate::{
     board::Board,
-    card::{Card, SpecialAchievement},
+    card::{Achievement, Card, SpecialAchievement},
     game::{PlayerId, Turn},
     state::ExecutionObs,
 };
@@ -24,6 +24,30 @@ fn serialize_board<S: Serializer>(board: &BoardView, serializer: S) -> Result<S:
 pub enum SingleAchievementView {
     Special(SpecialAchievement),
     Normal(u8),
+}
+
+impl<'a> PartialEq<Achievement<'a>> for SingleAchievementView {
+    fn eq(&self, other: &Achievement) -> bool {
+        match (self, other) {
+            (SingleAchievementView::Normal(age), Achievement::Normal(card)) => *age == card.age(),
+            (SingleAchievementView::Special(self_sa), Achievement::Special(other_sa)) => {
+                self_sa == other_sa
+            }
+            _ => false,
+        }
+    }
+}
+
+impl<'a> PartialEq<SingleAchievementView> for Achievement<'a> {
+    fn eq(&self, other: &SingleAchievementView) -> bool {
+        match (self, other) {
+            (Achievement::Normal(card), SingleAchievementView::Normal(age)) => card.age() == *age,
+            (Achievement::Special(self_sa), SingleAchievementView::Special(other_sa)) => {
+                self_sa == other_sa
+            }
+            _ => false,
+        }
+    }
 }
 
 type AchievementView = Vec<SingleAchievementView>;
