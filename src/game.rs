@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use generator::Gn;
+use generator::{done, Gn};
 use ouroboros::self_referencing;
 use serde::Serialize;
 use strum::IntoEnumIterator;
@@ -12,6 +12,7 @@ use crate::{
     card::{Achievement, Card, Dogma, SpecialAchievement},
     card_pile::MainCardPile,
     containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
+    dogma_fn::mk_execution,
     enums::{Color, Splay},
     error::{InnResult, InnovationError},
     flow::FlowState,
@@ -268,7 +269,7 @@ impl<'c> Players<'c> {
                     }
                 }
             }
-            generator::done!()
+            done!()
         })
     }
 
@@ -299,6 +300,20 @@ impl<'c> Players<'c> {
         To: AddToGame<'c, ()> + Into<Place>,
     {
         self.transfer(from, to, card, ()).map(|_| ())
+    }
+
+    pub fn start_choice<'g>(&'g self) -> FlowState<'c, 'g> {
+        mk_execution(move |ctx| {
+            for player in self.players_from(0) {
+                self.draw(player, 1)?;
+                self.draw(player, 1)?;
+            }
+            for player in self.players_from(0) {
+                let card = ctx.choose_one_card(player, player.hand().as_vec()).expect("Already checked, and all players have two cards, so they can always choose one");
+                self.meld(player, card)?;
+            }
+            Ok(())
+        })
     }
 }
 
@@ -372,6 +387,11 @@ impl<'c> OuterGame<'c> {
             next_action_type: ObsType::Main,
         }
         .build()
+    }
+
+    pub fn start(&mut self) -> InnResult<GameState> {
+        let _game = self.borrow_players_ref();
+        todo!()
     }
 
     fn is_available_action(&self, action: &Action) -> bool {
