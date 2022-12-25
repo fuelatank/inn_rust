@@ -12,8 +12,9 @@ use crate::{
     structure::{Place, PlayerPlace},
 };
 
+type Condition<'c> = RefCell<Box<dyn Achievement<'c>>>;
 pub struct AchievementManager<'c> {
-    available_achievements: RefCell<Vec<(SpecialAchievement, RefCell<Box<dyn Achievement<'c>>>)>>,
+    available_achievements: RefCell<Vec<(SpecialAchievement, Condition<'c>)>>,
     acting_player: PlayerId, // may be a duplicated Turn?
 }
 
