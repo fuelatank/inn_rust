@@ -428,6 +428,7 @@ impl<'c> OuterGame<'c> {
     fn observe<'a>(&'a self, id: usize, obs_type: ObsType<'a>) -> Observation {
         let players = *self.borrow_players_ref();
         Observation {
+            acting_player: id,
             main_player: players.player_at(id).self_view(),
             other_players: players
                 .players_from(id)

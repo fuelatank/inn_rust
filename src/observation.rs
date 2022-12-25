@@ -5,7 +5,7 @@ use serde::{Serialize, Serializer};
 use crate::{
     board::Board,
     card::{Card, SpecialAchievement},
-    game::Turn,
+    game::{Turn, PlayerId},
     state::ExecutionObs,
 };
 
@@ -65,6 +65,7 @@ pub enum ObsType<'a> {
 
 #[derive(Debug, Serialize)]
 pub struct Observation<'a> {
+    pub acting_player: PlayerId,
     pub main_player: MainPlayerView<'a>,
     pub other_players: Vec<OtherPlayerView<'a>>,
     pub main_pile: [usize; 10],
