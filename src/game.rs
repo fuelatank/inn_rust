@@ -390,8 +390,10 @@ impl<'c> OuterGame<'c> {
     }
 
     pub fn start(&mut self) -> InnResult<GameState> {
-        let _game = self.borrow_players_ref();
-        todo!()
+        self.with_mut(|fields| {
+            *fields.state = State::Executing((*fields.players_ref).start_choice());
+        });
+        self.resume_execution()
     }
 
     fn is_available_action(&self, action: &Action) -> bool {
@@ -453,15 +455,7 @@ impl<'c> OuterGame<'c> {
         if !self.is_available_action(&action) {
             return Err(InnovationError::InvalidAction);
         }
-        // helper enums/functions
-        enum Info<'a> {
-            Normal(ObsType<'a>),
-            End(Vec<PlayerId>),
-        }
-        fn ok_normal(player: PlayerId, obs_type: ObsType) -> InnResult<(PlayerId, Info)> {
-            Ok((player, Info::Normal(obs_type)))
-        }
-        match self.with_mut(|fields| {
+        self.with_mut(|fields| {
             fields.logger.borrow_mut().act(action.clone());
             let game = *fields.players_ref;
             let action = action.to_ref(game);
@@ -501,11 +495,25 @@ impl<'c> OuterGame<'c> {
                     }
                 },
             }
+            Ok(())
+        })?;
+        self.resume_execution()
+    }
 
+    fn resume_execution(&mut self) -> InnResult<GameState> {
+        // helper enums/functions
+        enum Info<'a> {
+            Normal(ObsType<'a>),
+            End(Vec<PlayerId>),
+        }
+        fn ok_normal(player: PlayerId, obs_type: ObsType) -> InnResult<(PlayerId, Info)> {
+            Ok((player, Info::Normal(obs_type)))
+        }
+
+        match self.with_mut(|fields| {
             // resume execution, change to Main if ended,
             // and get current player and the obsType, which contains
             // some information if it is executing
-
             if let State::Executing(state) = fields.state {
                 match state.resume() {
                     Some(Ok(st)) => {
@@ -519,7 +527,7 @@ impl<'c> OuterGame<'c> {
                             situation,
                         } = e
                         {
-                            Ok((current_player.unwrap(), Info::End(situation.winners(game))))
+                            Ok((current_player.unwrap(), Info::End(situation.winners(*fields.players_ref))))
                         } else {
                             Err(e)
                         }
