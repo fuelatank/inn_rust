@@ -11,12 +11,12 @@ use crate::{
     auto_achieve::AchievementManager,
     card::{Achievement, Card, Dogma, SpecialAchievement},
     card_pile::MainCardPile,
-    containers::{BoxAchievementSet, BoxCardSet, CardSet},
+    containers::{BoxCardSet, CardSet, Removeable, VecSet, Addable},
     enums::{Color, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     flow::FlowState,
     logger::{FnPureObserver, Logger, Operation, Subject},
-    observation::{EndObservation, GameState, ObsType, Observation},
+    observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
     player::Player,
     state::{Choose, State},
     structure::{
@@ -78,7 +78,7 @@ impl<'c> Players<'c> {
                         i,
                         Box::new(C::default()),
                         Box::new(C::default()),
-                        Box::new(A::default()),
+                        Default::default(),
                     )
                 })
                 .collect(),
@@ -96,7 +96,7 @@ impl<'c> Players<'c> {
         &mut self,
         hand: BoxCardSet<'c>,
         score_pile: BoxCardSet<'c>,
-        achievements: BoxAchievementSet<'c>,
+        achievements: VecSet<Achievement<'c>>,
     ) {
         let id = self.players.len();
         self.players
@@ -187,6 +187,16 @@ impl<'c> Players<'c> {
     pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, Rc::clone(&self.main_pile), card)
         self.transfer(player.with_id(Hand), MainCardPile_, card, ())
+    }
+
+    pub fn achieve<'g>(&'g self, player: &'g Player<'c>, view: &SingleAchievementView) -> InnResult<()> {
+        match self.main_card_pile.borrow_mut().remove(view) {
+            Some(achievement) => {
+                player.achievements_mut().add(achievement);
+                Ok(())
+            },
+            None => Err(InnovationError::CardNotFound),
+        }
     }
 
     pub fn execute<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> FlowState<'c, 'g> {
@@ -482,7 +492,7 @@ impl<'c> OuterGame<'c> {
                                             // sort order
                                             (
                                                 player.total_score(),
-                                                player.achievements().as_vec().len(),
+                                                player.achievements().clone_inner().len(),
                                             )
                                         })
                                         .max()
@@ -491,7 +501,7 @@ impl<'c> OuterGame<'c> {
                                         .filter_map(|player| {
                                             if (
                                                 player.total_score(),
-                                                player.achievements().as_vec().len(),
+                                                player.achievements().clone_inner().len(),
                                             ) == max_score
                                             {
                                                 Some(player.id())

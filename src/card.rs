@@ -118,7 +118,7 @@ impl<'a> Achievement<'a> {
     pub fn view(&self) -> SingleAchievementView {
         match self {
             Achievement::Normal(c) => SingleAchievementView::Normal(c.age),
-            Achievement::Special(s) => SingleAchievementView::Special(s),
+            Achievement::Special(s) => SingleAchievementView::Special(*s),
         }
     }
 }

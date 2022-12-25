@@ -130,12 +130,12 @@ impl<'a> Removeable<&'a Card, u8> for MainCardPile<'a> {
     }
 }
 
-impl<'a> Removeable<Achievement<'a>, SingleAchievementView<'a>> for MainCardPile<'a> {
-    fn remove(&mut self, achievement: &SingleAchievementView<'a>) -> Option<Achievement<'a>> {
+impl<'a> Removeable<Achievement<'a>, SingleAchievementView> for MainCardPile<'a> {
+    fn remove(&mut self, achievement: &SingleAchievementView) -> Option<Achievement<'a>> {
         match achievement {
-            SingleAchievementView::Special(&sa) => self
+            SingleAchievementView::Special(sa) => self
                 .achievements
-                .try_remove(|a| *a == Achievement::Special(sa)),
+                .try_remove(|a| *a == Achievement::Special(*sa)),
             SingleAchievementView::Normal(age) => self.achievements.try_remove(|a| {
                 if let Achievement::Normal(card) = a {
                     card.age() == *age

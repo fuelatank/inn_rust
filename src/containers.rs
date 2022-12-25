@@ -61,12 +61,22 @@ pub struct VecSet<T> {
 }
 
 impl<T> VecSet<T> {
+    pub fn inner(&self) -> &Vec<T> {
+        &self.v
+    }
+
     pub fn try_remove<P>(&mut self, f: P) -> Option<T> where P: Fn(&T) -> bool {
         let i = self.v.iter().position(f);
         match i {
             Some(v) => Some(self.v.remove(v)),
             None => None,
         }
+    }
+}
+
+impl<T: Clone> VecSet<T> {
+    pub fn clone_inner(&self) -> Vec<T> {
+        self.v.clone()
     }
 }
 
@@ -94,7 +104,7 @@ impl<'a, T: PartialEq> Removeable<&'a T, T> for VecSet<&'a T> {
 
 impl<'a, T: PartialEq> CardSet<'a, T> for VecSet<&'a T> {
     fn as_vec(&self) -> Vec<&'a T> {
-        self.v.clone()
+        self.clone_inner()
     }
 }
 

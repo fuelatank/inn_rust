@@ -21,12 +21,12 @@ fn serialize_board<S: Serializer>(board: &BoardView, serializer: S) -> Result<S:
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", content = "view", rename_all = "snake_case")]
-pub enum SingleAchievementView<'a> {
-    Special(&'a SpecialAchievement),
+pub enum SingleAchievementView {
+    Special(SpecialAchievement),
     Normal(u8),
 }
 
-type AchievementView<'a> = Vec<SingleAchievementView<'a>>;
+type AchievementView = Vec<SingleAchievementView>;
 
 pub struct TurnView {
     main_action_index: usize,
@@ -44,7 +44,7 @@ pub struct MainPlayerView<'a> {
     pub score: CardView<'a>,
     #[serde(serialize_with = "serialize_board")]
     pub board: BoardView<'a>,
-    pub achievements: AchievementView<'a>,
+    pub achievements: AchievementView,
 }
 
 #[derive(Debug, Serialize)]
@@ -53,7 +53,7 @@ pub struct OtherPlayerView<'a> {
     pub score: AgeView,
     #[serde(serialize_with = "serialize_board")]
     pub board: BoardView<'a>,
-    pub achievements: AchievementView<'a>,
+    pub achievements: AchievementView,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -123,7 +123,7 @@ mod tests {
             "type": "normal",
             "view": 8
         }));
-        assert_eq!(to_value(&SingleAchievementView::Special(&SpecialAchievement::Wonder)).unwrap(), json!({
+        assert_eq!(to_value(&SingleAchievementView::Special(SpecialAchievement::Wonder)).unwrap(), json!({
             "type": "special",
             "view": "Wonder",
         }));
