@@ -46,7 +46,11 @@ pub struct Hand;
 
 impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Hand {
     fn remove_from(&self, player: &Player<'c>, param: &'a Card) -> InnResult<&'c Card> {
-        player.hand.borrow_mut().remove(param).ok_or(InnovationError::CardNotFound)
+        player
+            .hand
+            .borrow_mut()
+            .remove(param)
+            .ok_or(InnovationError::CardNotFound)
     }
 }
 
@@ -60,7 +64,11 @@ pub struct Score;
 
 impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Score {
     fn remove_from(&self, player: &Player<'c>, param: &'a Card) -> InnResult<&'c Card> {
-        player.score_pile.borrow_mut().remove(param).ok_or(InnovationError::CardNotFound)
+        player
+            .score_pile
+            .borrow_mut()
+            .remove(param)
+            .ok_or(InnovationError::CardNotFound)
     }
 }
 
@@ -74,10 +82,11 @@ pub struct Board;
 
 impl<'c, P> RemoveFromPlayer<'c, P> for Board
 where
-    Board_<'c>: Removeable<'c, Card, P>,
+    Board_<'c>: Removeable<&'c Card, P>,
 {
     fn remove_from(&self, player: &Player<'c>, param: P) -> InnResult<&'c Card> {
-        <Board_ as Removeable<Card, P>>::remove(&mut *player.board().borrow_mut(), &param).ok_or(InnovationError::CardNotFound)
+        <Board_ as Removeable<&'c Card, P>>::remove(&mut *player.board().borrow_mut(), &param)
+            .ok_or(InnovationError::CardNotFound)
     }
 }
 
@@ -101,7 +110,13 @@ pub struct MainCardPile;
 
 impl<'c> RemoveFromGame<'c, u8> for MainCardPile {
     fn remove_from(&self, game: &Players<'c>, param: u8) -> InnResult<&'c Card> {
-        game.main_card_pile().borrow_mut().remove(&param).ok_or(InnovationError::Win { current_player: None, situation: WinningSituation::ByScore })
+        game.main_card_pile()
+            .borrow_mut()
+            .remove(&param)
+            .ok_or(InnovationError::Win {
+                current_player: None,
+                situation: WinningSituation::ByScore,
+            })
     }
 }
 

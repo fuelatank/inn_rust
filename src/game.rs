@@ -11,12 +11,12 @@ use crate::{
     auto_achieve::AchievementManager,
     card::{Achievement, Card, Dogma, SpecialAchievement},
     card_pile::MainCardPile,
-    containers::{BoxAchievementSet, BoxCardSet, CardSet},
+    containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
     enums::{Color, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     flow::FlowState,
     logger::{FnPureObserver, Logger, Operation, Subject},
-    observation::{EndObservation, GameState, ObsType, Observation},
+    observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
     player::Player,
     state::{Choose, State},
     structure::{
@@ -54,7 +54,7 @@ impl<'c> Players<'c> {
         C: CardSet<'c, Card> + Default + 'c,
         A: CardSet<'c, Achievement<'c>> + Default + 'c,
     {
-        let pile = Rc::new(RefCell::new(MainCardPile::new(
+        let pile = Rc::new(RefCell::new(MainCardPile::new::<A>(
             cards.clone(),
             SpecialAchievement::iter().collect(),
         )));
@@ -78,7 +78,7 @@ impl<'c> Players<'c> {
                         i,
                         Box::new(C::default()),
                         Box::new(C::default()),
-                        Box::new(A::default()),
+                        Default::default(),
                     )
                 })
                 .collect(),
@@ -96,7 +96,7 @@ impl<'c> Players<'c> {
         &mut self,
         hand: BoxCardSet<'c>,
         score_pile: BoxCardSet<'c>,
-        achievements: BoxAchievementSet<'c>,
+        achievements: VecSet<Achievement<'c>>,
     ) {
         let id = self.players.len();
         self.players
@@ -187,6 +187,24 @@ impl<'c> Players<'c> {
     pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, Rc::clone(&self.main_pile), card)
         self.transfer(player.with_id(Hand), MainCardPile_, card, ())
+    }
+
+    pub fn has_achievement(&self, view: &SingleAchievementView) -> bool {
+        self.main_card_pile.borrow().has_achievement(view)
+    }
+
+    pub fn try_achieve<'g>(
+        &'g self,
+        player: &'g Player<'c>,
+        view: &SingleAchievementView,
+    ) -> InnResult<()> {
+        match self.main_card_pile.borrow_mut().remove(view) {
+            Some(achievement) => {
+                player.achievements_mut().add(achievement);
+                Ok(())
+            }
+            None => Err(InnovationError::CardNotFound),
+        }
     }
 
     pub fn execute<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> FlowState<'c, 'g> {
@@ -358,20 +376,28 @@ impl<'c> OuterGame<'c> {
 
     fn is_available_action(&self, action: &Action) -> bool {
         self.with(|fields| match (action, fields.next_action_type) {
-            (Action::Step(step), ObsType::Main) => match step {
-                NoRefStepAction::Draw => true,
-                NoRefStepAction::Meld(c) => {
+            (Action::Step(step), ObsType::Main) => {
+                if let NoRefStepAction::Draw = step {
+                    true
+                } else {
                     let players = fields.players;
                     let player = &players.players[fields.turn.player_id()];
-                    player.hand().as_vec().contains(&players.find_card(c))
+                    match step {
+                        NoRefStepAction::Meld(c) => {
+                            player.hand().as_vec().contains(&players.find_card(c))
+                        }
+                        NoRefStepAction::Achieve(age) => {
+                            player.age() >= *age
+                                && player.total_score() >= 5 * (*age as usize)
+                                && players.has_achievement(&SingleAchievementView::Normal(*age))
+                        }
+                        NoRefStepAction::Execute(c) => {
+                            player.board().borrow().contains(players.find_card(c))
+                        }
+                        _ => panic!("just checked, action can't be Draw"),
+                    }
                 }
-                NoRefStepAction::Achieve(_) => todo!(),
-                NoRefStepAction::Execute(c) => {
-                    let players = fields.players;
-                    let player = &fields.players.players[fields.turn.player_id()];
-                    player.board().borrow().contains(players.find_card(c))
-                }
-            },
+            }
             (Action::Executing(choice), ObsType::Executing(obs)) => match (choice, &obs.state) {
                 (
                     NoRefChoice::Card(cards),
@@ -435,9 +461,9 @@ impl<'c> OuterGame<'c> {
                                 game.meld(player, card)?;
                                 fields.turn.next();
                             }
-                            RefStepAction::Achieve(_age) => {
+                            RefStepAction::Achieve(age) => {
+                                game.try_achieve(player, &SingleAchievementView::Normal(age)).expect("Have checked action, corresponding achievement should be available.");
                                 fields.turn.next();
-                                todo!()
                             }
                             RefStepAction::Execute(card) => {
                                 *fields.state = State::Executing(game.execute(player, card));
@@ -482,7 +508,7 @@ impl<'c> OuterGame<'c> {
                                             // sort order
                                             (
                                                 player.total_score(),
-                                                player.achievements().as_vec().len(),
+                                                player.achievements().clone_inner().len(),
                                             )
                                         })
                                         .max()
@@ -491,7 +517,7 @@ impl<'c> OuterGame<'c> {
                                         .filter_map(|player| {
                                             if (
                                                 player.total_score(),
-                                                player.achievements().as_vec().len(),
+                                                player.achievements().clone_inner().len(),
                                             ) == max_score
                                             {
                                                 Some(player.id())
@@ -540,11 +566,7 @@ impl<'c> OuterGame<'c> {
         }
     }
 
-    fn observe_end<'a>(
-        &'a self,
-        current_player: PlayerId,
-        winners: Vec<PlayerId>,
-    ) -> EndObservation {
+    fn observe_end(&self, current_player: PlayerId, winners: Vec<PlayerId>) -> EndObservation {
         let players = *self.borrow_players_ref();
         EndObservation {
             players_from_current: players
@@ -657,7 +679,7 @@ mod tests {
                 .to_owned(),
         );
         let cards = vec![&pottery, &archery, &code_of_laws, &monotheism, &philosophy];
-        let mut game = OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards);
+        let mut game = OuterGame::init::<VecSet<&Card>, VecSet<&Achievement>>(2, cards);
         game.step(Action::Step(NoRefStepAction::Draw))
             .expect("Action should be valid");
         game.step(Action::Step(NoRefStepAction::Draw))

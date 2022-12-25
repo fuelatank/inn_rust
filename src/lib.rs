@@ -1,5 +1,5 @@
-pub mod auto_achieve;
 pub mod action;
+pub mod auto_achieve;
 pub mod board;
 pub mod card;
 pub mod card_pile;

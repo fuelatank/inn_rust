@@ -99,7 +99,7 @@ impl Debug for Card {
     }
 }
 
-#[derive(PartialEq, Debug, Serialize, EnumIter)]
+#[derive(PartialEq, Debug, Serialize, EnumIter, Clone, Copy)]
 pub enum SpecialAchievement {
     Monument,
     Empire,
@@ -108,7 +108,7 @@ pub enum SpecialAchievement {
     Universe,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Achievement<'a> {
     Normal(&'a Card),
     Special(SpecialAchievement),
@@ -118,7 +118,7 @@ impl<'a> Achievement<'a> {
     pub fn view(&self) -> SingleAchievementView {
         match self {
             Achievement::Normal(c) => SingleAchievementView::Normal(c.age),
-            Achievement::Special(s) => SingleAchievementView::Special(s),
+            Achievement::Special(s) => SingleAchievementView::Special(*s),
         }
     }
 }
