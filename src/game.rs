@@ -189,7 +189,11 @@ impl<'c> Players<'c> {
         self.transfer(player.with_id(Hand), MainCardPile_, card, ())
     }
 
-    pub fn achieve<'g>(
+    pub fn has_achievement(&self, view: &SingleAchievementView) -> bool {
+        self.main_card_pile.borrow().has_achievement(view)
+    }
+
+    pub fn try_achieve<'g>(
         &'g self,
         player: &'g Player<'c>,
         view: &SingleAchievementView,
@@ -372,20 +376,28 @@ impl<'c> OuterGame<'c> {
 
     fn is_available_action(&self, action: &Action) -> bool {
         self.with(|fields| match (action, fields.next_action_type) {
-            (Action::Step(step), ObsType::Main) => match step {
-                NoRefStepAction::Draw => true,
-                NoRefStepAction::Meld(c) => {
+            (Action::Step(step), ObsType::Main) => {
+                if let NoRefStepAction::Draw = step {
+                    true
+                } else {
                     let players = fields.players;
                     let player = &players.players[fields.turn.player_id()];
-                    player.hand().as_vec().contains(&players.find_card(c))
+                    match step {
+                        NoRefStepAction::Meld(c) => {
+                            player.hand().as_vec().contains(&players.find_card(c))
+                        }
+                        NoRefStepAction::Achieve(age) => {
+                            player.age() >= *age
+                                && player.total_score() >= 5 * (*age as usize)
+                                && players.has_achievement(&SingleAchievementView::Normal(*age))
+                        }
+                        NoRefStepAction::Execute(c) => {
+                            player.board().borrow().contains(players.find_card(c))
+                        }
+                        _ => panic!("just checked, action can't be Draw"),
+                    }
                 }
-                NoRefStepAction::Achieve(_) => todo!(),
-                NoRefStepAction::Execute(c) => {
-                    let players = fields.players;
-                    let player = &fields.players.players[fields.turn.player_id()];
-                    player.board().borrow().contains(players.find_card(c))
-                }
-            },
+            }
             (Action::Executing(choice), ObsType::Executing(obs)) => match (choice, &obs.state) {
                 (
                     NoRefChoice::Card(cards),
@@ -449,9 +461,9 @@ impl<'c> OuterGame<'c> {
                                 game.meld(player, card)?;
                                 fields.turn.next();
                             }
-                            RefStepAction::Achieve(_age) => {
+                            RefStepAction::Achieve(age) => {
+                                game.try_achieve(player, &SingleAchievementView::Normal(age)).expect("Have checked action, corresponding achievement should be available.");
                                 fields.turn.next();
-                                todo!()
                             }
                             RefStepAction::Execute(card) => {
                                 *fields.state = State::Executing(game.execute(player, card));

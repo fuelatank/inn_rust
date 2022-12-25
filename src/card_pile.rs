@@ -115,6 +115,10 @@ impl<'a> MainCardPile<'a> {
             self.piles[9].len(),
         ]
     }
+
+    pub fn has_achievement(&self, view: &SingleAchievementView) -> bool {
+        self.achievements.inner().iter().any(|a| a == view)
+    }
 }
 
 impl<'a> Addable<&'a Card> for MainCardPile<'a> {
@@ -132,17 +136,6 @@ impl<'a> Removeable<&'a Card, u8> for MainCardPile<'a> {
 
 impl<'a> Removeable<Achievement<'a>, SingleAchievementView> for MainCardPile<'a> {
     fn remove(&mut self, achievement: &SingleAchievementView) -> Option<Achievement<'a>> {
-        match achievement {
-            SingleAchievementView::Special(sa) => self
-                .achievements
-                .try_remove(|a| *a == Achievement::Special(*sa)),
-            SingleAchievementView::Normal(age) => self.achievements.try_remove(|a| {
-                if let Achievement::Normal(card) = a {
-                    card.age() == *age
-                } else {
-                    false
-                }
-            }),
-        }
+        self.achievements.try_remove(|a| a == achievement)
     }
 }

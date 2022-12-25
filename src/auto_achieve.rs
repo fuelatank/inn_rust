@@ -64,7 +64,7 @@ impl<'c> InternalObserver<'c> for AchievementManager<'c> {
                 if check.borrow().further_check(game, player) {
                     // MAYRESOLVED: TODO: achieve
                     // TODO: how to pass winning message?
-                    game.achieve(player, &SingleAchievementView::Special(*card)).expect("Achieve could only happen when achievement is available; otherwise it will be removed from the manager. Or winning is unimplemented.");
+                    game.try_achieve(player, &SingleAchievementView::Special(*card)).expect("Achieve could only happen when achievement is available; otherwise it will be removed from the manager. Or winning is unimplemented.");
                     should_remove.push(*card);
                     break;
                 }
