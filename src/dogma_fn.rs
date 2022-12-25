@@ -8,6 +8,7 @@ use crate::{
     card::{Card, Dogma},
     enums::{Color, Icon, Splay},
     error::InnResult,
+    flow::FlowState,
     game::{Players, RcCell},
     player::Player,
     state::{Choose, ExecutionState},
@@ -16,28 +17,32 @@ use crate::{
 
 // wrapper of Scope
 // which lifetime in Scope???
-struct Context<'a, 'c, 'g> {
+pub struct Context<'a, 'c, 'g> {
     s: Scope<'a, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>>,
 }
 
 impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
-    fn new(
+    pub fn new(
         s: Scope<'a, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>>,
     ) -> Context<'a, 'c, 'g> {
         Context { s }
     }
 
-    fn into_raw(self) -> Scope<'a, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>> {
+    pub fn into_raw(self) -> Scope<'a, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>> {
         self.s
     }
 
-    fn yield_(&mut self, player: &'g Player<'c>, choose: Choose<'c>) -> RefChoice<'c, 'g> {
+    pub fn yield_(&mut self, player: &'g Player<'c>, choose: Choose<'c>) -> RefChoice<'c, 'g> {
         self.s
             .yield_(Ok(ExecutionState::new(player, choose)))
             .expect("Generator got None")
     }
 
-    fn choose_one_card(&mut self, player: &'g Player<'c>, from: Vec<&'c Card>) -> Option<&'c Card> {
+    pub fn choose_one_card(
+        &mut self,
+        player: &'g Player<'c>,
+        from: Vec<&'c Card>,
+    ) -> Option<&'c Card> {
         let cards = self
             .yield_(
                 player,
@@ -56,7 +61,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         }
     }
 
-    fn choose_card_at_most(
+    pub fn choose_card_at_most(
         &mut self,
         player: &'g Player<'c>,
         from: Vec<&'c Card>,
@@ -80,7 +85,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         }
     }
 
-    fn choose_any_cards_up_to(
+    pub fn choose_any_cards_up_to(
         &mut self,
         player: &'g Player<'c>,
         from: Vec<&'c Card>,
@@ -98,7 +103,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         .cards()
     }
 
-    fn choose_cards_exact(
+    pub fn choose_cards_exact(
         &mut self,
         player: &'g Player<'c>,
         from: Vec<&'c Card>,
@@ -121,18 +126,18 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         }
     }
 
-    fn choose_yn(&mut self, player: &'g Player<'c>) -> bool {
+    pub fn choose_yn(&mut self, player: &'g Player<'c>) -> bool {
         self.yield_(player, Choose::Yn).yn()
     }
 
-    fn may<T, F>(&mut self, player: &'g Player<'c>, f: F) -> Option<T>
+    pub fn may<T, F>(&mut self, player: &'g Player<'c>, f: F) -> Option<T>
     where
         F: FnOnce(&mut Context<'a, 'c, 'g>) -> T,
     {
         self.choose_yn(player).then(|| f(self))
     }
 
-    fn may_splay(
+    pub fn may_splay(
         &mut self,
         player: &'g Player<'c>,
         game: &'g Players<'c>,
@@ -148,7 +153,8 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         })
         .is_some()
     }
-    fn may_splays(
+
+    pub fn may_splays(
         &mut self,
         player: &'g Player<'c>,
         game: &'g Players<'c>,
@@ -175,6 +181,24 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
     }
 }
 
+pub fn mk_execution<'c, 'g, F>(f: F) -> FlowState<'c, 'g>
+where
+    F: for<'a> FnOnce(&mut Context<'a, 'c, 'g>) -> InnResult<()> + 'g,
+{
+    Gn::new_scoped_local(|s| {
+        let mut ctx = Context::new(s);
+        if let Err(e) = f(&mut ctx) {
+            ctx.into_raw().yield_(Err(e));
+            panic!(
+                "Error happened but an progress of execution has been made!\n\
+                So the same execution process can't be touched.\n\
+                This can be caused by unknown internal error OR winning."
+            )
+        };
+        done!()
+    })
+}
+
 fn shared<F>(f: F) -> Dogma
 where
     F: for<'a, 'c, 'g> Fn(
@@ -192,18 +216,7 @@ where
     let rcf = Rc::new(f);
     Dogma::Share(Box::new(move |player, game| {
         let cloned = Rc::clone(&rcf);
-        Gn::new_scoped_local(move |s| {
-            let mut ctx = Context::new(s);
-            if let Err(e) = cloned(player, game, &mut ctx) {
-                ctx.into_raw().yield_(Err(e));
-                panic!(
-                    "Error happened but an progress of execution has been made!\n\
-                    So the same execution process can't be touched.\n\
-                    This can be caused by unknown internal error OR winning."
-                )
-            };
-            done!()
-        })
+        mk_execution(move |ctx| cloned(player, game, ctx))
     }))
 }
 
@@ -220,18 +233,7 @@ where
     let rcf = Rc::new(f);
     Dogma::Demand(Box::new(move |player, opponent, game| {
         let cloned = Rc::clone(&rcf);
-        Gn::new_scoped_local(move |s| {
-            let mut ctx = Context::new(s);
-            if let Err(e) = cloned(player, opponent, game, &mut ctx) {
-                ctx.into_raw().yield_(Err(e));
-                panic!(
-                    "Error happened but an progress of execution has been made!\n\
-                    So the same execution process can't be touched.\n\
-                    This can be caused by unknown internal error OR winning."
-                )
-            };
-            done!()
-        })
+        mk_execution(move |ctx| cloned(player, opponent, game, ctx))
     }))
 }
 
