@@ -13,7 +13,7 @@ use crate::{
     card_pile::MainCardPile,
     containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
     enums::{Color, Splay},
-    error::{InnResult, InnovationError, WinningSituation},
+    error::{InnResult, InnovationError},
     flow::FlowState,
     logger::{FnPureObserver, Logger, Operation, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
@@ -499,36 +499,7 @@ impl<'c> OuterGame<'c> {
                             situation,
                         } = e
                         {
-                            let winners = match situation {
-                                WinningSituation::SomeOne(p) => vec![p],
-                                WinningSituation::ByScore => {
-                                    let max_score = game
-                                        .players_from(0)
-                                        .map(|player| {
-                                            // sort order
-                                            (
-                                                player.total_score(),
-                                                player.achievements().clone_inner().len(),
-                                            )
-                                        })
-                                        .max()
-                                        .unwrap();
-                                    game.players_from(0)
-                                        .filter_map(|player| {
-                                            if (
-                                                player.total_score(),
-                                                player.achievements().clone_inner().len(),
-                                            ) == max_score
-                                            {
-                                                Some(player.id())
-                                            } else {
-                                                None
-                                            }
-                                        })
-                                        .collect()
-                                }
-                            };
-                            Ok((current_player.unwrap(), Info::End(winners)))
+                            Ok((current_player.unwrap(), Info::End(situation.winners(game))))
                         } else {
                             Err(e)
                         }

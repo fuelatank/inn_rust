@@ -1,9 +1,43 @@
-use crate::game::PlayerId;
+use crate::game::{PlayerId, Players};
 
 #[derive(Debug)]
 pub enum WinningSituation {
     SomeOne(PlayerId),
     ByScore,
+}
+
+impl WinningSituation {
+    pub fn winners(self, game: &Players) -> Vec<PlayerId> {
+        match self {
+            WinningSituation::SomeOne(p) => vec![p],
+            WinningSituation::ByScore => {
+                let max_score = game
+                    .players_from(0)
+                    .map(|player| {
+                        // sort order
+                        (
+                            player.total_score(),
+                            player.achievements().clone_inner().len(),
+                        )
+                    })
+                    .max()
+                    .unwrap();
+                game.players_from(0)
+                    .filter_map(|player| {
+                        if (
+                            player.total_score(),
+                            player.achievements().clone_inner().len(),
+                        ) == max_score
+                        {
+                            Some(player.id())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
