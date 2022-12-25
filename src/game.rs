@@ -527,7 +527,10 @@ impl<'c> OuterGame<'c> {
                             situation,
                         } = e
                         {
-                            Ok((current_player.unwrap(), Info::End(situation.winners(*fields.players_ref))))
+                            Ok((
+                                current_player.unwrap(),
+                                Info::End(situation.winners(*fields.players_ref)),
+                            ))
                         } else {
                             Err(e)
                         }
@@ -659,6 +662,14 @@ mod tests {
             dogma_fn::code_of_laws(),
             String::from("this is the doc of the card 'code of laws'"),
         );
+        let agriculture = Card::new(
+            "Agriculture".to_owned(),
+            1,
+            Yellow,
+            [Empty, Leaf, Leaf, Leaf],
+            dogma_fn::agriculture(),
+            "You may return a card from your hand. If you do, draw and score a card of value one higher than the card you returned.".to_owned()
+        );
         // will be used as achievement
         let monotheism = Card::new(
             "Monotheism".to_owned(),
@@ -677,34 +688,49 @@ mod tests {
             "You may splay left any one color of your cards.\nYou may score a card from your hand."
                 .to_owned(),
         );
-        let cards = vec![&pottery, &archery, &code_of_laws, &monotheism, &philosophy];
+        let cards = vec![&pottery, &archery, &code_of_laws, &agriculture, &monotheism, &philosophy];
         let mut game = OuterGame::init::<VecSet<&Card>, VecSet<&Achievement>>(2, cards);
+        // do not call start(), in order to reduce cards used
+        // card pile: 1[archery, code of laws, agriculture], 2[philosophy]
         game.step(Action::Step(NoRefStepAction::Draw))
             .expect("Action should be valid");
+        // card pile: 1[code of laws, agriculture], 2[philosophy];
+        // p1.hand[archery]; act1.cur.p2
         game.step(Action::Step(NoRefStepAction::Draw))
             .expect("Action should be valid");
+        // card pile: 1[agriculture], 2[philosophy]; p1.hand[archery]; act2.cur.p2.hand[code of laws]
         println!("{:#?}", game.step(Action::Step(NoRefStepAction::Draw)));
+        // card pile: 1[], 2[philosophy];
+        // act1.cur.p1.hand[archery]; p2.hand[code of laws, agriculture]
         println!(
             "{:#?}",
             game.step(Action::Step(NoRefStepAction::Meld(String::from("Archery"))))
         );
+        // card pile: 1[], 2[philosophy];
+        // act2.cur.p1.board[archery]; p2.hand[code of laws, agriculture]
         {
             let obs = game
                 .step(Action::Step(NoRefStepAction::Execute(String::from(
                     "Archery",
                 ))))
                 .expect("Action should be valid");
+            // p2 must draw a 1, then give a card to p1
+            // card pile: 1[], 2[];
+            // act2.p1.board[archery.exe]; cur.p2.hand[code of laws, philosophy, agriculture]
             assert!(matches!(
                 obs.as_normal().unwrap().obstype,
                 ObsType::Executing(_)
             ))
         }
+        // choose to transfer Philosophy
         {
             let obs = game
                 .step(Action::Executing(NoRefChoice::Card(vec![String::from(
                     "Philosophy",
                 )])))
                 .expect("Action should be valid");
+            // card pile: 1[], 2[];
+            // p1.hand[philosophy].board[archery]; act1.cur.p2.hand[code of laws, agriculture]
             println!("{:#?}", obs);
             assert_eq!(obs.as_normal().unwrap().turn.player_id(), 1);
             assert!(matches!(obs.as_normal().unwrap().obstype, ObsType::Main));
