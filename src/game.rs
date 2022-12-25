@@ -688,7 +688,14 @@ mod tests {
             "You may splay left any one color of your cards.\nYou may score a card from your hand."
                 .to_owned(),
         );
-        let cards = vec![&pottery, &archery, &code_of_laws, &agriculture, &monotheism, &philosophy];
+        let cards = vec![
+            &pottery,
+            &archery,
+            &code_of_laws,
+            &agriculture,
+            &monotheism,
+            &philosophy,
+        ];
         let mut game = OuterGame::init::<VecSet<&Card>, VecSet<&Achievement>>(2, cards);
         // do not call start(), in order to reduce cards used
         // card pile: 1[archery, code of laws, agriculture], 2[philosophy]
