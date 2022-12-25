@@ -6,9 +6,10 @@ use crate::{
     card::SpecialAchievement,
     enums::{Color, Icon, Splay},
     game::{PlayerId, Players},
-    logger::{InternalObserver, Item, Operation, SimpleOp, Observer},
+    logger::{InternalObserver, Item, Observer, Operation, SimpleOp},
+    observation::SingleAchievementView,
     player::Player,
-    structure::{Place, PlayerPlace}, observation::SingleAchievementView,
+    structure::{Place, PlayerPlace},
 };
 
 pub struct AchievementManager<'c> {
@@ -19,19 +20,21 @@ pub struct AchievementManager<'c> {
 impl<'c> AchievementManager<'c> {
     pub fn new(special_achievements: Vec<SpecialAchievement>, first_player: PlayerId) -> Self {
         Self {
-            available_achievements: RefCell::new(special_achievements
-                .into_iter()
-                .map(|sa| {
-                    let condition: Box<dyn Achievement> = match &sa {
-                        SpecialAchievement::Monument => Box::new(Monument::new(first_player)),
-                        SpecialAchievement::Empire => Box::new(Empire),
-                        SpecialAchievement::World => Box::new(World),
-                        SpecialAchievement::Wonder => Box::new(Wonder),
-                        SpecialAchievement::Universe => Box::new(Universe),
-                    };
-                    (sa, RefCell::new(condition))
-                })
-                .collect()),
+            available_achievements: RefCell::new(
+                special_achievements
+                    .into_iter()
+                    .map(|sa| {
+                        let condition: Box<dyn Achievement> = match &sa {
+                            SpecialAchievement::Monument => Box::new(Monument::new(first_player)),
+                            SpecialAchievement::Empire => Box::new(Empire),
+                            SpecialAchievement::World => Box::new(World),
+                            SpecialAchievement::Wonder => Box::new(Wonder),
+                            SpecialAchievement::Universe => Box::new(Universe),
+                        };
+                        (sa, RefCell::new(condition))
+                    })
+                    .collect(),
+            ),
             acting_player: first_player,
         }
     }
@@ -66,7 +69,9 @@ impl<'c> InternalObserver<'c> for AchievementManager<'c> {
                 }
             }
         }
-        self.available_achievements.borrow_mut().retain(|a| !should_remove.contains(&a.0));
+        self.available_achievements
+            .borrow_mut()
+            .retain(|a| !should_remove.contains(&a.0));
     }
 }
 

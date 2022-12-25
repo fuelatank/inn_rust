@@ -65,7 +65,10 @@ impl<T> VecSet<T> {
         &self.v
     }
 
-    pub fn try_remove<P>(&mut self, f: P) -> Option<T> where P: Fn(&T) -> bool {
+    pub fn try_remove<P>(&mut self, f: P) -> Option<T>
+    where
+        P: Fn(&T) -> bool,
+    {
         let i = self.v.iter().position(f);
         match i {
             Some(v) => Some(self.v.remove(v)),

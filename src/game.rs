@@ -11,7 +11,7 @@ use crate::{
     auto_achieve::AchievementManager,
     card::{Achievement, Card, Dogma, SpecialAchievement},
     card_pile::MainCardPile,
-    containers::{BoxCardSet, CardSet, Removeable, VecSet, Addable},
+    containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
     enums::{Color, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     flow::FlowState,
@@ -189,12 +189,16 @@ impl<'c> Players<'c> {
         self.transfer(player.with_id(Hand), MainCardPile_, card, ())
     }
 
-    pub fn achieve<'g>(&'g self, player: &'g Player<'c>, view: &SingleAchievementView) -> InnResult<()> {
+    pub fn achieve<'g>(
+        &'g self,
+        player: &'g Player<'c>,
+        view: &SingleAchievementView,
+    ) -> InnResult<()> {
         match self.main_card_pile.borrow_mut().remove(view) {
             Some(achievement) => {
                 player.achievements_mut().add(achievement);
                 Ok(())
-            },
+            }
             None => Err(InnovationError::CardNotFound),
         }
     }
@@ -550,11 +554,7 @@ impl<'c> OuterGame<'c> {
         }
     }
 
-    fn observe_end(
-        &self,
-        current_player: PlayerId,
-        winners: Vec<PlayerId>,
-    ) -> EndObservation {
+    fn observe_end(&self, current_player: PlayerId, winners: Vec<PlayerId>) -> EndObservation {
         let players = *self.borrow_players_ref();
         EndObservation {
             players_from_current: players

@@ -5,7 +5,7 @@ use serde::{Serialize, Serializer};
 use crate::{
     board::Board,
     card::{Card, SpecialAchievement},
-    game::{Turn, PlayerId},
+    game::{PlayerId, Turn},
     state::ExecutionObs,
 };
 
@@ -109,7 +109,7 @@ impl<'a> GameState<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{to_value, json};
+    use serde_json::{json, to_value};
 
     #[test]
     fn obstype_serialization() {
@@ -119,13 +119,19 @@ mod tests {
 
     #[test]
     fn achievement_serialization() {
-        assert_eq!(to_value(&SingleAchievementView::Normal(8)).unwrap(), json!({
-            "type": "normal",
-            "view": 8
-        }));
-        assert_eq!(to_value(&SingleAchievementView::Special(SpecialAchievement::Wonder)).unwrap(), json!({
-            "type": "special",
-            "view": "Wonder",
-        }));
+        assert_eq!(
+            to_value(&SingleAchievementView::Normal(8)).unwrap(),
+            json!({
+                "type": "normal",
+                "view": 8
+            })
+        );
+        assert_eq!(
+            to_value(&SingleAchievementView::Special(SpecialAchievement::Wonder)).unwrap(),
+            json!({
+                "type": "special",
+                "view": "Wonder",
+            })
+        );
     }
 }

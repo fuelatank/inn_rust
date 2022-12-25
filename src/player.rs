@@ -1,7 +1,10 @@
-use crate::{board::Board, containers::VecSet, card::Achievement};
-use crate::containers::BoxCardSet;
-use crate::enums::{Color, Splay};
-use crate::observation::{MainPlayerView, OtherPlayerView};
+use crate::{
+    board::Board,
+    card::Achievement,
+    containers::{BoxCardSet, VecSet},
+    enums::{Color, Splay},
+    observation::{MainPlayerView, OtherPlayerView},
+};
 use std::cell::{Ref, RefCell, RefMut};
 
 pub struct Player<'c> {
