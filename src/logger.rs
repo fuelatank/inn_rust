@@ -63,7 +63,8 @@ impl<'c> Subject<'c> {
 
     /// Register a permanent external observer to the system.
     pub fn register_external_owned(&mut self, new_observer: impl Observer<'c> + 'c) {
-        self.owned_ext_observers.push(RefCell::new(Box::new(new_observer)));
+        self.owned_ext_observers
+            .push(RefCell::new(Box::new(new_observer)));
     }
 
     /// Register an internal observer to the system.
@@ -86,20 +87,20 @@ impl<'c> Subject<'c> {
             owned_observer.borrow_mut().on_notify(&item);
         }
         for observer in self.ext_observers.iter() {
-            observer
-                .upgrade()
-                .map(|active_observer| active_observer.borrow_mut().on_notify(&item));
-        };
+            if let Some(active_observer) = observer.upgrade() {
+                active_observer.borrow_mut().on_notify(&item);
+            }
+        }
 
         // second notify internal observers, letting them modify the game state and send new events
         for owned_observer in self.owned_observers.iter() {
             owned_observer.update_game(&item, game);
         }
         for observer in self.observers.iter() {
-            observer
-                .upgrade()
-                .map(|active_observer| active_observer.update_game(&item, game));
-        };
+            if let Some(active_observer) = observer.upgrade() {
+                active_observer.update_game(&item, game);
+            }
+        }
     }
 
     pub fn act(&self, action: Action, game: &Players<'c>) {

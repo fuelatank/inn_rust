@@ -54,7 +54,7 @@ impl<'c> Players<'c> {
         C: CardSet<'c, Card> + Default + 'c,
         A: CardSet<'c, Achievement<'c>> + Default + 'c,
     {
-        let pile = Rc::new(RefCell::new(MainCardPile::new(
+        let pile = Rc::new(RefCell::new(MainCardPile::new::<A>(
             cards.clone(),
             SpecialAchievement::iter().collect(),
         )));
@@ -540,8 +540,8 @@ impl<'c> OuterGame<'c> {
         }
     }
 
-    fn observe_end<'a>(
-        &'a self,
+    fn observe_end(
+        &self,
         current_player: PlayerId,
         winners: Vec<PlayerId>,
     ) -> EndObservation {
@@ -657,7 +657,7 @@ mod tests {
                 .to_owned(),
         );
         let cards = vec![&pottery, &archery, &code_of_laws, &monotheism, &philosophy];
-        let mut game = OuterGame::init::<VecSet<Card>, VecSet<Achievement>>(2, cards);
+        let mut game = OuterGame::init::<VecSet<&Card>, VecSet<&Achievement>>(2, cards);
         game.step(Action::Step(NoRefStepAction::Draw))
             .expect("Action should be valid");
         game.step(Action::Step(NoRefStepAction::Draw))

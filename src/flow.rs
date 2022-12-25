@@ -18,7 +18,7 @@ mod tests {
     use crate::card::{Achievement, Card};
     use crate::containers::{Addable, CardSet};
 
-    fn _chemistry2<'a, T: CardSet<'a, Card>, U: Addable<'a, Achievement<'a>> + Default>(
+    fn _chemistry2<'a, T: CardSet<'a, Card>, U: Addable<&'a Achievement<'a>> + Default>(
     ) -> Box<dyn Fn(&mut Players, usize)> {
         // Player is inside Game
         // One player must be placed inside one game

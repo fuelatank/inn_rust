@@ -99,7 +99,7 @@ impl Debug for Card {
     }
 }
 
-#[derive(PartialEq, Debug, Serialize, EnumIter)]
+#[derive(PartialEq, Debug, Serialize, EnumIter, Clone, Copy)]
 pub enum SpecialAchievement {
     Monument,
     Empire,
@@ -108,7 +108,7 @@ pub enum SpecialAchievement {
     Universe,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Achievement<'a> {
     Normal(&'a Card),
     Special(SpecialAchievement),

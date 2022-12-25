@@ -74,10 +74,10 @@ pub struct Board;
 
 impl<'c, P> RemoveFromPlayer<'c, P> for Board
 where
-    Board_<'c>: Removeable<'c, Card, P>,
+    Board_<'c>: Removeable<&'c Card, P>,
 {
     fn remove_from(&self, player: &Player<'c>, param: P) -> InnResult<&'c Card> {
-        <Board_ as Removeable<Card, P>>::remove(&mut *player.board().borrow_mut(), &param).ok_or(InnovationError::CardNotFound)
+        <Board_ as Removeable<&'c Card, P>>::remove(&mut *player.board().borrow_mut(), &param).ok_or(InnovationError::CardNotFound)
     }
 }
 
