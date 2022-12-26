@@ -7,7 +7,7 @@ use crate::{
     enums::{Color, Icon, Splay},
     error::InnResult,
     game::{PlayerId, Players},
-    logger::{InternalObserver, Item, Observer, Operation, SimpleOp},
+    logger::{InternalObserver, Item, Operation, SimpleOp},
     observation::SingleAchievementView,
     player::Player,
     structure::{Place, PlayerPlace},
@@ -42,16 +42,11 @@ impl<'c> AchievementManager<'c> {
     }
 }
 
-impl<'c> Observer<'c> for AchievementManager<'c> {
-    fn on_notify(&mut self, event: &Item<'c>) {
+impl<'c> InternalObserver<'c> for AchievementManager<'c> {
+    fn update(&mut self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()> {
         if let Item::ChangeTurn(_prev, next) = event {
             self.acting_player = *next;
         }
-    }
-}
-
-impl<'c> InternalObserver<'c> for AchievementManager<'c> {
-    fn update_game(&self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()> {
         // TODO: who is the "current player" that gets the achievement if two players
         // satisty the condition at exactly the same time?
         let mut should_remove = Vec::new();
