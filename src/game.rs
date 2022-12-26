@@ -45,7 +45,7 @@ impl<'c> Players<'c> {
         }
     }
 
-    pub fn new<C, A>(
+    pub fn new<C>(
         num_players: usize,
         cards: Vec<&'c Card>,
         logger: RcCell<Logger<'c>>,
@@ -53,9 +53,8 @@ impl<'c> Players<'c> {
     ) -> Players<'c>
     where
         C: CardSet<'c, Card> + Default + 'c,
-        A: CardSet<'c, Achievement<'c>> + Default + 'c,
     {
-        let pile = Rc::new(RefCell::new(MainCardPile::new::<A>(
+        let pile = Rc::new(RefCell::new(MainCardPile::new(
             cards.clone(),
             SpecialAchievement::iter().collect(),
         )));
@@ -374,16 +373,15 @@ pub struct OuterGame<'c> {
 }
 
 impl<'c> OuterGame<'c> {
-    pub fn init<C, A>(num_players: usize, cards: Vec<&'c Card>) -> OuterGame<'c>
+    pub fn init<C>(num_players: usize, cards: Vec<&'c Card>) -> OuterGame<'c>
     where
         C: CardSet<'c, Card> + Default + 'c,
-        A: CardSet<'c, Achievement<'c>> + Default + 'c,
     {
         let logger = Rc::new(RefCell::new(Logger::new()));
         // TODO: structure not clear
         let turn = Turn::new(num_players, 0);
         OuterGameBuilder {
-            players: Players::new::<C, A>(
+            players: Players::new::<C>(
                 num_players,
                 cards,
                 Rc::clone(&logger),
@@ -705,7 +703,7 @@ mod tests {
             &monotheism,
             &philosophy,
         ];
-        let mut game = OuterGame::init::<VecSet<&Card>, VecSet<&Achievement>>(2, cards);
+        let mut game = OuterGame::init::<VecSet<&Card>>(2, cards);
         // do not call start(), in order to reduce cards used
         // card pile: 1[archery, code of laws, agriculture], 2[philosophy]
         game.step(Action::Step(NoRefStepAction::Draw))

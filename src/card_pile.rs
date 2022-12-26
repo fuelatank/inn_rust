@@ -1,7 +1,7 @@
 use crate::containers::{Addable, Removeable};
 use crate::{
     card::{Achievement, Card, SpecialAchievement},
-    containers::{CardSet, VecSet},
+    containers::VecSet,
     observation::SingleAchievementView,
 };
 use std::collections::VecDeque;
@@ -61,13 +61,10 @@ impl<'a> MainCardPile<'a> {
         }
     }
 
-    pub fn new<A>(
+    pub fn new(
         cards: Vec<&'a Card>,
         special_achievements: Vec<SpecialAchievement>,
-    ) -> MainCardPile<'a>
-    where
-        A: CardSet<'a, Achievement<'a>> + Default + 'a,
-    {
+    ) -> MainCardPile<'a> {
         let mut pile = MainCardPile::empty();
         for card in cards {
             pile.add(card);
