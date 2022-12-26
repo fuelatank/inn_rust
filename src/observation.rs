@@ -4,8 +4,8 @@ use serde::{Serialize, Serializer};
 
 use crate::{
     board::Board,
-    card::{Card, SpecialAchievement},
-    game::{Turn, PlayerId},
+    card::{Achievement, Card, SpecialAchievement},
+    game::{PlayerId, Turn},
     state::ExecutionObs,
 };
 
@@ -19,14 +19,38 @@ fn serialize_board<S: Serializer>(board: &BoardView, serializer: S) -> Result<S:
     board.serialize(serializer)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(tag = "type", content = "view", rename_all = "snake_case")]
-pub enum SingleAchievementView<'a> {
-    Special(&'a SpecialAchievement),
+pub enum SingleAchievementView {
+    Special(SpecialAchievement),
     Normal(u8),
 }
 
-type AchievementView<'a> = Vec<SingleAchievementView<'a>>;
+impl<'a> PartialEq<Achievement<'a>> for SingleAchievementView {
+    fn eq(&self, other: &Achievement) -> bool {
+        match (self, other) {
+            (SingleAchievementView::Normal(age), Achievement::Normal(card)) => *age == card.age(),
+            (SingleAchievementView::Special(self_sa), Achievement::Special(other_sa)) => {
+                self_sa == other_sa
+            }
+            _ => false,
+        }
+    }
+}
+
+impl<'a> PartialEq<SingleAchievementView> for Achievement<'a> {
+    fn eq(&self, other: &SingleAchievementView) -> bool {
+        match (self, other) {
+            (Achievement::Normal(card), SingleAchievementView::Normal(age)) => card.age() == *age,
+            (Achievement::Special(self_sa), SingleAchievementView::Special(other_sa)) => {
+                self_sa == other_sa
+            }
+            _ => false,
+        }
+    }
+}
+
+type AchievementView = Vec<SingleAchievementView>;
 
 pub struct TurnView {
     main_action_index: usize,
@@ -44,7 +68,7 @@ pub struct MainPlayerView<'a> {
     pub score: CardView<'a>,
     #[serde(serialize_with = "serialize_board")]
     pub board: BoardView<'a>,
-    pub achievements: AchievementView<'a>,
+    pub achievements: AchievementView,
 }
 
 #[derive(Debug, Serialize)]
@@ -53,7 +77,7 @@ pub struct OtherPlayerView<'a> {
     pub score: AgeView,
     #[serde(serialize_with = "serialize_board")]
     pub board: BoardView<'a>,
-    pub achievements: AchievementView<'a>,
+    pub achievements: AchievementView,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -73,10 +97,44 @@ pub struct Observation<'a> {
     pub obstype: ObsType<'a>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct EndObservation<'a> {
+    // todo: reveal achievement
+    pub players_from_current: Vec<MainPlayerView<'a>>,
+    pub main_pile: [usize; 10],
+    pub turn: &'a Turn,
+    pub winners: Vec<PlayerId>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum GameState<'a> {
+    Normal(Observation<'a>),
+    End(EndObservation<'a>),
+}
+
+impl<'a> GameState<'a> {
+    pub fn as_normal(&self) -> Option<&Observation<'a>> {
+        if let Self::Normal(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_end(&self) -> Option<&EndObservation<'a>> {
+        if let Self::End(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{to_value, json};
+    use serde_json::{json, to_value};
 
     #[test]
     fn obstype_serialization() {
@@ -86,13 +144,19 @@ mod tests {
 
     #[test]
     fn achievement_serialization() {
-        assert_eq!(to_value(&SingleAchievementView::Normal(8)).unwrap(), json!({
-            "type": "normal",
-            "view": 8
-        }));
-        assert_eq!(to_value(&SingleAchievementView::Special(&SpecialAchievement::Wonder)).unwrap(), json!({
-            "type": "special",
-            "view": "Wonder",
-        }));
+        assert_eq!(
+            to_value(&SingleAchievementView::Normal(8)).unwrap(),
+            json!({
+                "type": "normal",
+                "view": 8
+            })
+        );
+        assert_eq!(
+            to_value(&SingleAchievementView::Special(SpecialAchievement::Wonder)).unwrap(),
+            json!({
+                "type": "special",
+                "view": "Wonder",
+            })
+        );
     }
 }

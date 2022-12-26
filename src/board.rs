@@ -1,8 +1,9 @@
+use counter::Counter;
 use serde::Serialize;
 
-use crate::card::Card;
 use crate::containers::{Addable, Removeable};
 use crate::enums::{Color, Splay};
+use crate::{card::Card, enums::Icon};
 use std::collections::VecDeque;
 
 #[derive(Debug, Default, Clone, Serialize)]
@@ -75,6 +76,28 @@ impl<'a> Stack<'a> {
             None => None,
         }
     }
+
+    pub fn icon_count(&self) -> Counter<Icon, usize> {
+        let mut counter = Counter::new();
+        let mask = self.splay.mask();
+        let mut card_iter = self.cards.iter();
+        match card_iter.next() {
+            Some(top_card) => {
+                for icon in top_card.icons() {
+                    counter[&icon] += 1;
+                }
+            }
+            None => return counter,
+        }
+        for card in card_iter {
+            for (icon, shown) in card.icons().iter().zip(mask) {
+                if shown {
+                    counter[icon] += 1;
+                }
+            }
+        }
+        counter
+    }
 }
 
 #[derive(Debug, Default, Clone, Serialize)]
@@ -146,9 +169,17 @@ impl<'a> Board<'a> {
             None => 0,
         }
     }
+
+    pub fn icon_count(&self) -> Counter<Icon> {
+        self.stacks
+            .iter()
+            .map(|stack| stack.icon_count())
+            .reduce(|accum, item| accum + item)
+            .unwrap()
+    }
 }
 
-impl<'a> Addable<'a, Card> for Board<'a> {
+impl<'a> Addable<&'a Card> for Board<'a> {
     fn add(&mut self, elem: &'a Card) {
         self.meld(elem);
         /*if self.is_forward {
@@ -159,14 +190,14 @@ impl<'a> Addable<'a, Card> for Board<'a> {
     }
 }
 
-impl<'a> Removeable<'a, Card, Card> for Board<'a> {
+impl<'a> Removeable<&'a Card, Card> for Board<'a> {
     fn remove(&mut self, param: &Card) -> Option<&'a Card> {
         let stack = self.get_stack_mut(param.color());
         stack.remove(param)
     }
 }
 
-impl<'a> Removeable<'a, Card, bool> for Stack<'a> {
+impl<'a> Removeable<&'a Card, bool> for Stack<'a> {
     fn remove(&mut self, param: &bool) -> Option<&'a Card> {
         if *param {
             self.pop_front()
@@ -176,17 +207,17 @@ impl<'a> Removeable<'a, Card, bool> for Stack<'a> {
     }
 }
 
-impl<'a> Removeable<'a, Card, usize> for Stack<'a> {
+impl<'a> Removeable<&'a Card, usize> for Stack<'a> {
     fn remove(&mut self, param: &usize) -> Option<&'a Card> {
         self.cards.remove(*param)
     }
 }
 
-impl<'a, P> Removeable<'a, Card, (Color, P)> for Board<'a>
+impl<'a, P> Removeable<&'a Card, (Color, P)> for Board<'a>
 where
-    Stack<'a>: Removeable<'a, Card, P>,
+    Stack<'a>: Removeable<&'a Card, P>,
 {
     fn remove(&mut self, param: &(Color, P)) -> Option<&'a Card> {
-        <Stack as Removeable<Card, P>>::remove(self.get_stack_mut(param.0), &param.1)
+        <Stack as Removeable<&'a Card, P>>::remove(self.get_stack_mut(param.0), &param.1)
     }
 }

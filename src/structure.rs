@@ -3,13 +3,13 @@ use crate::{
     card::Card,
     containers::{Addable, Removeable},
     enums::Color,
-    error::{InnResult, InnovationError},
+    error::{InnResult, InnovationError, WinningSituation},
     game::Players,
     player::Player,
 };
 
 trait RemoveFromPlayer<'c, P> {
-    fn remove_from(&self, player: &Player<'c>, param: P) -> Option<&'c Card>;
+    fn remove_from(&self, player: &Player<'c>, param: P) -> InnResult<&'c Card>;
 }
 
 trait AddToPlayer<'c, P> {
@@ -17,7 +17,7 @@ trait AddToPlayer<'c, P> {
 }
 
 pub trait RemoveFromGame<'c, P> {
-    fn remove_from(&self, game: &Players<'c>, param: P) -> Option<&'c Card>;
+    fn remove_from(&self, game: &Players<'c>, param: P) -> InnResult<&'c Card>;
 }
 
 pub trait AddToGame<'c, P> {
@@ -28,7 +28,7 @@ impl<'c, T, P> RemoveFromGame<'c, P> for (usize, T)
 where
     T: RemoveFromPlayer<'c, P>,
 {
-    fn remove_from(&self, game: &Players<'c>, param: P) -> Option<&'c Card> {
+    fn remove_from(&self, game: &Players<'c>, param: P) -> InnResult<&'c Card> {
         self.1.remove_from(game.player_at(self.0), param)
     }
 }
@@ -45,8 +45,12 @@ where
 pub struct Hand;
 
 impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Hand {
-    fn remove_from(&self, player: &Player<'c>, param: &'a Card) -> Option<&'c Card> {
-        player.hand.borrow_mut().remove(param)
+    fn remove_from(&self, player: &Player<'c>, param: &'a Card) -> InnResult<&'c Card> {
+        player
+            .hand
+            .borrow_mut()
+            .remove(param)
+            .ok_or(InnovationError::CardNotFound)
     }
 }
 
@@ -59,8 +63,12 @@ impl<'c> AddToPlayer<'c, ()> for Hand {
 pub struct Score;
 
 impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Score {
-    fn remove_from(&self, player: &Player<'c>, param: &'a Card) -> Option<&'c Card> {
-        player.score_pile.borrow_mut().remove(param)
+    fn remove_from(&self, player: &Player<'c>, param: &'a Card) -> InnResult<&'c Card> {
+        player
+            .score_pile
+            .borrow_mut()
+            .remove(param)
+            .ok_or(InnovationError::CardNotFound)
     }
 }
 
@@ -74,10 +82,11 @@ pub struct Board;
 
 impl<'c, P> RemoveFromPlayer<'c, P> for Board
 where
-    Board_<'c>: Removeable<'c, Card, P>,
+    Board_<'c>: Removeable<&'c Card, P>,
 {
-    fn remove_from(&self, player: &Player<'c>, param: P) -> Option<&'c Card> {
-        <Board_ as Removeable<Card, P>>::remove(&mut *player.board().borrow_mut(), &param)
+    fn remove_from(&self, player: &Player<'c>, param: P) -> InnResult<&'c Card> {
+        <Board_ as Removeable<&'c Card, P>>::remove(&mut *player.board().borrow_mut(), &param)
+            .ok_or(InnovationError::CardNotFound)
     }
 }
 
@@ -100,8 +109,14 @@ impl<'c> AddToPlayer<'c, usize> for Board {
 pub struct MainCardPile;
 
 impl<'c> RemoveFromGame<'c, u8> for MainCardPile {
-    fn remove_from(&self, game: &Players<'c>, param: u8) -> Option<&'c Card> {
-        game.main_card_pile().borrow_mut().remove(&param)
+    fn remove_from(&self, game: &Players<'c>, param: u8) -> InnResult<&'c Card> {
+        game.main_card_pile()
+            .borrow_mut()
+            .remove(&param)
+            .ok_or(InnovationError::Win {
+                current_player: None,
+                situation: WinningSituation::ByScore,
+            })
     }
 }
 

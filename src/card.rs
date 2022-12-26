@@ -4,6 +4,7 @@ use crate::observation::SingleAchievementView;
 use counter::Counter;
 use serde::Serialize;
 use std::fmt::Debug;
+use strum_macros::EnumIter;
 
 pub enum Dogma {
     Share(ShareFlow),
@@ -52,24 +53,35 @@ impl Card {
             doc,
         }
     }
+
     pub fn age(&self) -> u8 {
         self.age
     }
+
     pub fn color(&self) -> Color {
         self.color
     }
+
     pub fn contains(&self, icon: Icon) -> bool {
         self.icons.contains(&icon)
     }
+
     pub fn doc(&self) -> &String {
         &self.doc
     }
+
     pub fn dogmas(&self) -> &[Dogma] {
         &self.dogmas
     }
+
+    pub fn icons(&self) -> [Icon; 4] {
+        self.icons
+    }
+
     pub fn main_icon(&self) -> Icon {
         self.main_icon
     }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -87,25 +99,26 @@ impl Debug for Card {
     }
 }
 
-#[derive(PartialEq, Debug, Serialize)]
+#[derive(PartialEq, Debug, Serialize, EnumIter, Clone, Copy)]
 pub enum SpecialAchievement {
-    Universe,
-    Wonder,
+    Monument,
+    Empire,
     World,
-    // TODO: more
+    Wonder,
+    Universe,
 }
 
-#[derive(PartialEq, Debug)]
-pub enum Achievement {
-    Normal(Card),
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum Achievement<'a> {
+    Normal(&'a Card),
     Special(SpecialAchievement),
 }
 
-impl Achievement {
+impl<'a> Achievement<'a> {
     pub fn view(&self) -> SingleAchievementView {
         match self {
             Achievement::Normal(c) => SingleAchievementView::Normal(c.age),
-            Achievement::Special(s) => SingleAchievementView::Special(s),
+            Achievement::Special(s) => SingleAchievementView::Special(*s),
         }
     }
 }

@@ -1,15 +1,18 @@
-use crate::board::Board;
-use crate::containers::{BoxAchievementSet, BoxCardSet};
-use crate::enums::{Color, Splay};
-use crate::observation::{MainPlayerView, OtherPlayerView};
-use std::cell::{Ref, RefCell};
+use crate::{
+    board::Board,
+    card::Achievement,
+    containers::{BoxCardSet, VecSet},
+    enums::{Color, Splay},
+    observation::{MainPlayerView, OtherPlayerView},
+};
+use std::cell::{Ref, RefCell, RefMut};
 
 pub struct Player<'c> {
     id: usize,
     main_board: RefCell<Board<'c>>,
     pub hand: RefCell<BoxCardSet<'c>>,
     pub score_pile: RefCell<BoxCardSet<'c>>,
-    achievements: RefCell<BoxAchievementSet<'c>>,
+    achievements: RefCell<VecSet<Achievement<'c>>>,
 }
 
 impl<'c> Player<'c> {
@@ -17,7 +20,7 @@ impl<'c> Player<'c> {
         id: usize,
         hand: BoxCardSet<'c>,
         score_pile: BoxCardSet<'c>,
-        achievements: BoxAchievementSet<'c>,
+        achievements: VecSet<Achievement<'c>>,
     ) -> Player<'c> {
         Player {
             id,
@@ -52,6 +55,18 @@ impl<'c> Player<'c> {
         &self.main_board
     }
 
+    pub fn total_score(&self) -> usize {
+        self.score_pile().as_iter().map(|i| i.age() as usize).sum()
+    }
+
+    pub fn achievements(&self) -> Ref<VecSet<Achievement<'c>>> {
+        self.achievements.borrow()
+    }
+
+    pub fn achievements_mut(&self) -> RefMut<VecSet<Achievement<'c>>> {
+        self.achievements.borrow_mut()
+    }
+
     pub fn is_splayed(&self, color: Color, direction: Splay) -> bool {
         self.main_board.borrow().is_splayed(color, direction)
     }
@@ -64,8 +79,8 @@ impl<'c> Player<'c> {
             achievements: self
                 .achievements
                 .borrow()
-                .as_vec()
-                .into_iter()
+                .inner()
+                .iter()
                 .map(|a| a.view())
                 .collect(),
         }
@@ -84,7 +99,7 @@ impl<'c> Player<'c> {
             achievements: self
                 .achievements
                 .borrow()
-                .as_vec()
+                .clone_inner()
                 .into_iter()
                 .map(|a| a.view())
                 .collect(),

@@ -1,5 +1,9 @@
-use crate::card::Card;
 use crate::containers::{Addable, Removeable};
+use crate::{
+    card::{Achievement, Card, SpecialAchievement},
+    containers::VecSet,
+    observation::SingleAchievementView,
+};
 use std::collections::VecDeque;
 
 pub type CardOrder<'c> = [Vec<&'c Card>; 10];
@@ -21,13 +25,13 @@ impl<'a> CardPile<'a> {
     }
 }
 
-impl<'a> Addable<'a, Card> for CardPile<'a> {
+impl<'a> Addable<&'a Card> for CardPile<'a> {
     fn add(&mut self, card: &'a Card) {
         self.cards.push_back(card)
     }
 }
 
-impl<'a> Removeable<'a, Card, ()> for CardPile<'a> {
+impl<'a> Removeable<&'a Card, ()> for CardPile<'a> {
     fn remove(&mut self, _: &()) -> Option<&'a Card> {
         self.cards.pop_front()
     }
@@ -35,6 +39,7 @@ impl<'a> Removeable<'a, Card, ()> for CardPile<'a> {
 
 pub struct MainCardPile<'a> {
     piles: [CardPile<'a>; 10],
+    achievements: VecSet<Achievement<'a>>,
 }
 
 impl<'a> MainCardPile<'a> {
@@ -52,13 +57,26 @@ impl<'a> MainCardPile<'a> {
                 CardPile::new(),
                 CardPile::new(),
             ],
+            achievements: Default::default(),
         }
     }
 
-    pub fn new(cards: Vec<&'a Card>) -> MainCardPile<'a> {
+    pub fn new(
+        cards: Vec<&'a Card>,
+        special_achievements: Vec<SpecialAchievement>,
+    ) -> MainCardPile<'a> {
         let mut pile = MainCardPile::empty();
         for card in cards {
             pile.add(card);
+        }
+        // pick one (if exists) card of each age as achievement
+        for age in pile.piles.iter_mut() {
+            if let Some(card) = age.remove(&()) {
+                pile.achievements.add(Achievement::Normal(card));
+            }
+        }
+        for sa in special_achievements.into_iter().map(Achievement::Special) {
+            pile.achievements.add(sa)
         }
         pile
     }
@@ -94,17 +112,27 @@ impl<'a> MainCardPile<'a> {
             self.piles[9].len(),
         ]
     }
+
+    pub fn has_achievement(&self, view: &SingleAchievementView) -> bool {
+        self.achievements.inner().iter().any(|a| a == view)
+    }
 }
 
-impl<'a> Addable<'a, Card> for MainCardPile<'a> {
+impl<'a> Addable<&'a Card> for MainCardPile<'a> {
     fn add(&mut self, card: &'a Card) {
         let age = card.age();
         self.piles[(age - 1) as usize].add(card)
     }
 }
 
-impl<'a> Removeable<'a, Card, u8> for MainCardPile<'a> {
+impl<'a> Removeable<&'a Card, u8> for MainCardPile<'a> {
     fn remove(&mut self, age: &u8) -> Option<&'a Card> {
         self.pop_age(*age)
+    }
+}
+
+impl<'a> Removeable<Achievement<'a>, SingleAchievementView> for MainCardPile<'a> {
+    fn remove(&mut self, achievement: &SingleAchievementView) -> Option<Achievement<'a>> {
+        self.achievements.try_remove(|a| a == achievement)
     }
 }
