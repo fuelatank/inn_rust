@@ -14,7 +14,7 @@ use crate::{
     containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
     dogma_fn::mk_execution,
     enums::{Color, Splay},
-    error::{InnResult, InnovationError},
+    error::{InnResult, InnovationError, WinningSituation},
     flow::FlowState,
     logger::{FnPureObserver, Logger, Operation, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
@@ -271,6 +271,13 @@ impl<'c> Players<'c> {
                 }
             }
             done!()
+        })
+    }
+
+    pub fn win<'g>(&'g self, player: &'g Player<'c>) -> InnResult<()> {
+        Err(InnovationError::Win {
+            current_player: None,
+            situation: WinningSituation::SomeOne(player.id()),
         })
     }
 
