@@ -5,12 +5,35 @@ use strum::IntoEnumIterator;
 use crate::{
     card::SpecialAchievement,
     enums::{Color, Icon, Splay},
+    error::{InnResult, InnovationError, WinningSituation},
     game::{PlayerId, Players},
-    logger::{InternalObserver, Item, Observer, Operation, SimpleOp},
+    logger::{InternalObserver, Item, Operation, SimpleOp},
     observation::SingleAchievementView,
     player::Player,
     structure::{Place, PlayerPlace},
 };
+
+pub struct WinByAchievementChecker;
+
+impl<'c> InternalObserver<'c> for WinByAchievementChecker {
+    fn update(&mut self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()> {
+        let win_num = match game.players().len() {
+            2 => 6,
+            3 => 5,
+            4 => 4,
+            _ => return Err(InnovationError::WrongPlayerNum),
+        };
+        if let Item::Operation(Operation::Achieve(id, _)) = event {
+            if game.player_at(*id).achievements().inner().len() >= win_num {
+                return Err(InnovationError::Win {
+                    current_player: None,
+                    situation: WinningSituation::SomeOne(*id),
+                });
+            }
+        }
+        Ok(())
+    }
+}
 
 type Condition<'c> = RefCell<Box<dyn Achievement<'c>>>;
 pub struct AchievementManager<'c> {
@@ -41,16 +64,11 @@ impl<'c> AchievementManager<'c> {
     }
 }
 
-impl<'c> Observer<'c> for AchievementManager<'c> {
-    fn on_notify(&mut self, event: &Item<'c>) {
+impl<'c> InternalObserver<'c> for AchievementManager<'c> {
+    fn update(&mut self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()> {
         if let Item::ChangeTurn(_prev, next) = event {
             self.acting_player = *next;
         }
-    }
-}
-
-impl<'c> InternalObserver<'c> for AchievementManager<'c> {
-    fn update_game(&self, event: &Item<'c>, game: &Players<'c>) {
         // TODO: who is the "current player" that gets the achievement if two players
         // satisty the condition at exactly the same time?
         let mut should_remove = Vec::new();
@@ -73,6 +91,7 @@ impl<'c> InternalObserver<'c> for AchievementManager<'c> {
         self.available_achievements
             .borrow_mut()
             .retain(|a| !should_remove.contains(&a.0));
+        Ok(())
     }
 }
 

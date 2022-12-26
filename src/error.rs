@@ -45,7 +45,11 @@ pub enum InnovationError {
     ParamUnwrapError,
     CardNotFound,
     InvalidAction,
+    WrongPlayerNum,
     Win {
+        // the one who executes the most inner card, not share,
+        // or the one acting if there's no card in execution
+        // just for fun... or to decide which player to start observation?
         current_player: Option<PlayerId>,
         situation: WinningSituation,
     },

@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    collections::VecDeque,
     rc::{Rc, Weak},
 };
 
@@ -8,8 +9,9 @@ use crate::{
     card::Card,
     card_pile::CardOrder,
     enums::{Color, Splay},
+    error::InnResult,
     game::{PlayerId, Players},
-    structure::Place,
+    structure::Place, observation::SingleAchievementView,
 };
 
 #[derive(Clone)]
@@ -26,6 +28,7 @@ pub enum Operation<'c> {
     Splay(PlayerId, Color, Splay),
     Transfer(Place, Place, &'c Card),
     SimpleOp(SimpleOp, PlayerId, &'c Card),
+    Achieve(PlayerId, SingleAchievementView),
 }
 
 #[derive(Clone)]
@@ -38,19 +41,27 @@ pub enum Item<'c> {
 
 #[derive(Default)]
 pub struct Subject<'c> {
-    observers: Vec<Weak<dyn InternalObserver<'c>>>,
-    owned_observers: Vec<Box<dyn InternalObserver<'c> + 'c>>,
-    ext_observers: Vec<Weak<RefCell<dyn Observer<'c>>>>,
+    // There's already a RefCell outside the Vec, because need to filter out
+    // empty observers in notify(). But, inside it still need to be Weak<RefCell>,
+    // because we want to make it general so that the observers can borrow
+    // each other in its turn. (Although not a common case)
+    observers: RefCell<Vec<Weak<RefCell<dyn InternalObserver<'c>>>>>,
+    owned_observers: Vec<RefCell<Box<dyn InternalObserver<'c> + 'c>>>,
+    ext_observers: RefCell<Vec<Weak<RefCell<dyn Observer<'c>>>>>,
     owned_ext_observers: Vec<RefCell<Box<dyn Observer<'c> + 'c>>>,
+    waiting: RefCell<VecDeque<Item<'c>>>,
+    processing: RefCell<()>, // can't be bool because we need to mutate it
 }
 
 impl<'c> Subject<'c> {
     pub fn new() -> Self {
         Self {
-            observers: Vec::new(),
+            observers: RefCell::new(Vec::new()),
             owned_observers: Vec::new(),
-            ext_observers: Vec::new(),
+            ext_observers: RefCell::new(Vec::new()),
             owned_ext_observers: Vec::new(),
+            waiting: RefCell::new(VecDeque::new()),
+            processing: RefCell::new(()),
         }
     }
 
@@ -58,7 +69,9 @@ impl<'c> Subject<'c> {
     ///
     /// The caller should have a strong reference of the observer to prevent dropping.
     pub fn register_external(&mut self, new_observer: &Rc<RefCell<dyn Observer<'c>>>) {
-        self.ext_observers.push(Rc::downgrade(new_observer));
+        self.ext_observers
+            .borrow_mut()
+            .push(Rc::downgrade(new_observer));
     }
 
     /// Register a permanent external observer to the system.
@@ -70,74 +83,106 @@ impl<'c> Subject<'c> {
     /// Register an internal observer to the system.
     ///
     /// The caller should have a strong reference of the observer to prevent dropping.
-    pub fn register_internal(&mut self, new_observer: &Rc<dyn InternalObserver<'c>>) {
-        self.observers.push(Rc::downgrade(new_observer));
+    pub fn register_internal(&mut self, new_observer: &Rc<RefCell<dyn InternalObserver<'c>>>) {
+        self.observers
+            .borrow_mut()
+            .push(Rc::downgrade(new_observer));
     }
 
     /// Register a permanent internal observer to the system.
     pub fn register_internal_owned(&mut self, new_observer: impl InternalObserver<'c> + 'c) {
-        self.owned_observers.push(Box::new(new_observer));
+        self.owned_observers
+            .push(RefCell::new(Box::new(new_observer)));
     }
 
     // must be immutable &self, because there may be multiple calls in the stack
-    pub fn notify(&self, item: Item<'c>, game: &Players<'c>) {
-        // first notify external observers, which may log events and don't modify game state,
-        // so we won't worry about multiple RefCell borrow_mut
-        for owned_observer in self.owned_ext_observers.iter() {
-            owned_observer.borrow_mut().on_notify(&item);
-        }
-        for observer in self.ext_observers.iter() {
-            if let Some(active_observer) = observer.upgrade() {
-                active_observer.borrow_mut().on_notify(&item);
-            }
+    pub fn notify(&self, item: Item<'c>, game: &Players<'c>) -> InnResult<()> {
+        self.waiting.borrow_mut().push_back(item);
+
+        let check = self.processing.try_borrow_mut();
+
+        if check.is_err() {
+            return Ok(());
         }
 
-        // second notify internal observers, letting them modify the game state and send new events
-        for owned_observer in self.owned_observers.iter() {
-            owned_observer.update_game(&item, game);
-        }
-        for observer in self.observers.iter() {
-            if let Some(active_observer) = observer.upgrade() {
-                active_observer.update_game(&item, game);
+        let processing = check.unwrap();
+
+        // process until no message delay.
+        loop {
+            // using while let has lifetime issue
+            let next = self.waiting.borrow_mut().pop_front();
+            if next.is_none() {
+                break;
             }
+
+            let item = next.unwrap();
+
+            // first notify external observers, which may log events and don't modify game state,
+            // so we won't worry about multiple RefCell borrow_mut
+            for owned_observer in self.owned_ext_observers.iter() {
+                owned_observer.borrow_mut().on_notify(&item);
+            }
+            self.ext_observers.borrow_mut().retain_mut(|observer| {
+                if let Some(active_observer) = observer.upgrade() {
+                    active_observer.borrow_mut().on_notify(&item);
+                    true
+                } else {
+                    false
+                }
+            });
+
+            // second notify internal observers, letting them modify the game state and send new events
+            for owned_observer in self.owned_observers.iter() {
+                owned_observer.borrow_mut().update(&item, game)?;
+            }
+            // can't retain_mut directly because of InnResult
+            // i.e., the list must be filtered after update and possibly return earlier.
+            for observer in self.observers.borrow().iter() {
+                if let Some(active_observer) = observer.upgrade() {
+                    active_observer.borrow_mut().update(&item, game)?;
+                }
+            }
+            self.observers
+                .borrow_mut()
+                .retain_mut(|o| o.upgrade().is_some());
         }
+
+        // drop explicitly, because I don't know if it'll be optimized to be dropped earlier
+        drop(processing);
+
+        Ok(())
     }
 
-    pub fn act(&self, action: Action, game: &Players<'c>) {
-        self.notify(Item::Action(action), game);
+    pub fn act(&self, action: Action, game: &Players<'c>) -> InnResult<()> {
+        self.notify(Item::Action(action), game)
     }
 
-    pub fn operate(&self, operation: Operation<'c>, game: &Players<'c>) {
-        self.notify(Item::Operation(operation), game);
+    pub fn operate(&self, operation: Operation<'c>, game: &Players<'c>) -> InnResult<()> {
+        self.notify(Item::Operation(operation), game)
     }
 }
 
 pub trait Observer<'c> {
     // doesn't modify game state
+    // does it need InnResult?
     fn on_notify(&mut self, event: &Item<'c>);
 }
 
 pub trait InternalObserver<'c> {
-    // can't be &mut self to prevent multiple borrow:
-    // may call a method in game, which triggers some log,
-    // which calls again the on_notify, then it'll be
-    // borrowed twice in the stack.
-    // How do these RefCell/mutable/immutable work and connect together?
-    fn update_game(&self, event: &Item<'c>, game: &Players<'c>);
+    fn update(&mut self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()>;
 }
 
-// can be used in observers modifying game without modifying self
-pub struct FnInternalObserver<'c>(Box<dyn Fn(&Item<'c>, &Players<'c>) + 'c>);
+pub struct FnInternalObserver<'c>(Box<dyn FnMut(&Item<'c>, &Players<'c>) -> InnResult<()> + 'c>);
 
 impl<'c> FnInternalObserver<'c> {
-    pub fn new(f: impl Fn(&Item<'c>, &Players<'c>) + 'c) -> Self {
+    pub fn new(f: impl FnMut(&Item<'c>, &Players<'c>) -> InnResult<()> + 'c) -> Self {
         Self(Box::new(f))
     }
 }
 
 impl<'c> InternalObserver<'c> for FnInternalObserver<'c> {
-    fn update_game(&self, event: &Item<'c>, game: &Players<'c>) {
-        self.0(event, game);
+    fn update(&mut self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()> {
+        self.0(event, game)
     }
 }
 

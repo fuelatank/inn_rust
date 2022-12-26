@@ -8,13 +8,13 @@ use strum::IntoEnumIterator;
 
 use crate::{
     action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefStepAction},
-    auto_achieve::AchievementManager,
+    auto_achieve::{AchievementManager, WinByAchievementChecker},
     card::{Achievement, Card, Dogma, SpecialAchievement},
     card_pile::MainCardPile,
     containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
     dogma_fn::mk_execution,
     enums::{Color, Splay},
-    error::{InnResult, InnovationError},
+    error::{InnResult, InnovationError, WinningSituation},
     flow::FlowState,
     logger::{FnPureObserver, Logger, Operation, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
@@ -64,6 +64,7 @@ impl<'c> Players<'c> {
             SpecialAchievement::iter().collect(),
             first_player,
         ));
+        subject.register_internal_owned(WinByAchievementChecker);
         // Should logger cards be initialized here, or in other methods?
         logger.borrow_mut().start(pile.borrow().contents());
         subject.register_external_owned(FnPureObserver::new(move |ev| {
@@ -273,6 +274,13 @@ impl<'c> Players<'c> {
         })
     }
 
+    pub fn win<'g>(&'g self, player: &'g Player<'c>) -> InnResult<()> {
+        Err(InnovationError::Win {
+            current_player: None,
+            situation: WinningSituation::SomeOne(player.id()),
+        })
+    }
+
     pub fn transfer<Fr, To, RP, AP>(
         &self,
         from: Fr,
@@ -289,9 +297,10 @@ impl<'c> Players<'c> {
             to.add_to(card, self, add_param);
             // TODO: this does not allow observers to perform operations (log)
             self.logger
-                .operate(Operation::Transfer(from.into(), to.into(), card), self);
-            card
+                .operate(Operation::Transfer(from.into(), to.into(), card), self)?;
+            Ok(card)
         })
+        .and_then(|r| r)
     }
 
     pub fn transfer_card<Fr, To>(&self, from: Fr, to: To, card: &'c Card) -> InnResult<()>
