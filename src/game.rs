@@ -289,9 +289,10 @@ impl<'c> Players<'c> {
             to.add_to(card, self, add_param);
             // TODO: this does not allow observers to perform operations (log)
             self.logger
-                .operate(Operation::Transfer(from.into(), to.into(), card), self);
-            card
+                .operate(Operation::Transfer(from.into(), to.into(), card), self)?;
+            Ok(card)
         })
+        .and_then(|r| r)
     }
 
     pub fn transfer_card<Fr, To>(&self, from: Fr, to: To, card: &'c Card) -> InnResult<()>

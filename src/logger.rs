@@ -8,6 +8,7 @@ use crate::{
     card::Card,
     card_pile::CardOrder,
     enums::{Color, Splay},
+    error::InnResult,
     game::{PlayerId, Players},
     structure::Place,
 };
@@ -80,7 +81,7 @@ impl<'c> Subject<'c> {
     }
 
     // must be immutable &self, because there may be multiple calls in the stack
-    pub fn notify(&self, item: Item<'c>, game: &Players<'c>) {
+    pub fn notify(&self, item: Item<'c>, game: &Players<'c>) -> InnResult<()> {
         // first notify external observers, which may log events and don't modify game state,
         // so we won't worry about multiple RefCell borrow_mut
         for owned_observer in self.owned_ext_observers.iter() {
@@ -94,26 +95,28 @@ impl<'c> Subject<'c> {
 
         // second notify internal observers, letting them modify the game state and send new events
         for owned_observer in self.owned_observers.iter() {
-            owned_observer.update_game(&item, game);
+            owned_observer.update_game(&item, game)?;
         }
         for observer in self.observers.iter() {
             if let Some(active_observer) = observer.upgrade() {
-                active_observer.update_game(&item, game);
+                active_observer.update_game(&item, game)?;
             }
         }
+        Ok(())
     }
 
-    pub fn act(&self, action: Action, game: &Players<'c>) {
-        self.notify(Item::Action(action), game);
+    pub fn act(&self, action: Action, game: &Players<'c>) -> InnResult<()> {
+        self.notify(Item::Action(action), game)
     }
 
-    pub fn operate(&self, operation: Operation<'c>, game: &Players<'c>) {
-        self.notify(Item::Operation(operation), game);
+    pub fn operate(&self, operation: Operation<'c>, game: &Players<'c>) -> InnResult<()> {
+        self.notify(Item::Operation(operation), game)
     }
 }
 
 pub trait Observer<'c> {
     // doesn't modify game state
+    // does it need InnResult?
     fn on_notify(&mut self, event: &Item<'c>);
 }
 
@@ -123,21 +126,21 @@ pub trait InternalObserver<'c> {
     // which calls again the on_notify, then it'll be
     // borrowed twice in the stack.
     // How do these RefCell/mutable/immutable work and connect together?
-    fn update_game(&self, event: &Item<'c>, game: &Players<'c>);
+    fn update_game(&self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()>;
 }
 
 // can be used in observers modifying game without modifying self
-pub struct FnInternalObserver<'c>(Box<dyn Fn(&Item<'c>, &Players<'c>) + 'c>);
+pub struct FnInternalObserver<'c>(Box<dyn Fn(&Item<'c>, &Players<'c>) -> InnResult<()> + 'c>);
 
 impl<'c> FnInternalObserver<'c> {
-    pub fn new(f: impl Fn(&Item<'c>, &Players<'c>) + 'c) -> Self {
+    pub fn new(f: impl Fn(&Item<'c>, &Players<'c>) -> InnResult<()> + 'c) -> Self {
         Self(Box::new(f))
     }
 }
 
 impl<'c> InternalObserver<'c> for FnInternalObserver<'c> {
-    fn update_game(&self, event: &Item<'c>, game: &Players<'c>) {
-        self.0(event, game);
+    fn update_game(&self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()> {
+        self.0(event, game)
     }
 }
 

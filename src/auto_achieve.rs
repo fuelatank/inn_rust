@@ -5,6 +5,7 @@ use strum::IntoEnumIterator;
 use crate::{
     card::SpecialAchievement,
     enums::{Color, Icon, Splay},
+    error::InnResult,
     game::{PlayerId, Players},
     logger::{InternalObserver, Item, Observer, Operation, SimpleOp},
     observation::SingleAchievementView,
@@ -50,7 +51,7 @@ impl<'c> Observer<'c> for AchievementManager<'c> {
 }
 
 impl<'c> InternalObserver<'c> for AchievementManager<'c> {
-    fn update_game(&self, event: &Item<'c>, game: &Players<'c>) {
+    fn update_game(&self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()> {
         // TODO: who is the "current player" that gets the achievement if two players
         // satisty the condition at exactly the same time?
         let mut should_remove = Vec::new();
@@ -73,6 +74,7 @@ impl<'c> InternalObserver<'c> for AchievementManager<'c> {
         self.available_achievements
             .borrow_mut()
             .retain(|a| !should_remove.contains(&a.0));
+        Ok(())
     }
 }
 
