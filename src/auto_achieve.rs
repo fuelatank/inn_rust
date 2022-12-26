@@ -5,13 +5,35 @@ use strum::IntoEnumIterator;
 use crate::{
     card::SpecialAchievement,
     enums::{Color, Icon, Splay},
-    error::InnResult,
+    error::{InnResult, InnovationError, WinningSituation},
     game::{PlayerId, Players},
     logger::{InternalObserver, Item, Operation, SimpleOp},
     observation::SingleAchievementView,
     player::Player,
     structure::{Place, PlayerPlace},
 };
+
+pub struct WinByAchievementChecker;
+
+impl<'c> InternalObserver<'c> for WinByAchievementChecker {
+    fn update(&mut self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()> {
+        let win_num = match game.players().len() {
+            2 => 6,
+            3 => 5,
+            4 => 4,
+            _ => return Err(InnovationError::WrongPlayerNum),
+        };
+        if let Item::Operation(Operation::Achieve(id, _)) = event {
+            if game.player_at(*id).achievements().inner().len() >= win_num {
+                return Err(InnovationError::Win {
+                    current_player: None,
+                    situation: WinningSituation::SomeOne(*id),
+                });
+            }
+        }
+        Ok(())
+    }
+}
 
 type Condition<'c> = RefCell<Box<dyn Achievement<'c>>>;
 pub struct AchievementManager<'c> {

@@ -11,7 +11,7 @@ use crate::{
     enums::{Color, Splay},
     error::InnResult,
     game::{PlayerId, Players},
-    structure::Place,
+    structure::Place, observation::SingleAchievementView,
 };
 
 #[derive(Clone)]
@@ -28,6 +28,7 @@ pub enum Operation<'c> {
     Splay(PlayerId, Color, Splay),
     Transfer(Place, Place, &'c Card),
     SimpleOp(SimpleOp, PlayerId, &'c Card),
+    Achieve(PlayerId, SingleAchievementView),
 }
 
 #[derive(Clone)]

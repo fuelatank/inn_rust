@@ -8,7 +8,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefStepAction},
-    auto_achieve::AchievementManager,
+    auto_achieve::{AchievementManager, WinByAchievementChecker},
     card::{Achievement, Card, Dogma, SpecialAchievement},
     card_pile::MainCardPile,
     containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
@@ -64,6 +64,7 @@ impl<'c> Players<'c> {
             SpecialAchievement::iter().collect(),
             first_player,
         ));
+        subject.register_internal_owned(WinByAchievementChecker);
         // Should logger cards be initialized here, or in other methods?
         logger.borrow_mut().start(pile.borrow().contents());
         subject.register_external_owned(FnPureObserver::new(move |ev| {

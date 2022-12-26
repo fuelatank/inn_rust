@@ -19,7 +19,7 @@ fn serialize_board<S: Serializer>(board: &BoardView, serializer: S) -> Result<S:
     board.serialize(serializer)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(tag = "type", content = "view", rename_all = "snake_case")]
 pub enum SingleAchievementView {
     Special(SpecialAchievement),
