@@ -381,12 +381,7 @@ impl<'c> OuterGame<'c> {
         // TODO: structure not clear
         let turn = Turn::new(num_players, 0);
         OuterGameBuilder {
-            players: Players::new::<C>(
-                num_players,
-                cards,
-                Rc::clone(&logger),
-                turn.first_player(),
-            ),
+            players: Players::new::<C>(num_players, cards, Rc::clone(&logger), turn.first_player()),
             players_ref_builder: |players| players,
             turn,
             logger,
@@ -563,6 +558,7 @@ impl<'c> OuterGame<'c> {
     fn observe<'a>(&'a self, id: usize, obs_type: ObsType<'a>) -> Observation {
         let players = *self.borrow_players_ref();
         Observation {
+            acting_player: id,
             main_player: players.player_at(id).self_view(),
             other_players: players
                 .players_from(id)

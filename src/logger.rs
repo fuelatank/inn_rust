@@ -11,7 +11,8 @@ use crate::{
     enums::{Color, Splay},
     error::InnResult,
     game::{PlayerId, Players},
-    structure::Place, observation::SingleAchievementView,
+    observation::SingleAchievementView,
+    structure::Place,
 };
 
 #[derive(Clone)]
