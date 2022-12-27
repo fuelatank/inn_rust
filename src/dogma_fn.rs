@@ -130,11 +130,11 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         self.yield_(player, Choose::Yn).yn()
     }
 
-    pub fn may<T, F>(&mut self, player: &'g Player<'c>, f: F) -> Option<T>
+    pub fn may<T, F>(&mut self, player: &'g Player<'c>, f: F) -> InnResult<Option<T>>
     where
-        F: FnOnce(&mut Context<'a, 'c, 'g>) -> T,
+        F: FnOnce(&mut Context<'a, 'c, 'g>) -> InnResult<T>,
     {
-        self.choose_yn(player).then(|| f(self))
+        self.choose_yn(player).then(|| f(self)).transpose()
     }
 
     pub fn may_splay(
@@ -143,15 +143,14 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         game: &'g Players<'c>,
         color: Color,
         direction: Splay,
-    ) -> bool {
+    ) -> InnResult<bool> {
         let board = player.board().borrow();
         if board.get_stack(color).len() <= 1 || board.is_splayed(color, direction) {
-            return false;
+            return Ok(false);
         }
-        self.may(player, |_| {
-            game.splay(player, color, direction);
-        })
-        .is_some()
+        Ok(self
+            .may(player, |_| game.splay(player, color, direction))?
+            .is_some())
     }
 
     pub fn may_splays(
@@ -160,7 +159,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         game: &'g Players<'c>,
         colors: Vec<Color>,
         direction: Splay,
-    ) -> bool {
+    ) -> InnResult<bool> {
         let board = player.board().borrow();
         let available_top_cards: Vec<_> = colors
             .into_iter()
@@ -168,16 +167,17 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
             .map(|color| board.get_stack(color).top_card().unwrap())
             .collect();
         if available_top_cards.is_empty() {
-            return false;
+            return Ok(false);
         }
-        self.may(player, |ctx| {
-            let color = ctx
-                .choose_one_card(player, available_top_cards)
-                .unwrap()
-                .color();
-            game.splay(player, color, direction);
-        })
-        .is_some()
+        Ok(self
+            .may(player, |ctx| {
+                let color = ctx
+                    .choose_one_card(player, available_top_cards)
+                    .unwrap()
+                    .color();
+                game.splay(player, color, direction)
+            })?
+            .is_some())
     }
 }
 
@@ -263,8 +263,8 @@ pub fn tools() -> Vec<Dogma> {
             // need confirmation of rule, any or exact 3 cards?
             let cards = ctx
                 .may(player, |ctx| {
-                    ctx.choose_cards_exact(player, player.hand().as_vec(), 3)
-                })
+                    Ok(ctx.choose_cards_exact(player, player.hand().as_vec(), 3))
+                })?
                 .flatten();
             if cards.is_some() {
                 game.draw_and_meld(player, 3)?;
@@ -274,8 +274,8 @@ pub fn tools() -> Vec<Dogma> {
         shared(|player, game, ctx| {
             let card = ctx
                 .may(player, |ctx| {
-                    ctx.choose_one_card(player, player.hand().filtered_vec(|&c| c.age() == 3))
-                })
+                    Ok(ctx.choose_one_card(player, player.hand().filtered_vec(|&c| c.age() == 3)))
+                })?
                 .flatten();
             if card.is_some() {
                 game.draw(player, 1)?;
@@ -350,8 +350,8 @@ pub fn oars() -> Vec<Dogma> {
 pub fn agriculture() -> Vec<Dogma> {
     vec![shared(|player, game, ctx| {
         let card = ctx.may(player, |ctx| {
-            ctx.choose_one_card(player, player.hand().as_vec())
-        });
+            Ok(ctx.choose_one_card(player, player.hand().as_vec()))
+        })?;
         if let Some(card) = card.flatten() {
             game.r#return(player, card)?;
             game.draw_and_score(player, card.age())?;
@@ -396,7 +396,7 @@ pub fn code_of_laws() -> Vec<Dogma> {
                 .expect("Generator got None")
                 .yn()
             {
-                game.splay(player, card.color(), Splay::Left);
+                game.splay(player, card.color(), Splay::Left)?;
             }
             done!()
         })
@@ -438,7 +438,7 @@ pub fn monotheism() -> Vec<Dogma> {
 pub fn philosophy() -> Vec<Dogma> {
     vec![
         shared(|player, game, ctx| {
-            ctx.may_splays(player, game, Color::iter().collect(), Splay::Left);
+            ctx.may_splays(player, game, Color::iter().collect(), Splay::Left)?;
             Ok(())
         }),
         shared(|player, game, ctx| {

@@ -16,7 +16,7 @@ use crate::{
     enums::{Color, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     flow::FlowState,
-    logger::{FnPureObserver, Logger, Operation, Subject},
+    logger::{FnPureObserver, Logger, Operation, SimpleOp, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
     player::Player,
     state::{Choose, State},
@@ -137,43 +137,93 @@ impl<'c> Players<'c> {
     pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.hand, &age)
         self.transfer(MainCardPile_, player.with_id(Hand), age, ())
+            .and_then(|r| {
+                self.logger
+                    .operate(Operation::SimpleOp(SimpleOp::Draw, player.id(), r), self)?;
+                Ok(r)
+            })
     }
 
     pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.main_board, &age)
         self.transfer(MainCardPile_, player.with_id(Board), age, true)
+            .and_then(|r| {
+                self.logger.operate(
+                    Operation::SimpleOp(SimpleOp::DrawAndMeld, player.id(), r),
+                    self,
+                )?;
+                Ok(r)
+            })
     }
 
     pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.score_pile, &age)
         self.transfer(MainCardPile_, player.with_id(Score), age, ())
+            .and_then(|r| {
+                self.logger.operate(
+                    Operation::SimpleOp(SimpleOp::DrawAndScore, player.id(), r),
+                    self,
+                )?;
+                Ok(r)
+            })
     }
 
     pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         self.transfer(MainCardPile_, player.with_id(Board), age, false)
+            .and_then(|r| {
+                self.logger.operate(
+                    Operation::SimpleOp(SimpleOp::DrawAndTuck, player.id(), r),
+                    self,
+                )?;
+                Ok(r)
+            })
     }
 
     pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
         self.transfer(player.with_id(Hand), player.with_id(Board), card, true)
+            .and_then(|r| {
+                self.logger
+                    .operate(Operation::SimpleOp(SimpleOp::Meld, player.id(), r), self)?;
+                Ok(r)
+            })
     }
 
     pub fn score<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.score_pile, card)
         self.transfer(player.with_id(Hand), player.with_id(Score), card, ())
+            .and_then(|r| {
+                self.logger
+                    .operate(Operation::SimpleOp(SimpleOp::Score, player.id(), r), self)?;
+                Ok(r)
+            })
     }
 
     pub fn tuck<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
         self.transfer(player.with_id(Hand), player.with_id(Board), card, false)
+            .and_then(|r| {
+                self.logger
+                    .operate(Operation::SimpleOp(SimpleOp::Tuck, player.id(), r), self)?;
+                Ok(r)
+            })
     }
 
-    pub fn splay<'g>(&'g self, player: &'g Player<'c>, color: Color, direction: Splay) {
+    pub fn splay<'g>(
+        &'g self,
+        player: &'g Player<'c>,
+        color: Color,
+        direction: Splay,
+    ) -> InnResult<()> {
+        // error when not able to splay?
         player
             .board()
             .borrow_mut()
             .get_stack_mut(color)
             .splay(direction);
+        self.logger
+            .operate(Operation::Splay(player.id(), color, direction), self)?;
+        Ok(())
     }
 
     pub fn is_splayed<'g>(
@@ -188,6 +238,11 @@ impl<'c> Players<'c> {
     pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, Rc::clone(&self.main_pile), card)
         self.transfer(player.with_id(Hand), MainCardPile_, card, ())
+            .and_then(|r| {
+                self.logger
+                    .operate(Operation::SimpleOp(SimpleOp::Return, player.id(), r), self)?;
+                Ok(r)
+            })
     }
 
     pub fn has_achievement(&self, view: &SingleAchievementView) -> bool {
@@ -202,6 +257,8 @@ impl<'c> Players<'c> {
         match self.main_card_pile.borrow_mut().remove(view) {
             Some(achievement) => {
                 player.achievements_mut().add(achievement);
+                self.logger
+                    .operate(Operation::Achieve(player.id(), view.clone()), self)?;
                 Ok(())
             }
             None => Err(InnovationError::CardNotFound),

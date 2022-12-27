@@ -22,6 +22,9 @@ pub enum SimpleOp {
     Tuck,
     Score,
     Return,
+    DrawAndMeld,
+    DrawAndScore,
+    DrawAndTuck,
 }
 
 #[derive(Clone)]
