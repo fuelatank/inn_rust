@@ -5,10 +5,10 @@ use strum::IntoEnumIterator;
 
 use crate::{
     action::RefChoice,
-    card::{Card, Dogma},
+    card::Card,
     enums::{Color, Icon, Splay},
     error::InnResult,
-    flow::FlowState,
+    flow::{Dogma, FlowState},
     game::{Players, RcCell},
     player::Player,
     state::{Choose, ExecutionState},
