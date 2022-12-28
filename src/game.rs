@@ -16,7 +16,7 @@ use crate::{
     enums::{Color, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     flow::FlowState,
-    logger::{FnPureObserver, Logger, Operation, SimpleOp, Subject},
+    logger::{FnPureObserver, Item, Logger, Operation, SimpleOp, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
     player::Player,
     state::{Choose, State},
@@ -380,6 +380,10 @@ impl<'c> Players<'c> {
             Ok(())
         })
     }
+
+    pub fn notify(&self, item: Item<'c>) -> InnResult<()> {
+        self.logger.notify(item, self)
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -416,12 +420,53 @@ impl Turn {
     }
 }
 
+pub struct LoggingTurn<'c, 'g> {
+    turn: Turn,
+    game: &'g Players<'c>,
+}
+
+impl<'c, 'g> LoggingTurn<'c, 'g> {
+    pub fn new(turn: Turn, game: &'g Players<'c>) -> Self {
+        Self { turn, game }
+    }
+
+    pub fn first_player(&self) -> usize {
+        self.turn.first_player()
+    }
+
+    pub fn is_second_action(&self) -> bool {
+        self.turn.is_second_action()
+    }
+
+    pub fn player_id(&self) -> usize {
+        self.turn.player_id()
+    }
+
+    pub fn next(&mut self) -> InnResult<()> {
+        let original_player = self.turn.player_id();
+        self.turn.next();
+        let current_player = self.turn.player_id();
+        if original_player == current_player {
+            self.game.notify(Item::NextAction(current_player))
+        } else {
+            self.game
+                .notify(Item::ChangeTurn(original_player, current_player))
+        }
+    }
+
+    pub fn turn(&self) -> &Turn {
+        &self.turn
+    }
+}
+
 #[self_referencing]
 pub struct OuterGame<'c> {
     players: Players<'c>,
     #[borrows(players)]
     players_ref: &'this Players<'c>,
-    turn: Turn,
+    #[borrows(players)]
+    #[covariant]
+    turn: LoggingTurn<'c, 'this>,
     logger: RcCell<Logger<'c>>,
     #[borrows()]
     #[covariant]
@@ -440,7 +485,7 @@ impl<'c> OuterGame<'c> {
         OuterGameBuilder {
             players: Players::new::<C>(num_players, cards, Rc::clone(&logger), turn.first_player()),
             players_ref_builder: |players| players,
-            turn,
+            turn_builder: |players| LoggingTurn::new(turn, players),
             logger,
             state: State::Main,
             next_action_type: ObsType::Main,
@@ -528,15 +573,15 @@ impl<'c> OuterGame<'c> {
                                 // because either he's executing something or not.
                                 game.draw(player, player.age())
                                     .map_err(|e| e.or_set_current_player(player.id()))?;
-                                fields.turn.next();
+                                fields.turn.next()?;
                             }
                             RefStepAction::Meld(card) => {
                                 game.meld(player, card)?;
-                                fields.turn.next();
+                                fields.turn.next()?;
                             }
                             RefStepAction::Achieve(age) => {
                                 game.try_achieve(player, &SingleAchievementView::Normal(age)).expect("Have checked action, corresponding achievement should be available.");
-                                fields.turn.next();
+                                fields.turn.next()?;
                             }
                             RefStepAction::Execute(card) => {
                                 *fields.state = State::Executing(game.execute(player, card));
@@ -596,7 +641,7 @@ impl<'c> OuterGame<'c> {
                     }
                     None => {
                         *fields.state = State::Main;
-                        fields.turn.next();
+                        fields.turn.next()?;
                         ok_normal(fields.turn.player_id(), ObsType::Main)
                     }
                 }
@@ -623,7 +668,7 @@ impl<'c> OuterGame<'c> {
                 .map(|p| p.other_view())
                 .collect(),
             main_pile: players.main_card_pile.borrow().view(),
-            turn: self.borrow_turn(),
+            turn: self.borrow_turn().turn(),
             obstype: obs_type,
         }
     }
@@ -636,7 +681,7 @@ impl<'c> OuterGame<'c> {
                 .map(|id| players.player_at(id).self_view())
                 .collect(),
             main_pile: players.main_card_pile().borrow().view(),
-            turn: self.borrow_turn(),
+            turn: self.borrow_turn().turn(),
             winners,
         }
     }
