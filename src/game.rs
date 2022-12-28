@@ -22,6 +22,7 @@ use crate::{
     state::{Choose, State},
     structure::{
         AddToGame, Board, Hand, MainCardPile as MainCardPile_, Place, RemoveFromGame, Score,
+        TestRemoveFromGame,
     },
 };
 
@@ -351,7 +352,8 @@ impl<'c> Players<'c> {
         let card = from.remove_from(self, remove_param);
         card.map(|card| {
             to.add_to(card, self, add_param);
-            // TODO: this does not allow observers to perform operations (log)
+            // MAYRESOLVED: TODO: this does not allow observers to perform operations (log)
+            // log event, after actual operation, to ensure that observers act after operation
             self.logger
                 .operate(Operation::Transfer(from.into(), to.into(), card), self)?;
             Ok(card)
@@ -365,6 +367,39 @@ impl<'c> Players<'c> {
         To: AddToGame<'c, ()> + Into<Place>,
     {
         self.transfer(from, to, card, ()).map(|_| ())
+    }
+
+    pub fn exchange<Fr, To>(
+        &self,
+        place1: Fr,
+        place2: To,
+        cards12: Vec<&'c Card>,
+        cards21: Vec<&'c Card>,
+    ) -> InnResult<()>
+    where
+        Fr: TestRemoveFromGame<'c, &'c Card> + AddToGame<'c, ()> + Into<Place>,
+        To: TestRemoveFromGame<'c, &'c Card> + AddToGame<'c, ()> + Into<Place>,
+    {
+        // first check if this operation can work
+        // if not, return the first Err detected
+        // check first to avoid half execution when found an Err
+        for card in cards12.clone() {
+            place1.test_remove(self, card)?;
+        }
+        for card in cards21.clone() {
+            place2.test_remove(self, card)?;
+        }
+        // after ensured no chance of Err, we can perform the operation
+        for card in cards12.clone() {
+            place1.remove_from(self, card).expect("remove_from() should be consistent with test_remove().");
+            place2.add_to(card, self, ());
+        }
+        for card in cards21.clone() {
+            place2.remove_from(self, card).expect("remove_from() should be consistent with test_remove().");
+            place1.add_to(card, self, ());
+        }
+        self.logger.operate(Operation::Exchange(place1.into(), place2.into(), cards12, cards21), self)?;
+        Ok(())
     }
 
     pub fn start_choice<'g>(&'g self) -> FlowState<'c, 'g> {
