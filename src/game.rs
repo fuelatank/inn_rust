@@ -16,12 +16,13 @@ use crate::{
     enums::{Color, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     flow::FlowState,
-    logger::{FnPureObserver, Logger, Operation, Subject},
+    logger::{FnPureObserver, Item, Logger, Operation, SimpleOp, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
     player::Player,
     state::{Choose, State},
     structure::{
         AddToGame, Board, Hand, MainCardPile as MainCardPile_, Place, RemoveFromGame, Score,
+        TestRemoveFromGame,
     },
 };
 
@@ -137,43 +138,93 @@ impl<'c> Players<'c> {
     pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.hand, &age)
         self.transfer(MainCardPile_, player.with_id(Hand), age, ())
+            .and_then(|r| {
+                self.logger
+                    .operate(Operation::SimpleOp(SimpleOp::Draw, player.id(), r), self)?;
+                Ok(r)
+            })
     }
 
     pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.main_board, &age)
         self.transfer(MainCardPile_, player.with_id(Board), age, true)
+            .and_then(|r| {
+                self.logger.operate(
+                    Operation::SimpleOp(SimpleOp::DrawAndMeld, player.id(), r),
+                    self,
+                )?;
+                Ok(r)
+            })
     }
 
     pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.score_pile, &age)
         self.transfer(MainCardPile_, player.with_id(Score), age, ())
+            .and_then(|r| {
+                self.logger.operate(
+                    Operation::SimpleOp(SimpleOp::DrawAndScore, player.id(), r),
+                    self,
+                )?;
+                Ok(r)
+            })
     }
 
     pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         self.transfer(MainCardPile_, player.with_id(Board), age, false)
+            .and_then(|r| {
+                self.logger.operate(
+                    Operation::SimpleOp(SimpleOp::DrawAndTuck, player.id(), r),
+                    self,
+                )?;
+                Ok(r)
+            })
     }
 
     pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
         self.transfer(player.with_id(Hand), player.with_id(Board), card, true)
+            .and_then(|r| {
+                self.logger
+                    .operate(Operation::SimpleOp(SimpleOp::Meld, player.id(), r), self)?;
+                Ok(r)
+            })
     }
 
     pub fn score<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.score_pile, card)
         self.transfer(player.with_id(Hand), player.with_id(Score), card, ())
+            .and_then(|r| {
+                self.logger
+                    .operate(Operation::SimpleOp(SimpleOp::Score, player.id(), r), self)?;
+                Ok(r)
+            })
     }
 
     pub fn tuck<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, &self.main_board, card)
         self.transfer(player.with_id(Hand), player.with_id(Board), card, false)
+            .and_then(|r| {
+                self.logger
+                    .operate(Operation::SimpleOp(SimpleOp::Tuck, player.id(), r), self)?;
+                Ok(r)
+            })
     }
 
-    pub fn splay<'g>(&'g self, player: &'g Player<'c>, color: Color, direction: Splay) {
+    pub fn splay<'g>(
+        &'g self,
+        player: &'g Player<'c>,
+        color: Color,
+        direction: Splay,
+    ) -> InnResult<()> {
+        // error when not able to splay?
         player
             .board()
             .borrow_mut()
             .get_stack_mut(color)
             .splay(direction);
+        self.logger
+            .operate(Operation::Splay(player.id(), color, direction), self)?;
+        Ok(())
     }
 
     pub fn is_splayed<'g>(
@@ -188,6 +239,11 @@ impl<'c> Players<'c> {
     pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
         // transfer(&self.hand, Rc::clone(&self.main_pile), card)
         self.transfer(player.with_id(Hand), MainCardPile_, card, ())
+            .and_then(|r| {
+                self.logger
+                    .operate(Operation::SimpleOp(SimpleOp::Return, player.id(), r), self)?;
+                Ok(r)
+            })
     }
 
     pub fn has_achievement(&self, view: &SingleAchievementView) -> bool {
@@ -202,6 +258,8 @@ impl<'c> Players<'c> {
         match self.main_card_pile.borrow_mut().remove(view) {
             Some(achievement) => {
                 player.achievements_mut().add(achievement);
+                self.logger
+                    .operate(Operation::Achieve(player.id(), view.clone()), self)?;
                 Ok(())
             }
             None => Err(InnovationError::CardNotFound),
@@ -294,7 +352,8 @@ impl<'c> Players<'c> {
         let card = from.remove_from(self, remove_param);
         card.map(|card| {
             to.add_to(card, self, add_param);
-            // TODO: this does not allow observers to perform operations (log)
+            // MAYRESOLVED: TODO: this does not allow observers to perform operations (log)
+            // log event, after actual operation, to ensure that observers act after operation
             self.logger
                 .operate(Operation::Transfer(from.into(), to.into(), card), self)?;
             Ok(card)
@@ -310,6 +369,46 @@ impl<'c> Players<'c> {
         self.transfer(from, to, card, ()).map(|_| ())
     }
 
+    pub fn exchange<Fr, To>(
+        &self,
+        place1: Fr,
+        place2: To,
+        cards12: Vec<&'c Card>,
+        cards21: Vec<&'c Card>,
+    ) -> InnResult<()>
+    where
+        Fr: TestRemoveFromGame<'c, &'c Card> + AddToGame<'c, ()> + Into<Place>,
+        To: TestRemoveFromGame<'c, &'c Card> + AddToGame<'c, ()> + Into<Place>,
+    {
+        // first check if this operation can work
+        // if not, return the first Err detected
+        // check first to avoid half execution when found an Err
+        for card in cards12.clone() {
+            place1.test_remove(self, card)?;
+        }
+        for card in cards21.clone() {
+            place2.test_remove(self, card)?;
+        }
+        // after ensured no chance of Err, we can perform the operation
+        for card in cards12.clone() {
+            place1
+                .remove_from(self, card)
+                .expect("remove_from() should be consistent with test_remove().");
+            place2.add_to(card, self, ());
+        }
+        for card in cards21.clone() {
+            place2
+                .remove_from(self, card)
+                .expect("remove_from() should be consistent with test_remove().");
+            place1.add_to(card, self, ());
+        }
+        self.logger.operate(
+            Operation::Exchange(place1.into(), place2.into(), cards12, cards21),
+            self,
+        )?;
+        Ok(())
+    }
+
     pub fn start_choice<'g>(&'g self) -> FlowState<'c, 'g> {
         mk_execution(move |ctx| {
             for player in self.players_from(0) {
@@ -322,6 +421,10 @@ impl<'c> Players<'c> {
             }
             Ok(())
         })
+    }
+
+    pub fn notify(&self, item: Item<'c>) -> InnResult<()> {
+        self.logger.notify(item, self)
     }
 }
 
@@ -359,12 +462,53 @@ impl Turn {
     }
 }
 
+pub struct LoggingTurn<'c, 'g> {
+    turn: Turn,
+    game: &'g Players<'c>,
+}
+
+impl<'c, 'g> LoggingTurn<'c, 'g> {
+    pub fn new(turn: Turn, game: &'g Players<'c>) -> Self {
+        Self { turn, game }
+    }
+
+    pub fn first_player(&self) -> usize {
+        self.turn.first_player()
+    }
+
+    pub fn is_second_action(&self) -> bool {
+        self.turn.is_second_action()
+    }
+
+    pub fn player_id(&self) -> usize {
+        self.turn.player_id()
+    }
+
+    fn next(&mut self) -> InnResult<()> {
+        let original_player = self.turn.player_id();
+        self.turn.next();
+        let current_player = self.turn.player_id();
+        if original_player == current_player {
+            self.game.notify(Item::NextAction(current_player))
+        } else {
+            self.game
+                .notify(Item::ChangeTurn(original_player, current_player))
+        }
+    }
+
+    pub fn turn(&self) -> &Turn {
+        &self.turn
+    }
+}
+
 #[self_referencing]
 pub struct OuterGame<'c> {
     players: Players<'c>,
     #[borrows(players)]
     players_ref: &'this Players<'c>,
-    turn: Turn,
+    #[borrows(players)]
+    #[covariant]
+    turn: LoggingTurn<'c, 'this>,
     logger: RcCell<Logger<'c>>,
     #[borrows()]
     #[covariant]
@@ -383,7 +527,7 @@ impl<'c> OuterGame<'c> {
         OuterGameBuilder {
             players: Players::new::<C>(num_players, cards, Rc::clone(&logger), turn.first_player()),
             players_ref_builder: |players| players,
-            turn,
+            turn_builder: |players| LoggingTurn::new(turn, players),
             logger,
             state: State::Main,
             next_action_type: ObsType::Main,
@@ -471,15 +615,15 @@ impl<'c> OuterGame<'c> {
                                 // because either he's executing something or not.
                                 game.draw(player, player.age())
                                     .map_err(|e| e.or_set_current_player(player.id()))?;
-                                fields.turn.next();
+                                fields.turn.next()?;
                             }
                             RefStepAction::Meld(card) => {
                                 game.meld(player, card)?;
-                                fields.turn.next();
+                                fields.turn.next()?;
                             }
                             RefStepAction::Achieve(age) => {
                                 game.try_achieve(player, &SingleAchievementView::Normal(age)).expect("Have checked action, corresponding achievement should be available.");
-                                fields.turn.next();
+                                fields.turn.next()?;
                             }
                             RefStepAction::Execute(card) => {
                                 *fields.state = State::Executing(game.execute(player, card));
@@ -539,7 +683,7 @@ impl<'c> OuterGame<'c> {
                     }
                     None => {
                         *fields.state = State::Main;
-                        fields.turn.next();
+                        fields.turn.next()?;
                         ok_normal(fields.turn.player_id(), ObsType::Main)
                     }
                 }
@@ -566,7 +710,7 @@ impl<'c> OuterGame<'c> {
                 .map(|p| p.other_view())
                 .collect(),
             main_pile: players.main_card_pile.borrow().view(),
-            turn: self.borrow_turn(),
+            turn: self.borrow_turn().turn(),
             obstype: obs_type,
         }
     }
@@ -579,7 +723,7 @@ impl<'c> OuterGame<'c> {
                 .map(|id| players.player_at(id).self_view())
                 .collect(),
             main_pile: players.main_card_pile().borrow().view(),
-            turn: self.borrow_turn(),
+            turn: self.borrow_turn().turn(),
             winners,
         }
     }

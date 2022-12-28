@@ -12,12 +12,30 @@ trait RemoveFromPlayer<'c, P> {
     fn remove_from(&self, player: &Player<'c>, param: P) -> InnResult<&'c Card>;
 }
 
+trait TestRemoveFromPlayer<'c, P>: RemoveFromPlayer<'c, P> {
+    /// Checks if it can successfully find a card using the param,
+    /// without actually removing it.
+    ///
+    /// Should return `Ok` if and only if `remove_from` returns `Ok`, and
+    /// the `Err` returned should be the same as in `remove_from`.
+    fn test_remove(&self, player: &Player<'c>, param: P) -> InnResult<()>;
+}
+
 trait AddToPlayer<'c, P> {
     fn add_to(&self, card: &'c Card, player: &Player<'c>, param: P);
 }
 
 pub trait RemoveFromGame<'c, P> {
     fn remove_from(&self, game: &Players<'c>, param: P) -> InnResult<&'c Card>;
+}
+
+pub trait TestRemoveFromGame<'c, P>: RemoveFromGame<'c, P> {
+    /// Checks if it can successfully find a card using the param,
+    /// without actually removing it.
+    ///
+    /// Should return `Ok` if and only if `remove_from` returns `Ok`, and
+    /// the `Err` returned should be the same as in `remove_from`.
+    fn test_remove(&self, game: &Players<'c>, param: P) -> InnResult<()>;
 }
 
 pub trait AddToGame<'c, P> {
@@ -30,6 +48,15 @@ where
 {
     fn remove_from(&self, game: &Players<'c>, param: P) -> InnResult<&'c Card> {
         self.1.remove_from(game.player_at(self.0), param)
+    }
+}
+
+impl<'c, T, P> TestRemoveFromGame<'c, P> for (usize, T)
+where
+    T: TestRemoveFromPlayer<'c, P>,
+{
+    fn test_remove(&self, game: &Players<'c>, param: P) -> InnResult<()> {
+        self.1.test_remove(game.player_at(self.0), param)
     }
 }
 
@@ -54,6 +81,16 @@ impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Hand {
     }
 }
 
+impl<'c, 'a> TestRemoveFromPlayer<'c, &'a Card> for Hand {
+    fn test_remove(&self, player: &Player<'c>, param: &'a Card) -> InnResult<()> {
+        if player.hand().as_iter().any(|card| param == card) {
+            Ok(())
+        } else {
+            Err(InnovationError::CardNotFound)
+        }
+    }
+}
+
 impl<'c> AddToPlayer<'c, ()> for Hand {
     fn add_to(&self, card: &'c Card, player: &Player<'c>, _param: ()) {
         player.hand.borrow_mut().add(card)
@@ -69,6 +106,16 @@ impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Score {
             .borrow_mut()
             .remove(param)
             .ok_or(InnovationError::CardNotFound)
+    }
+}
+
+impl<'c, 'a> TestRemoveFromPlayer<'c, &'a Card> for Score {
+    fn test_remove(&self, player: &Player<'c>, param: &'a Card) -> InnResult<()> {
+        if player.score_pile().as_iter().any(|card| param == card) {
+            Ok(())
+        } else {
+            Err(InnovationError::CardNotFound)
+        }
     }
 }
 
