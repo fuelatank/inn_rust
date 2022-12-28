@@ -52,7 +52,8 @@ where
 }
 
 impl<'c, T, P> TestRemoveFromGame<'c, P> for (usize, T)
-where T: TestRemoveFromPlayer<'c, P>,
+where
+    T: TestRemoveFromPlayer<'c, P>,
 {
     fn test_remove(&self, game: &Players<'c>, param: P) -> InnResult<()> {
         self.1.test_remove(game.player_at(self.0), param)

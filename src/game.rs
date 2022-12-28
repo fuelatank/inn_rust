@@ -391,14 +391,21 @@ impl<'c> Players<'c> {
         }
         // after ensured no chance of Err, we can perform the operation
         for card in cards12.clone() {
-            place1.remove_from(self, card).expect("remove_from() should be consistent with test_remove().");
+            place1
+                .remove_from(self, card)
+                .expect("remove_from() should be consistent with test_remove().");
             place2.add_to(card, self, ());
         }
         for card in cards21.clone() {
-            place2.remove_from(self, card).expect("remove_from() should be consistent with test_remove().");
+            place2
+                .remove_from(self, card)
+                .expect("remove_from() should be consistent with test_remove().");
             place1.add_to(card, self, ());
         }
-        self.logger.operate(Operation::Exchange(place1.into(), place2.into(), cards12, cards21), self)?;
+        self.logger.operate(
+            Operation::Exchange(place1.into(), place2.into(), cards12, cards21),
+            self,
+        )?;
         Ok(())
     }
 
@@ -477,7 +484,7 @@ impl<'c, 'g> LoggingTurn<'c, 'g> {
         self.turn.player_id()
     }
 
-    pub fn next(&mut self) -> InnResult<()> {
+    fn next(&mut self) -> InnResult<()> {
         let original_player = self.turn.player_id();
         self.turn.next();
         let current_player = self.turn.player_id();
