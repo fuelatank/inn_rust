@@ -62,21 +62,34 @@ impl<'a> MainCardPile<'a> {
 
     pub fn new(
         cards: Vec<&'a Card>,
-        special_achievements: Vec<SpecialAchievement>,
+        achievements: impl IntoIterator<Item = Achievement<'a>>,
     ) -> MainCardPile<'a> {
         let mut pile = MainCardPile::empty();
         for card in cards {
             pile.add(card);
         }
-        // pick one (if exists) card of each age as achievement
-        for age in pile.piles.iter_mut() {
+        for achievement in achievements {
+            pile.achievements.add(achievement)
+        }
+        pile
+    }
+
+    pub fn new_init(
+        cards: Vec<&'a Card>,
+        special_achievements: Vec<SpecialAchievement>,
+    ) -> MainCardPile<'a> {
+        let mut pile = MainCardPile::new(
+            cards,
+            special_achievements.into_iter().map(Achievement::Special),
+        );
+
+        // pick one (if exists) card of each of the first 9 ages as achievement
+        for age in pile.piles.iter_mut().take(9) {
             if let Some(card) = age.remove(&()) {
                 pile.achievements.add(Achievement::Normal(card));
             }
         }
-        for sa in special_achievements.into_iter().map(Achievement::Special) {
-            pile.achievements.add(sa)
-        }
+        
         pile
     }
 
