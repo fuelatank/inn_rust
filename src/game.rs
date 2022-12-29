@@ -732,12 +732,7 @@ impl<'c> OuterGame<'c> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        action::NoRefChoice,
-        containers::VecSet,
-        dogma_fn,
-        enums::{Color::*, Icon::*},
-    };
+    use crate::{action::NoRefChoice, containers::VecSet, default_cards};
 
     #[test]
     fn turn() {
@@ -785,56 +780,13 @@ mod tests {
     #[test]
     fn create_game_player() {
         // will be used as achievement
-        let pottery = Card::new(
-            "Pottery".to_owned(),
-            1,
-            Blue,
-            [Empty, Leaf, Leaf, Leaf],
-            dogma_fn::pottery(),
-            "You may return up to three cards from your hand. If you returned any cards, draw and score a card of value equal to the number of cards you returned.".to_owned()
-        );
-        let archery = Card::new(
-            String::from("Archery"),
-            1,
-            Red,
-            [Castle, Lightblub, Empty, Castle],
-            dogma_fn::archery(),
-            String::from(""),
-        );
-        let code_of_laws = Card::new(
-            String::from("Code of Laws"),
-            1,
-            Purple,
-            [Empty, Crown, Crown, Leaf],
-            dogma_fn::code_of_laws(),
-            String::from("this is the doc of the card 'code of laws'"),
-        );
-        let agriculture = Card::new(
-            "Agriculture".to_owned(),
-            1,
-            Yellow,
-            [Empty, Leaf, Leaf, Leaf],
-            dogma_fn::agriculture(),
-            "You may return a card from your hand. If you do, draw and score a card of value one higher than the card you returned.".to_owned()
-        );
+        let pottery = default_cards::pottery();
+        let archery = default_cards::archery();
+        let code_of_laws = default_cards::code_of_laws();
+        let agriculture = default_cards::agriculture();
         // will be used as achievement
-        let monotheism = Card::new(
-            "Monotheism".to_owned(),
-            2,
-            Purple,
-            [Empty, Castle, Castle, Castle],
-            dogma_fn::monotheism(),
-            "I demand you transfer a top card on your board of a different color from any card on my board to my score pile! If you do, draw and tuck a 1!\nDraw and tuck a 1.".to_owned(),
-        );
-        let philosophy = Card::new(
-            "Philosophy".to_owned(),
-            2,
-            Purple,
-            [Empty, Lightblub, Lightblub, Lightblub],
-            dogma_fn::philosophy(),
-            "You may splay left any one color of your cards.\nYou may score a card from your hand."
-                .to_owned(),
-        );
+        let monotheism = default_cards::monotheism();
+        let philosophy = default_cards::philosophy();
         let cards = vec![
             &pottery,
             &archery,
