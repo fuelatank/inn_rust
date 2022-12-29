@@ -150,9 +150,8 @@ impl<'a> Board<'a> {
     pub fn top_cards(&self) -> Vec<&'a Card> {
         let mut r: Vec<&Card> = Vec::new();
         for stack in self.stacks.iter() {
-            match stack.top_card() {
-                Some(c) => r.push(c),
-                None => {}
+            if let Some(c) = stack.top_card() {
+                r.push(c);
             }
         }
         r

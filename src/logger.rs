@@ -177,6 +177,8 @@ pub trait InternalObserver<'c> {
     fn update(&mut self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()>;
 }
 
+// there's really no way to factor the type
+#[allow(clippy::type_complexity)]
 pub struct FnInternalObserver<'c>(Box<dyn FnMut(&Item<'c>, &Players<'c>) -> InnResult<()> + 'c>);
 
 impl<'c> FnInternalObserver<'c> {

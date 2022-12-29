@@ -78,8 +78,8 @@ impl<'c> Players<'c> {
                 .map(|i| {
                     Player::new(
                         i,
-                        Box::new(C::default()),
-                        Box::new(C::default()),
+                        Box::<C>::default(),
+                        Box::<C>::default(),
                         Default::default(),
                     )
                 })
@@ -284,7 +284,7 @@ impl<'c> Players<'c> {
                         for player in self
                             .players_from(id + 1)
                             .zip(can_be_shared.iter())
-                            .filter_map(|(p, mask)| mask.then(|| p))
+                            .filter_map(|(p, mask)| mask.then_some(p))
                         {
                             let mut gen = flow(player, self);
 
@@ -308,7 +308,7 @@ impl<'c> Players<'c> {
                             .players_from(id)
                             .skip(1)
                             .zip(can_be_shared.iter())
-                            .filter_map(|(p, mask)| (!mask).then(|| p))
+                            .filter_map(|(p, mask)| (!mask).then_some(p))
                         {
                             let mut gen = flow(self.player_at(id), player, self);
                             // s.yield_from(gen); but with or(card)
@@ -675,7 +675,7 @@ impl<'c> OuterGame<'c> {
                         {
                             Ok((
                                 current_player.unwrap(),
-                                Info::End(situation.winners(*fields.players_ref)),
+                                Info::End(situation.winners(fields.players_ref)),
                             ))
                         } else {
                             Err(e)
