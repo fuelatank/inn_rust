@@ -1,7 +1,6 @@
-use crate::containers::{Addable, Removeable};
 use crate::{
     card::{Achievement, Card, SpecialAchievement},
-    containers::VecSet,
+    containers::{Addable, Removeable, VecSet},
     observation::SingleAchievementView,
 };
 use std::collections::VecDeque;
