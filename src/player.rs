@@ -1,8 +1,9 @@
 use crate::{
     board::Board,
-    card::Achievement,
-    containers::{BoxCardSet, VecSet},
+    card::{Achievement, Card},
+    containers::{BoxCardSet, CardSet, VecSet, Addable},
     enums::{Color, Splay},
+    game::PlayerId,
     observation::{MainPlayerView, OtherPlayerView},
 };
 use std::cell::{Ref, RefCell, RefMut};
@@ -103,6 +104,70 @@ impl<'c> Player<'c> {
                 .into_iter()
                 .map(|a| a.view())
                 .collect(),
+        }
+    }
+}
+
+pub struct PlayerBuilder<'c> {
+    main_board: Board<'c>,
+    hand: BoxCardSet<'c>,
+    score_pile: BoxCardSet<'c>,
+    achievements: VecSet<Achievement<'c>>,
+}
+
+impl<'c> PlayerBuilder<'c> {
+    pub fn new<C>() -> PlayerBuilder<'c>
+    where
+        C: CardSet<'c, Card> + Default + 'c,
+    {
+        PlayerBuilder {
+            main_board: Board::new(),
+            hand: Box::<C>::default(),
+            score_pile: Box::<C>::default(),
+            achievements: VecSet::default(),
+        }
+    }
+
+    pub fn hand(mut self, hand: Vec<&'c Card>) -> PlayerBuilder<'c> {
+        for card in hand {
+            self.hand.add(card);
+        }
+        self
+    }
+
+    pub fn score(mut self, score: Vec<&'c Card>) -> PlayerBuilder<'c> {
+        for card in score {
+            self.score_pile.add(card);
+        }
+        self
+    }
+
+    pub fn board(mut self, cards: Vec<&'c Card>) -> PlayerBuilder<'c> {
+        for card in cards {
+            self.main_board.tuck(card);
+        }
+        self
+    }
+
+    pub fn splay(mut self, color: Color, direction: Splay) -> PlayerBuilder<'c> {
+        self.main_board.get_stack_mut(color).splay(direction);
+        self
+    }
+
+    pub fn achievements(mut self, achievements: Vec<Achievement<'c>>) -> PlayerBuilder<'c> {
+        for achievement in achievements {
+            self.achievements.add(achievement);
+        }
+        self
+    }
+
+    pub fn build(self, id: PlayerId) -> Player<'c> {
+        Player {
+            id,
+            main_board: RefCell::new(self.main_board),
+            hand: RefCell::new(self.hand),
+            score_pile: RefCell::new(self.score_pile),
+            achievements: RefCell::new(self.achievements),
         }
     }
 }

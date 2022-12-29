@@ -18,7 +18,7 @@ use crate::{
     flow::{Dogma, FlowState},
     logger::{FnPureObserver, Item, Logger, Operation, SimpleOp, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
-    player::Player,
+    player::{Player, PlayerBuilder},
     state::{Choose, State},
     structure::{
         AddToGame, Board, Hand, MainCardPile as MainCardPile_, Place, RemoveFromGame, Score,
@@ -55,13 +55,34 @@ impl<'c> Players<'c> {
     where
         C: CardSet<'c, Card> + Default + 'c,
     {
-        let pile = Rc::new(RefCell::new(MainCardPile::new(
-            cards.clone(),
-            SpecialAchievement::iter().collect(),
-        )));
+        let pile = MainCardPile::new_init(cards.clone(), SpecialAchievement::iter().collect());
+        Players::from_builders(
+            cards,
+            pile,
+            logger,
+            (0..num_players)
+                .map(|_| PlayerBuilder::new::<C>())
+                .collect(),
+            first_player,
+        )
+    }
+
+    pub fn from_builders(
+        cards: Vec<&'c Card>,
+        main_pile: MainCardPile<'c>,
+        logger: RcCell<Logger<'c>>,
+        players: Vec<PlayerBuilder<'c>>,
+        first_player: PlayerId,
+    ) -> Players<'c> {
+        let pile = Rc::new(RefCell::new(main_pile));
         let mut subject = Subject::new();
         subject.register_internal_owned(AchievementManager::new(
-            SpecialAchievement::iter().collect(),
+            SpecialAchievement::iter()
+                .filter(|&sa| {
+                    pile.borrow()
+                        .has_achievement(&SingleAchievementView::Special(sa))
+                })
+                .collect(),
             first_player,
         ));
         subject.register_internal_owned(WinByAchievementChecker);
@@ -74,15 +95,10 @@ impl<'c> Players<'c> {
             cards,
             logger: subject,
             main_card_pile: Rc::clone(&pile),
-            players: (0..num_players)
-                .map(|i| {
-                    Player::new(
-                        i,
-                        Box::<C>::default(),
-                        Box::<C>::default(),
-                        Default::default(),
-                    )
-                })
+            players: players
+                .into_iter()
+                .enumerate()
+                .map(|(id, pb)| pb.build(id))
                 .collect(),
         }
     }
