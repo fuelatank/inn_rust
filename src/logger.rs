@@ -207,6 +207,7 @@ impl<'c> Observer<'c> for FnPureObserver<'c> {
     }
 }
 
+#[derive(Clone)]
 pub struct Game<'c> {
     pub initial_cards: CardOrder<'c>,
     pub items: Vec<Item<'c>>,
@@ -265,6 +266,10 @@ impl<'c> Logger<'c> {
 
     pub fn history(&self) -> &[Game<'c>] {
         &self.history
+    }
+
+    pub fn current_game(&self) -> Option<&Game<'c>> {
+        self.current_game.as_ref()
     }
 }
 

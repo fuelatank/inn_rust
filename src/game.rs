@@ -16,7 +16,7 @@ use crate::{
     enums::{Color, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     flow::{Dogma, FlowState},
-    logger::{FnPureObserver, Item, Logger, Operation, SimpleOp, Subject},
+    logger::{FnPureObserver, Game, Item, Logger, Operation, SimpleOp, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
     player::{Player, PlayerBuilder},
     state::{Choose, State},
@@ -560,7 +560,13 @@ impl<'c> OuterGame<'c> {
         // TODO: structure not clear
         let turn = Turn::new(players.len(), 0);
         OuterGameBuilder {
-            players: Players::from_builders(cards, main_pile, Rc::clone(&logger), players, turn.first_player()),
+            players: Players::from_builders(
+                cards,
+                main_pile,
+                Rc::clone(&logger),
+                players,
+                turn.first_player(),
+            ),
             players_ref_builder: |players| players,
             turn_builder: |players| LoggingTurn::new(turn, players),
             logger,
@@ -761,6 +767,14 @@ impl<'c> OuterGame<'c> {
             turn: self.borrow_turn().turn(),
             winners,
         }
+    }
+
+    pub fn history(&self) -> Vec<Game<'c>> {
+        self.borrow_logger().borrow().history().to_vec()
+    }
+
+    pub fn current_game(&self) -> Option<Game<'c>> {
+        self.borrow_logger().borrow().current_game().cloned()
     }
 }
 
