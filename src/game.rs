@@ -551,6 +551,25 @@ impl<'c> OuterGame<'c> {
         .build()
     }
 
+    pub fn config(
+        cards: Vec<&'c Card>,
+        main_pile: MainCardPile<'c>,
+        players: Vec<PlayerBuilder<'c>>,
+    ) -> OuterGame<'c> {
+        let logger = Rc::new(RefCell::new(Logger::new()));
+        // TODO: structure not clear
+        let turn = Turn::new(players.len(), 0);
+        OuterGameBuilder {
+            players: Players::from_builders(cards, main_pile, Rc::clone(&logger), players, turn.first_player()),
+            players_ref_builder: |players| players,
+            turn_builder: |players| LoggingTurn::new(turn, players),
+            logger,
+            state: State::Main,
+            next_action_type: ObsType::Main,
+        }
+        .build()
+    }
+
     pub fn start(&mut self) -> InnResult<GameState> {
         self.with_mut(|fields| {
             *fields.state = State::Executing((*fields.players_ref).start_choice());
