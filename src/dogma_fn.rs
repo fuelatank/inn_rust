@@ -43,6 +43,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         player: &'g Player<'c>,
         from: Vec<&'c Card>,
     ) -> Option<&'c Card> {
+        // TODO: cards not enough, etc?
         let cards = self
             .yield_(
                 player,
@@ -287,7 +288,6 @@ pub fn tools() -> Vec<Dogma> {
     ]
 }
 
-// TODO: simplify
 pub fn archery() -> Vec<Dogma> {
     vec![demand(|player, opponent, game, ctx| {
         game.draw(opponent, 1)?;
@@ -297,24 +297,18 @@ pub fn archery() -> Vec<Dogma> {
             .max_by_key(|c| c.age())
             .expect("After drawn a 1, opponent should have at least one card.")
             .age();
-        let cards = ctx
-            .yield_(
+        let card = ctx
+            .choose_one_card(
                 opponent,
-                Choose::Card {
-                    min_num: 1,
-                    max_num: Some(1),
-                    from: opponent
-                        .hand()
-                        .as_iter()
-                        .filter(|c| c.age() == age)
-                        .collect(),
-                },
+                opponent
+                    .hand()
+                    .as_iter()
+                    .filter(|c| c.age() == age)
+                    .collect(),
             )
-            .cards();
-        // TODO should handle failure case
-        game.transfer_card(opponent.with_id(Hand), player.with_id(Hand), cards[0])
-            .expect("todo");
-        done!()
+            .expect("After drawn a 1, opponent should have at least one card.");
+        game.transfer_card(opponent.with_id(Hand), player.with_id(Hand), card)?;
+        Ok(())
     })]
 }
 
