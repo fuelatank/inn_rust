@@ -5,8 +5,9 @@ use serde::{Serialize, Serializer};
 use crate::{
     board::Board,
     card::{Achievement, Card, SpecialAchievement},
-    game::{PlayerId, Turn},
+    game::PlayerId,
     state::ExecutionObs,
+    turn::Turn,
 };
 
 // lifetime?
