@@ -824,8 +824,12 @@ impl<'c> OuterGame<'c> {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
-    use crate::{action::NoRefChoice, containers::VecSet, default_cards};
+    use crate::{
+        action::NoRefChoice, containers::VecSet, default_cards, state::ExecutionObs,
+        utils::vec_eq_unordered,
+    };
 
     #[test]
     fn turn() {
@@ -927,12 +931,80 @@ mod tests {
                 .step(Action::Executing(NoRefChoice::Card(vec![String::from(
                     "Philosophy",
                 )])))
-                .expect("Action should be valid");
+                .expect("Action should be valid")
+                .as_normal()
+                .unwrap();
             // card pile: 1[], 2[];
             // p1.hand[philosophy].board[archery]; act1.cur.p2.hand[code of laws, agriculture]
             println!("{:#?}", obs);
-            assert_eq!(obs.as_normal().unwrap().turn.player_id(), 1);
-            assert!(matches!(obs.as_normal().unwrap().obstype, ObsType::Main));
+            assert_eq!(obs.turn.player_id(), 1);
+            assert!(matches!(obs.obstype, ObsType::Main));
         }
+    }
+
+    #[test]
+    fn executing() {
+        let archery = default_cards::archery();
+        let pottery = default_cards::pottery();
+        let agriculture = default_cards::agriculture();
+        let cards = vec![&archery, &pottery, &agriculture];
+        let mut game = OuterGame::config(
+            cards,
+            MainCardPile::new(vec![&pottery], Vec::new()),
+            vec![
+                PlayerBuilder::new::<VecSet<&Card>>().board(vec![&archery]),
+                PlayerBuilder::new::<VecSet<&Card>>().hand(vec![&agriculture]),
+            ],
+            TurnBuilder::new(),
+        );
+        {
+            // p1 executes 'Archery'.
+            // p1 has 2 Castles, while p2 doesn't have any.
+            // p1 demands p2 to draw a card 'Pottery' and transfer a 1 to p1's hand.
+            let obs = game
+                .step(Action::Step(NoRefStepAction::Execute("Archery".to_owned())))
+                .expect("should be able to execute in this configured game")
+                .as_normal()
+                .expect("game should not end in this configured game");
+            assert_eq!(obs.acting_player, 1);
+            // TODO: maybe use HashSet in observation?
+            assert!(vec_eq_unordered(
+                &obs.main_player.hand,
+                [&agriculture, &pottery]
+            ));
+            assert!(matches!(obs.obstype, ObsType::Executing(ExecutionObs {
+                state: Choose::Card { min_num: 1, max_num: Some(1), from },
+                card,
+            }) if vec_eq_unordered(&from, [&agriculture, &pottery]) && card == &archery));
+        }
+        assert!(game.step(Action::Step(NoRefStepAction::Draw)).is_err());
+        assert!(game.step(Action::Executing(NoRefChoice::Yn(true))).is_err());
+        assert!(game
+            .step(Action::Executing(NoRefChoice::Card(vec![])))
+            .is_err());
+        assert!(game
+            .step(Action::Executing(NoRefChoice::Card(vec![
+                "Archery".to_owned()
+            ])))
+            .is_err());
+        assert!(game
+            .step(Action::Executing(NoRefChoice::Card(vec![
+                "Agriculture".to_owned(),
+                "Pottery".to_owned()
+            ])))
+            .is_err());
+        {
+            let obs = game
+            .step(Action::Executing(NoRefChoice::Card(vec![
+                "Agriculture".to_owned()
+            ])))
+            .unwrap()
+            .as_normal()
+            .unwrap();
+            assert_eq!(obs.acting_player, 1);
+            assert!(vec_eq_unordered(&obs.main_player.hand, [&pottery]));
+            assert!(matches!(obs.obstype, ObsType::Main));
+        }
+        println!("Log messages: {:?}", game.current_game().unwrap().items);
     }
 }
