@@ -1,7 +1,7 @@
 use serde::Serialize;
 use strum_macros::EnumIter;
 
-#[derive(Copy, Clone, EnumIter, Serialize)]
+#[derive(Copy, Clone, Debug, EnumIter, Serialize)]
 pub enum Color {
     Blue,
     Red,

@@ -5,8 +5,12 @@ use crate::{
 };
 use counter::Counter;
 use serde::Serialize;
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 use strum_macros::EnumIter;
+
+fn main_icon(icons: [Icon; 4]) -> Icon {
+    *icons.iter().collect::<Counter<_>>().most_common()[0].0
+}
 
 #[derive(Serialize)]
 pub struct Card {
@@ -20,6 +24,18 @@ pub struct Card {
 }
 
 impl Card {
+    pub fn new_noop(name: String, age: u8, color: Color, icons: [Icon; 4]) -> Card {
+        Card {
+            name,
+            age,
+            color,
+            icons,
+            main_icon: main_icon(icons),
+            dogmas: Vec::new(),
+            doc: String::new(),
+        }
+    }
+
     pub fn new(
         name: String,
         age: u8,
@@ -33,7 +49,7 @@ impl Card {
             age,
             color,
             icons,
-            main_icon: *icons.iter().collect::<Counter<_>>().most_common()[0].0,
+            main_icon: main_icon(icons),
             dogmas,
             doc,
         }
@@ -75,6 +91,14 @@ impl Card {
 impl PartialEq for Card {
     fn eq(&self, other: &Card) -> bool {
         self.name == other.name
+    }
+}
+
+impl Eq for Card {}
+
+impl Hash for Card {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
     }
 }
 

@@ -15,7 +15,7 @@ use crate::{
     structure::Place,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum SimpleOp {
     Draw,
     Meld,
@@ -27,7 +27,7 @@ pub enum SimpleOp {
     DrawAndTuck,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Operation<'c> {
     Splay(PlayerId, Color, Splay),
     Transfer(Place, Place, &'c Card),
@@ -36,7 +36,7 @@ pub enum Operation<'c> {
     Achieve(PlayerId, SingleAchievementView),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Item<'c> {
     Action(Action),
     Operation(Operation<'c>),
@@ -177,6 +177,8 @@ pub trait InternalObserver<'c> {
     fn update(&mut self, event: &Item<'c>, game: &Players<'c>) -> InnResult<()>;
 }
 
+// there's really no way to factor the type
+#[allow(clippy::type_complexity)]
 pub struct FnInternalObserver<'c>(Box<dyn FnMut(&Item<'c>, &Players<'c>) -> InnResult<()> + 'c>);
 
 impl<'c> FnInternalObserver<'c> {
@@ -205,6 +207,7 @@ impl<'c> Observer<'c> for FnPureObserver<'c> {
     }
 }
 
+#[derive(Clone)]
 pub struct Game<'c> {
     pub initial_cards: CardOrder<'c>,
     pub items: Vec<Item<'c>>,
@@ -263,6 +266,10 @@ impl<'c> Logger<'c> {
 
     pub fn history(&self) -> &[Game<'c>] {
         &self.history
+    }
+
+    pub fn current_game(&self) -> Option<&Game<'c>> {
+        self.current_game.as_ref()
     }
 }
 

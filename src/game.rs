@@ -3,7 +3,6 @@ use std::rc::Rc;
 
 use generator::{done, Gn};
 use ouroboros::self_referencing;
-use serde::Serialize;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -16,14 +15,15 @@ use crate::{
     enums::{Color, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     flow::{Dogma, FlowState},
-    logger::{FnPureObserver, Item, Logger, Operation, SimpleOp, Subject},
+    logger::{FnPureObserver, Game, Item, Logger, Operation, SimpleOp, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
-    player::Player,
+    player::{Player, PlayerBuilder},
     state::{Choose, State},
     structure::{
         AddToGame, Board, Hand, MainCardPile as MainCardPile_, Place, RemoveFromGame, Score,
         TestRemoveFromGame,
     },
+    turn::{LoggingTurn, Turn, TurnBuilder},
 };
 
 pub type RcCell<T> = Rc<RefCell<T>>;
@@ -55,13 +55,34 @@ impl<'c> Players<'c> {
     where
         C: CardSet<'c, Card> + Default + 'c,
     {
-        let pile = Rc::new(RefCell::new(MainCardPile::new(
-            cards.clone(),
-            SpecialAchievement::iter().collect(),
-        )));
+        let pile = MainCardPile::new_init(cards.clone(), SpecialAchievement::iter().collect());
+        Players::from_builders(
+            cards,
+            pile,
+            logger,
+            (0..num_players)
+                .map(|_| PlayerBuilder::new::<C>())
+                .collect(),
+            first_player,
+        )
+    }
+
+    pub fn from_builders(
+        cards: Vec<&'c Card>,
+        main_pile: MainCardPile<'c>,
+        logger: RcCell<Logger<'c>>,
+        players: Vec<PlayerBuilder<'c>>,
+        first_player: PlayerId,
+    ) -> Players<'c> {
+        let pile = Rc::new(RefCell::new(main_pile));
         let mut subject = Subject::new();
         subject.register_internal_owned(AchievementManager::new(
-            SpecialAchievement::iter().collect(),
+            SpecialAchievement::iter()
+                .filter(|&sa| {
+                    pile.borrow()
+                        .has_achievement(&SingleAchievementView::Special(sa))
+                })
+                .collect(),
             first_player,
         ));
         subject.register_internal_owned(WinByAchievementChecker);
@@ -74,15 +95,10 @@ impl<'c> Players<'c> {
             cards,
             logger: subject,
             main_card_pile: Rc::clone(&pile),
-            players: (0..num_players)
-                .map(|i| {
-                    Player::new(
-                        i,
-                        Box::new(C::default()),
-                        Box::new(C::default()),
-                        Default::default(),
-                    )
-                })
+            players: players
+                .into_iter()
+                .enumerate()
+                .map(|(id, pb)| pb.build(id))
                 .collect(),
         }
     }
@@ -284,7 +300,7 @@ impl<'c> Players<'c> {
                         for player in self
                             .players_from(id + 1)
                             .zip(can_be_shared.iter())
-                            .filter_map(|(p, mask)| mask.then(|| p))
+                            .filter_map(|(p, mask)| mask.then_some(p))
                         {
                             let mut gen = flow(player, self);
 
@@ -308,7 +324,7 @@ impl<'c> Players<'c> {
                             .players_from(id)
                             .skip(1)
                             .zip(can_be_shared.iter())
-                            .filter_map(|(p, mask)| (!mask).then(|| p))
+                            .filter_map(|(p, mask)| (!mask).then_some(p))
                         {
                             let mut gen = flow(self.player_at(id), player, self);
                             // s.yield_from(gen); but with or(card)
@@ -428,79 +444,6 @@ impl<'c> Players<'c> {
     }
 }
 
-#[derive(Debug, Serialize)]
-pub struct Turn {
-    action: usize,
-    num_players: usize,
-    first_player: usize,
-}
-
-impl Turn {
-    fn new(num_players: usize, first_player: usize) -> Turn {
-        Turn {
-            action: 0,
-            num_players,
-            first_player,
-        }
-    }
-
-    pub fn first_player(&self) -> usize {
-        self.first_player
-    }
-
-    pub fn is_second_action(&self) -> bool {
-        self.action % 2 == 0
-    }
-
-    pub fn player_id(&self) -> usize {
-        let a = (self.action + 1) / 2;
-        (a + self.first_player) % self.num_players
-    }
-
-    fn next(&mut self) {
-        self.action += 1;
-    }
-}
-
-pub struct LoggingTurn<'c, 'g> {
-    turn: Turn,
-    game: &'g Players<'c>,
-}
-
-impl<'c, 'g> LoggingTurn<'c, 'g> {
-    pub fn new(turn: Turn, game: &'g Players<'c>) -> Self {
-        Self { turn, game }
-    }
-
-    pub fn first_player(&self) -> usize {
-        self.turn.first_player()
-    }
-
-    pub fn is_second_action(&self) -> bool {
-        self.turn.is_second_action()
-    }
-
-    pub fn player_id(&self) -> usize {
-        self.turn.player_id()
-    }
-
-    fn next(&mut self) -> InnResult<()> {
-        let original_player = self.turn.player_id();
-        self.turn.next();
-        let current_player = self.turn.player_id();
-        if original_player == current_player {
-            self.game.notify(Item::NextAction(current_player))
-        } else {
-            self.game
-                .notify(Item::ChangeTurn(original_player, current_player))
-        }
-    }
-
-    pub fn turn(&self) -> &Turn {
-        &self.turn
-    }
-}
-
 #[self_referencing]
 pub struct OuterGame<'c> {
     players: Players<'c>,
@@ -523,9 +466,40 @@ impl<'c> OuterGame<'c> {
     {
         let logger = Rc::new(RefCell::new(Logger::new()));
         // TODO: structure not clear
-        let turn = Turn::new(num_players, 0);
+        let turn = Turn::new(num_players);
         OuterGameBuilder {
-            players: Players::new::<C>(num_players, cards, Rc::clone(&logger), turn.first_player()),
+            players: Players::new::<C>(
+                num_players,
+                cards,
+                Rc::clone(&logger),
+                turn.current_player(),
+            ),
+            players_ref_builder: |players| players,
+            turn_builder: |players| LoggingTurn::new(turn, players),
+            logger,
+            state: State::Main,
+            next_action_type: ObsType::Main,
+        }
+        .build()
+    }
+
+    pub fn config(
+        cards: Vec<&'c Card>,
+        main_pile: MainCardPile<'c>,
+        players: Vec<PlayerBuilder<'c>>,
+        turn: TurnBuilder,
+    ) -> OuterGame<'c> {
+        let logger = Rc::new(RefCell::new(Logger::new()));
+        // TODO: structure not clear
+        let turn = turn.build(players.len());
+        OuterGameBuilder {
+            players: Players::from_builders(
+                cards,
+                main_pile,
+                Rc::clone(&logger),
+                players,
+                turn.current_player(),
+            ),
             players_ref_builder: |players| players,
             turn_builder: |players| LoggingTurn::new(turn, players),
             logger,
@@ -615,15 +589,15 @@ impl<'c> OuterGame<'c> {
                                 // because either he's executing something or not.
                                 game.draw(player, player.age())
                                     .map_err(|e| e.or_set_current_player(player.id()))?;
-                                fields.turn.next()?;
+                                fields.turn.next_action()?;
                             }
                             RefStepAction::Meld(card) => {
                                 game.meld(player, card)?;
-                                fields.turn.next()?;
+                                fields.turn.next_action()?;
                             }
                             RefStepAction::Achieve(age) => {
                                 game.try_achieve(player, &SingleAchievementView::Normal(age)).expect("Have checked action, corresponding achievement should be available.");
-                                fields.turn.next()?;
+                                fields.turn.next_action()?;
                             }
                             RefStepAction::Execute(card) => {
                                 *fields.state = State::Executing(game.execute(player, card));
@@ -675,7 +649,7 @@ impl<'c> OuterGame<'c> {
                         {
                             Ok((
                                 current_player.unwrap(),
-                                Info::End(situation.winners(*fields.players_ref)),
+                                Info::End(situation.winners(fields.players_ref)),
                             ))
                         } else {
                             Err(e)
@@ -683,7 +657,7 @@ impl<'c> OuterGame<'c> {
                     }
                     None => {
                         *fields.state = State::Main;
-                        fields.turn.next()?;
+                        fields.turn.next_action()?;
                         ok_normal(fields.turn.player_id(), ObsType::Main)
                     }
                 }
@@ -727,114 +701,35 @@ impl<'c> OuterGame<'c> {
             winners,
         }
     }
+
+    pub fn history(&self) -> Vec<Game<'c>> {
+        self.borrow_logger().borrow().history().to_vec()
+    }
+
+    pub fn current_game(&self) -> Option<Game<'c>> {
+        self.borrow_logger().borrow().current_game().cloned()
+    }
 }
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use crate::{
-        action::NoRefChoice,
-        containers::VecSet,
-        dogma_fn,
-        enums::{Color::*, Icon::*},
+        action::NoRefChoice, containers::VecSet, default_cards, state::ExecutionObs,
+        utils::vec_eq_unordered,
     };
-
-    #[test]
-    fn turn() {
-        let mut t1 = Turn::new(5, 1);
-        assert_eq!(t1.player_id(), 1);
-        assert_eq!(t1.is_second_action(), true);
-        t1.next();
-        assert_eq!(t1.player_id(), 2);
-        assert_eq!(t1.is_second_action(), false);
-        t1.next();
-        assert_eq!(t1.player_id(), 2);
-        assert_eq!(t1.is_second_action(), true);
-        t1.next();
-        assert_eq!(t1.player_id(), 3);
-        assert_eq!(t1.is_second_action(), false);
-        t1.next();
-        assert_eq!(t1.player_id(), 3);
-        assert_eq!(t1.is_second_action(), true);
-        t1.next();
-        assert_eq!(t1.player_id(), 4);
-        assert_eq!(t1.is_second_action(), false);
-        t1.next();
-        assert_eq!(t1.player_id(), 4);
-        assert_eq!(t1.is_second_action(), true);
-        t1.next();
-        assert_eq!(t1.player_id(), 0);
-        assert_eq!(t1.is_second_action(), false);
-        t1.next();
-        assert_eq!(t1.player_id(), 0);
-        assert_eq!(t1.is_second_action(), true);
-        t1.next();
-        assert_eq!(t1.player_id(), 1);
-        assert_eq!(t1.is_second_action(), false);
-        t1.next();
-        assert_eq!(t1.player_id(), 1);
-        assert_eq!(t1.is_second_action(), true);
-        t1.next();
-        t1.next();
-        t1.next();
-        t1.next();
-        assert_eq!(t1.player_id(), 3);
-        assert_eq!(t1.is_second_action(), true);
-    }
 
     #[test]
     fn create_game_player() {
         // will be used as achievement
-        let pottery = Card::new(
-            "Pottery".to_owned(),
-            1,
-            Blue,
-            [Empty, Leaf, Leaf, Leaf],
-            dogma_fn::pottery(),
-            "You may return up to three cards from your hand. If you returned any cards, draw and score a card of value equal to the number of cards you returned.".to_owned()
-        );
-        let archery = Card::new(
-            String::from("Archery"),
-            1,
-            Red,
-            [Castle, Lightblub, Empty, Castle],
-            dogma_fn::archery(),
-            String::from(""),
-        );
-        let code_of_laws = Card::new(
-            String::from("Code of Laws"),
-            1,
-            Purple,
-            [Empty, Crown, Crown, Leaf],
-            dogma_fn::code_of_laws(),
-            String::from("this is the doc of the card 'code of laws'"),
-        );
-        let agriculture = Card::new(
-            "Agriculture".to_owned(),
-            1,
-            Yellow,
-            [Empty, Leaf, Leaf, Leaf],
-            dogma_fn::agriculture(),
-            "You may return a card from your hand. If you do, draw and score a card of value one higher than the card you returned.".to_owned()
-        );
+        let pottery = default_cards::pottery();
+        let archery = default_cards::archery();
+        let code_of_laws = default_cards::code_of_laws();
+        let agriculture = default_cards::agriculture();
         // will be used as achievement
-        let monotheism = Card::new(
-            "Monotheism".to_owned(),
-            2,
-            Purple,
-            [Empty, Castle, Castle, Castle],
-            dogma_fn::monotheism(),
-            "I demand you transfer a top card on your board of a different color from any card on my board to my score pile! If you do, draw and tuck a 1!\nDraw and tuck a 1.".to_owned(),
-        );
-        let philosophy = Card::new(
-            "Philosophy".to_owned(),
-            2,
-            Purple,
-            [Empty, Lightblub, Lightblub, Lightblub],
-            dogma_fn::philosophy(),
-            "You may splay left any one color of your cards.\nYou may score a card from your hand."
-                .to_owned(),
-        );
+        let monotheism = default_cards::monotheism();
+        let philosophy = default_cards::philosophy();
         let cards = vec![
             &pottery,
             &archery,
@@ -882,12 +777,80 @@ mod tests {
                 .step(Action::Executing(NoRefChoice::Card(vec![String::from(
                     "Philosophy",
                 )])))
-                .expect("Action should be valid");
+                .expect("Action should be valid")
+                .as_normal()
+                .unwrap();
             // card pile: 1[], 2[];
             // p1.hand[philosophy].board[archery]; act1.cur.p2.hand[code of laws, agriculture]
             println!("{:#?}", obs);
-            assert_eq!(obs.as_normal().unwrap().turn.player_id(), 1);
-            assert!(matches!(obs.as_normal().unwrap().obstype, ObsType::Main));
+            assert_eq!(obs.turn.player_id(), 1);
+            assert!(matches!(obs.obstype, ObsType::Main));
         }
+    }
+
+    #[test]
+    fn executing() {
+        let archery = default_cards::archery();
+        let pottery = default_cards::pottery();
+        let agriculture = default_cards::agriculture();
+        let cards = vec![&archery, &pottery, &agriculture];
+        let mut game = OuterGame::config(
+            cards,
+            MainCardPile::new(vec![&pottery], Vec::new()),
+            vec![
+                PlayerBuilder::new::<VecSet<&Card>>().board(vec![&archery]),
+                PlayerBuilder::new::<VecSet<&Card>>().hand(vec![&agriculture]),
+            ],
+            TurnBuilder::new(),
+        );
+        {
+            // p1 executes 'Archery'.
+            // p1 has 2 Castles, while p2 doesn't have any.
+            // p1 demands p2 to draw a card 'Pottery' and transfer a 1 to p1's hand.
+            let obs = game
+                .step(Action::Step(NoRefStepAction::Execute("Archery".to_owned())))
+                .expect("should be able to execute in this configured game")
+                .as_normal()
+                .expect("game should not end in this configured game");
+            assert_eq!(obs.acting_player, 1);
+            // TODO: maybe use HashSet in observation?
+            assert!(vec_eq_unordered(
+                &obs.main_player.hand,
+                [&agriculture, &pottery]
+            ));
+            assert!(matches!(obs.obstype, ObsType::Executing(ExecutionObs {
+                state: Choose::Card { min_num: 1, max_num: Some(1), from },
+                card,
+            }) if vec_eq_unordered(&from, [&agriculture, &pottery]) && card == &archery));
+        }
+        assert!(game.step(Action::Step(NoRefStepAction::Draw)).is_err());
+        assert!(game.step(Action::Executing(NoRefChoice::Yn(true))).is_err());
+        assert!(game
+            .step(Action::Executing(NoRefChoice::Card(vec![])))
+            .is_err());
+        assert!(game
+            .step(Action::Executing(NoRefChoice::Card(vec![
+                "Archery".to_owned()
+            ])))
+            .is_err());
+        assert!(game
+            .step(Action::Executing(NoRefChoice::Card(vec![
+                "Agriculture".to_owned(),
+                "Pottery".to_owned()
+            ])))
+            .is_err());
+        {
+            let obs = game
+                .step(Action::Executing(NoRefChoice::Card(vec![
+                    "Agriculture".to_owned()
+                ])))
+                .unwrap()
+                .as_normal()
+                .unwrap();
+            assert_eq!(obs.acting_player, 1);
+            assert!(vec_eq_unordered(&obs.main_player.hand, [&pottery]));
+            assert!(matches!(obs.obstype, ObsType::Main));
+        }
+        println!("Log messages: {:?}", game.current_game().unwrap().items);
     }
 }

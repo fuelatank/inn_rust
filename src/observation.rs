@@ -5,8 +5,9 @@ use serde::{Serialize, Serializer};
 use crate::{
     board::Board,
     card::{Achievement, Card, SpecialAchievement},
-    game::{PlayerId, Turn},
+    game::PlayerId,
     state::ExecutionObs,
+    turn::Turn,
 };
 
 // lifetime?
@@ -89,6 +90,7 @@ pub enum ObsType<'a> {
 
 #[derive(Debug, Serialize)]
 pub struct Observation<'a> {
+    /// The player who is making choice.
     pub acting_player: PlayerId,
     pub main_player: MainPlayerView<'a>,
     pub other_players: Vec<OtherPlayerView<'a>>,
@@ -114,7 +116,7 @@ pub enum GameState<'a> {
 }
 
 impl<'a> GameState<'a> {
-    pub fn as_normal(&self) -> Option<&Observation<'a>> {
+    pub fn as_normal(self) -> Option<Observation<'a>> {
         if let Self::Normal(v) = self {
             Some(v)
         } else {
@@ -122,7 +124,7 @@ impl<'a> GameState<'a> {
         }
     }
 
-    pub fn as_end(&self) -> Option<&EndObservation<'a>> {
+    pub fn as_end(self) -> Option<EndObservation<'a>> {
         if let Self::End(v) = self {
             Some(v)
         } else {
@@ -133,13 +135,35 @@ impl<'a> GameState<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        enums::{Color, Icon},
+        state::Choose,
+    };
+
     use super::*;
     use serde_json::{json, to_value};
 
     #[test]
     fn obstype_serialization() {
         assert_eq!(to_value(&ObsType::Main).unwrap(), json!("main"));
-        // todo: test for Executing, actual Card needed
+        // MAYRESOLVED: TODO: test for Executing, actual Card needed
+        let card = Card::new_noop("PlaceHolder".to_owned(), 4, Color::Red, [Icon::Empty; 4]);
+        let card_value = to_value(&card).unwrap();
+        assert_eq!(
+            to_value(&ObsType::Executing(ExecutionObs {
+                state: Choose::Opponent,
+                card: &card,
+            }))
+            .unwrap(),
+            json!({
+                "executing": {
+                    "state": {
+                        "type": "opponent",
+                    },
+                    "card": card_value,
+                }
+            })
+        );
     }
 
     #[test]
