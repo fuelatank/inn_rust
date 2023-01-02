@@ -1,6 +1,6 @@
 use std::{collections::HashSet, hash::Hash};
 
-pub fn vec_eq_unordered<T, const N: usize>(v1: &Vec<T>, v2: [T; N]) -> bool
+pub fn vec_eq_unordered<T, const N: usize>(v1: &[T], v2: [T; N]) -> bool
 where
     T: Eq + Hash + Copy,
 {

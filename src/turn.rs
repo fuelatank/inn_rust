@@ -32,7 +32,7 @@ impl Turn {
         self.current_player
     }
 
-    pub fn next(&mut self) {
+    pub fn next_action(&mut self) {
         self.action += 1;
         if self.is_second_action {
             self.current_player = (self.current_player + 1) % self.num_players;
@@ -74,6 +74,12 @@ impl TurnBuilder {
     }
 }
 
+impl Default for TurnBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct LoggingTurn<'c, 'g> {
     turn: Turn,
     game: &'g Players<'c>,
@@ -96,9 +102,9 @@ impl<'c, 'g> LoggingTurn<'c, 'g> {
         self.turn.player_id()
     }
 
-    pub fn next(&mut self) -> InnResult<()> {
+    pub fn next_action(&mut self) -> InnResult<()> {
         let original_player = self.turn.player_id();
-        self.turn.next();
+        self.turn.next_action();
         let current_player = self.turn.player_id();
         if original_player == current_player {
             self.game.notify(Item::NextAction(current_player))
@@ -122,40 +128,40 @@ mod tests {
         let mut t1 = TurnBuilder::new().first_player(1).build(5);
         assert_eq!(t1.player_id(), 1);
         assert_eq!(t1.is_second_action(), true);
-        t1.next();
+        t1.next_action();
         assert_eq!(t1.player_id(), 2);
         assert_eq!(t1.is_second_action(), false);
-        t1.next();
+        t1.next_action();
         assert_eq!(t1.player_id(), 2);
         assert_eq!(t1.is_second_action(), true);
-        t1.next();
+        t1.next_action();
         assert_eq!(t1.player_id(), 3);
         assert_eq!(t1.is_second_action(), false);
-        t1.next();
+        t1.next_action();
         assert_eq!(t1.player_id(), 3);
         assert_eq!(t1.is_second_action(), true);
-        t1.next();
+        t1.next_action();
         assert_eq!(t1.player_id(), 4);
         assert_eq!(t1.is_second_action(), false);
-        t1.next();
+        t1.next_action();
         assert_eq!(t1.player_id(), 4);
         assert_eq!(t1.is_second_action(), true);
-        t1.next();
+        t1.next_action();
         assert_eq!(t1.player_id(), 0);
         assert_eq!(t1.is_second_action(), false);
-        t1.next();
+        t1.next_action();
         assert_eq!(t1.player_id(), 0);
         assert_eq!(t1.is_second_action(), true);
-        t1.next();
+        t1.next_action();
         assert_eq!(t1.player_id(), 1);
         assert_eq!(t1.is_second_action(), false);
-        t1.next();
+        t1.next_action();
         assert_eq!(t1.player_id(), 1);
         assert_eq!(t1.is_second_action(), true);
-        t1.next();
-        t1.next();
-        t1.next();
-        t1.next();
+        t1.next_action();
+        t1.next_action();
+        t1.next_action();
+        t1.next_action();
         assert_eq!(t1.player_id(), 3);
         assert_eq!(t1.is_second_action(), true);
     }

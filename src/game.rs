@@ -589,15 +589,15 @@ impl<'c> OuterGame<'c> {
                                 // because either he's executing something or not.
                                 game.draw(player, player.age())
                                     .map_err(|e| e.or_set_current_player(player.id()))?;
-                                fields.turn.next()?;
+                                fields.turn.next_action()?;
                             }
                             RefStepAction::Meld(card) => {
                                 game.meld(player, card)?;
-                                fields.turn.next()?;
+                                fields.turn.next_action()?;
                             }
                             RefStepAction::Achieve(age) => {
                                 game.try_achieve(player, &SingleAchievementView::Normal(age)).expect("Have checked action, corresponding achievement should be available.");
-                                fields.turn.next()?;
+                                fields.turn.next_action()?;
                             }
                             RefStepAction::Execute(card) => {
                                 *fields.state = State::Executing(game.execute(player, card));
@@ -657,7 +657,7 @@ impl<'c> OuterGame<'c> {
                     }
                     None => {
                         *fields.state = State::Main;
-                        fields.turn.next()?;
+                        fields.turn.next_action()?;
                         ok_normal(fields.turn.player_id(), ObsType::Main)
                     }
                 }
