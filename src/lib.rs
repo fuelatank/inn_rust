@@ -16,6 +16,7 @@ pub mod player;
 pub mod state;
 pub mod structure;
 pub mod xx;
+pub mod utils;
 
 #[cfg(test)]
 mod tests {
