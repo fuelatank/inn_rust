@@ -134,13 +134,35 @@ impl<'a> GameState<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        enums::{Color, Icon},
+        state::Choose,
+    };
+
     use super::*;
     use serde_json::{json, to_value};
 
     #[test]
     fn obstype_serialization() {
         assert_eq!(to_value(&ObsType::Main).unwrap(), json!("main"));
-        // todo: test for Executing, actual Card needed
+        // MAYRESOLVED: TODO: test for Executing, actual Card needed
+        let card = Card::new_noop("PlaceHolder".to_owned(), 4, Color::Red, [Icon::Empty; 4]);
+        let card_value = to_value(&card).unwrap();
+        assert_eq!(
+            to_value(&ObsType::Executing(ExecutionObs {
+                state: Choose::Opponent,
+                card: &card,
+            }))
+            .unwrap(),
+            json!({
+                "executing": {
+                    "state": {
+                        "type": "opponent",
+                    },
+                    "card": card_value,
+                }
+            })
+        );
     }
 
     #[test]
