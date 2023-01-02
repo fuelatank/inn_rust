@@ -448,33 +448,71 @@ impl<'c> Players<'c> {
 pub struct Turn {
     action: usize,
     num_players: usize,
-    first_player: usize,
+    current_player: usize,
+    is_second_action: bool,
 }
 
 impl Turn {
-    fn new(num_players: usize, first_player: usize) -> Turn {
+    fn new(num_players: usize) -> Turn {
         Turn {
             action: 0,
             num_players,
-            first_player,
+            current_player: 0,
+            is_second_action: true,
         }
     }
 
-    pub fn first_player(&self) -> usize {
-        self.first_player
+    pub fn current_player(&self) -> usize {
+        self.current_player
     }
 
     pub fn is_second_action(&self) -> bool {
-        self.action % 2 == 0
+        self.is_second_action
     }
 
     pub fn player_id(&self) -> usize {
-        let a = (self.action + 1) / 2;
-        (a + self.first_player) % self.num_players
+        self.current_player
     }
 
     fn next(&mut self) {
         self.action += 1;
+        if self.is_second_action {
+            self.current_player = (self.current_player + 1) % self.num_players;
+        }
+        self.is_second_action = !self.is_second_action;
+    }
+}
+
+pub struct TurnBuilder {
+    first_player: usize,
+    is_second_action: bool,
+}
+
+impl TurnBuilder {
+    pub fn new() -> TurnBuilder {
+        TurnBuilder {
+            first_player: 0,
+            is_second_action: true,
+        }
+    }
+
+    pub fn first_player(mut self, player: usize) -> TurnBuilder {
+        self.first_player = player;
+        self
+    }
+
+    pub fn second_action(mut self, is_second_action: bool) -> TurnBuilder {
+        self.is_second_action = is_second_action;
+        self
+    }
+
+    pub fn build(self, num_players: usize) -> Turn {
+        Turn {
+            action: 0,
+            num_players,
+            current_player: self.first_player % num_players,
+            is_second_action: self.is_second_action,
+        }
     }
 }
 
@@ -488,8 +526,8 @@ impl<'c, 'g> LoggingTurn<'c, 'g> {
         Self { turn, game }
     }
 
-    pub fn first_player(&self) -> usize {
-        self.turn.first_player()
+    pub fn current_player(&self) -> usize {
+        self.turn.current_player()
     }
 
     pub fn is_second_action(&self) -> bool {
@@ -539,9 +577,14 @@ impl<'c> OuterGame<'c> {
     {
         let logger = Rc::new(RefCell::new(Logger::new()));
         // TODO: structure not clear
-        let turn = Turn::new(num_players, 0);
+        let turn = Turn::new(num_players);
         OuterGameBuilder {
-            players: Players::new::<C>(num_players, cards, Rc::clone(&logger), turn.first_player()),
+            players: Players::new::<C>(
+                num_players,
+                cards,
+                Rc::clone(&logger),
+                turn.current_player(),
+            ),
             players_ref_builder: |players| players,
             turn_builder: |players| LoggingTurn::new(turn, players),
             logger,
@@ -555,17 +598,18 @@ impl<'c> OuterGame<'c> {
         cards: Vec<&'c Card>,
         main_pile: MainCardPile<'c>,
         players: Vec<PlayerBuilder<'c>>,
+        turn: TurnBuilder,
     ) -> OuterGame<'c> {
         let logger = Rc::new(RefCell::new(Logger::new()));
         // TODO: structure not clear
-        let turn = Turn::new(players.len(), 0);
+        let turn = turn.build(players.len());
         OuterGameBuilder {
             players: Players::from_builders(
                 cards,
                 main_pile,
                 Rc::clone(&logger),
                 players,
-                turn.first_player(),
+                turn.current_player(),
             ),
             players_ref_builder: |players| players,
             turn_builder: |players| LoggingTurn::new(turn, players),
@@ -785,7 +829,7 @@ mod tests {
 
     #[test]
     fn turn() {
-        let mut t1 = Turn::new(5, 1);
+        let mut t1 = TurnBuilder::new().first_player(1).build(5);
         assert_eq!(t1.player_id(), 1);
         assert_eq!(t1.is_second_action(), true);
         t1.next();
