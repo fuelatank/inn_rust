@@ -5,7 +5,7 @@ use crate::{
 };
 use counter::Counter;
 use serde::Serialize;
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 use strum_macros::EnumIter;
 
 fn main_icon(icons: [Icon; 4]) -> Icon {
@@ -91,6 +91,14 @@ impl Card {
 impl PartialEq for Card {
     fn eq(&self, other: &Card) -> bool {
         self.name == other.name
+    }
+}
+
+impl Eq for Card {}
+
+impl Hash for Card {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
     }
 }
 

@@ -15,7 +15,7 @@ use crate::{
     structure::Place,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum SimpleOp {
     Draw,
     Meld,
@@ -27,7 +27,7 @@ pub enum SimpleOp {
     DrawAndTuck,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Operation<'c> {
     Splay(PlayerId, Color, Splay),
     Transfer(Place, Place, &'c Card),
@@ -36,7 +36,7 @@ pub enum Operation<'c> {
     Achieve(PlayerId, SingleAchievementView),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Item<'c> {
     Action(Action),
     Operation(Operation<'c>),

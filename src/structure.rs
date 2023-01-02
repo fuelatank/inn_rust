@@ -173,7 +173,7 @@ impl<'c> AddToGame<'c, ()> for MainCardPile {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum PlayerPlace {
     Hand,
     Score,
@@ -198,7 +198,7 @@ impl From<Board> for PlayerPlace {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Place {
     MainCardPile,
     Player(usize, PlayerPlace),
