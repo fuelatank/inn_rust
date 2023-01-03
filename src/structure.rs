@@ -5,7 +5,7 @@ use crate::{
     enums::Color,
     error::{InnResult, InnovationError, WinningSituation},
     game::Players,
-    player::Player,
+    player::Player, utils::{Pick, FromRef},
 };
 
 trait RemoveFromPlayer<'c, P> {
@@ -69,6 +69,7 @@ where
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct Hand;
 
 impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Hand {
@@ -97,6 +98,7 @@ impl<'c> AddToPlayer<'c, ()> for Hand {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct Score;
 
 impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Score {
@@ -125,14 +127,15 @@ impl<'c> AddToPlayer<'c, ()> for Score {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct Board;
 
-impl<'c, P> RemoveFromPlayer<'c, P> for Board
+impl<'c, 'p, P> RemoveFromPlayer<'c, &'p P> for Board
 where
     Board_<'c>: Removeable<&'c Card, P>,
 {
-    fn remove_from(&self, player: &Player<'c>, param: P) -> InnResult<&'c Card> {
-        <Board_ as Removeable<&'c Card, P>>::remove(&mut *player.board().borrow_mut(), &param)
+    fn remove_from(&self, player: &Player<'c>, param: &'p P) -> InnResult<&'c Card> {
+        <Board_ as Removeable<&'c Card, P>>::remove(&mut *player.board().borrow_mut(), param)
             .ok_or(InnovationError::CardNotFound)
     }
 }
@@ -153,6 +156,7 @@ impl<'c> AddToPlayer<'c, usize> for Board {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct MainCardPile;
 
 impl<'c> RemoveFromGame<'c, u8> for MainCardPile {
@@ -180,20 +184,20 @@ pub enum PlayerPlace {
     Board,
 }
 
-impl From<Hand> for PlayerPlace {
-    fn from(_: Hand) -> Self {
+impl FromRef<Hand> for PlayerPlace {
+    fn from_ref(_: &Hand) -> Self {
         PlayerPlace::Hand
     }
 }
 
-impl From<Score> for PlayerPlace {
-    fn from(_: Score) -> Self {
+impl FromRef<Score> for PlayerPlace {
+    fn from_ref(_: &Score) -> Self {
         PlayerPlace::Score
     }
 }
 
-impl From<Board> for PlayerPlace {
-    fn from(_: Board) -> Self {
+impl FromRef<Board> for PlayerPlace {
+    fn from_ref(_: &Board) -> Self {
         PlayerPlace::Board
     }
 }
@@ -218,17 +222,17 @@ impl Place {
     }
 }
 
-impl<T> From<(usize, T)> for Place
+impl<T> FromRef<(usize, T)> for Place
 where
-    T: Into<PlayerPlace>,
+    T: Pick<PlayerPlace>,
 {
-    fn from(t: (usize, T)) -> Self {
-        Place::Player(t.0, t.1.into())
+    fn from_ref(t: &(usize, T)) -> Self {
+        Place::Player(t.0, t.1.pick())
     }
 }
 
-impl From<MainCardPile> for Place {
-    fn from(_: MainCardPile) -> Self {
+impl FromRef<MainCardPile> for Place {
+    fn from_ref(_: &MainCardPile) -> Self {
         Place::MainCardPile
     }
 }

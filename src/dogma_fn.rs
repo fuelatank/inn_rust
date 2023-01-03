@@ -307,7 +307,7 @@ pub fn archery() -> Vec<Dogma> {
                     .collect(),
             )
             .expect("After drawn a 1, opponent should have at least one card.");
-        game.transfer_card(opponent.with_id(Hand), player.with_id(Hand), card)?;
+        game.transfer_card(&opponent.with_id(Hand), &player.with_id(Hand), card)?;
         Ok(())
     })]
 }
@@ -327,7 +327,7 @@ pub fn oars() -> Vec<Dogma> {
             let card = ctx.choose_one_card(opponent, opponent.hand().has_icon(Icon::Crown));
             if let Some(card) = card {
                 // MAYRESOLVED: TODO: handle the Result
-                game.transfer_card(opponent.with_id(Hand), player.with_id(Score), card)?;
+                game.transfer_card(&opponent.with_id(Hand), &player.with_id(Score), card)?;
                 *transferred.borrow_mut() = true;
             }
             Ok(())
@@ -412,9 +412,9 @@ pub fn monotheism() -> Vec<Dogma> {
             let chosen = ctx.choose_one_card(opponent, available_cards);
             if let Some(card) = chosen {
                 game.transfer(
-                    opponent.with_id(Board),
-                    player.with_id(Score),
-                    (card.color(), true),
+                    &opponent.with_id(Board),
+                    &player.with_id(Score),
+                    &(card.color(), true),
                     (),
                 )
                 .unwrap();
@@ -475,10 +475,31 @@ pub fn optics() -> Vec<Dogma> {
                     .yield_(Ok(ExecutionState::new(player, Choose::Opponent)))
                     .expect("Generator got None")
                     .player();
-                game.transfer_card(player.with_id(Score), opponent.with_id(Score), card)
+                game.transfer_card(&player.with_id(Score), &opponent.with_id(Score), card)
                     .unwrap();
                 done!()
             }
         })
     }))]
+}
+
+pub fn anatomy() -> Vec<Dogma> {
+    vec![demand(|_player, opponent, game, ctx| {
+        if let Some(score_card) = ctx.choose_one_card(opponent, opponent.hand().as_vec()) {
+            game.return_from(opponent, score_card, &opponent.with_id(Score))?;
+            if let Some(board_card) = ctx.choose_one_card(
+                opponent,
+                opponent
+                    .board()
+                    .borrow()
+                    .top_cards()
+                    .into_iter()
+                    .filter(|c| c.age() == score_card.age())
+                    .collect(),
+            ) {
+                game.return_from(opponent, board_card, &opponent.with_id(Board))?;
+            }
+        }
+        Ok(())
+    })]
 }

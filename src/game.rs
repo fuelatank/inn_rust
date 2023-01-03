@@ -24,6 +24,7 @@ use crate::{
         TestRemoveFromGame,
     },
     turn::{LoggingTurn, Turn, TurnBuilder},
+    utils::Pick,
 };
 
 pub type RcCell<T> = Rc<RefCell<T>>;
@@ -34,6 +35,32 @@ pub struct Players<'c> {
     logger: Subject<'c>,
     main_card_pile: RcCell<MainCardPile<'c>>,
     players: Vec<Player<'c>>,
+}
+
+macro_rules! impl_simple_op {
+    (
+        $card_lt:lifetime, $op_name:ident, $op_from_name:ident,
+        to: |$player:ident| $to:expr,
+        param: $param:expr,
+        record: $simple_op:expr$(,)?
+    ) => {
+        pub fn $op_name(&self, player: &Player<$card_lt>, card: &$card_lt Card) -> InnResult<()> {
+            self.$op_from_name(player, card, &player.with_id(Hand))
+        }
+
+        pub fn $op_from_name<Fr>(&self, $player: &Player<$card_lt>, card: &$card_lt Card, from: &Fr) -> InnResult<()>
+        where
+            Fr: RemoveFromGame<$card_lt, &$card_lt Card> + Pick<Place>,
+        {
+            self.transfer(from, &$to, card, $param)
+                .and_then(|r| {
+                    self.logger.operate(
+                        Operation::SimpleOp($simple_op, $player.id(), r, from.pick()),
+                        self,
+                    )
+                })
+        }
+    };
 }
 
 impl<'c> Players<'c> {
@@ -153,20 +180,27 @@ impl<'c> Players<'c> {
 
     pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.hand, &age)
-        self.transfer(MainCardPile_, player.with_id(Hand), age, ())
+        self.transfer(&MainCardPile_, &player.with_id(Hand), age, ())
             .and_then(|r| {
-                self.logger
-                    .operate(Operation::SimpleOp(SimpleOp::Draw, player.id(), r), self)?;
+                self.logger.operate(
+                    Operation::SimpleOp(SimpleOp::Draw, player.id(), r, MainCardPile_.pick()),
+                    self,
+                )?;
                 Ok(r)
             })
     }
 
     pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.main_board, &age)
-        self.transfer(MainCardPile_, player.with_id(Board), age, true)
+        self.transfer(&MainCardPile_, &player.with_id(Board), age, true)
             .and_then(|r| {
                 self.logger.operate(
-                    Operation::SimpleOp(SimpleOp::DrawAndMeld, player.id(), r),
+                    Operation::SimpleOp(
+                        SimpleOp::DrawAndMeld,
+                        player.id(),
+                        r,
+                        MainCardPile_.pick(),
+                    ),
                     self,
                 )?;
                 Ok(r)
@@ -175,10 +209,15 @@ impl<'c> Players<'c> {
 
     pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.score_pile, &age)
-        self.transfer(MainCardPile_, player.with_id(Score), age, ())
+        self.transfer(&MainCardPile_, &player.with_id(Score), age, ())
             .and_then(|r| {
                 self.logger.operate(
-                    Operation::SimpleOp(SimpleOp::DrawAndScore, player.id(), r),
+                    Operation::SimpleOp(
+                        SimpleOp::DrawAndScore,
+                        player.id(),
+                        r,
+                        MainCardPile_.pick(),
+                    ),
                     self,
                 )?;
                 Ok(r)
@@ -186,44 +225,47 @@ impl<'c> Players<'c> {
     }
 
     pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
-        self.transfer(MainCardPile_, player.with_id(Board), age, false)
+        self.transfer(&MainCardPile_, &player.with_id(Board), age, false)
             .and_then(|r| {
                 self.logger.operate(
-                    Operation::SimpleOp(SimpleOp::DrawAndTuck, player.id(), r),
+                    Operation::SimpleOp(
+                        SimpleOp::DrawAndTuck,
+                        player.id(),
+                        r,
+                        MainCardPile_.pick(),
+                    ),
                     self,
                 )?;
                 Ok(r)
             })
     }
 
-    pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
-        // transfer(&self.hand, &self.main_board, card)
-        self.transfer(player.with_id(Hand), player.with_id(Board), card, true)
-            .and_then(|r| {
-                self.logger
-                    .operate(Operation::SimpleOp(SimpleOp::Meld, player.id(), r), self)?;
-                Ok(r)
-            })
+    impl_simple_op! {
+        'c, meld, meld_from,
+        to: |player| player.with_id(Board),
+        param: true,
+        record: SimpleOp::Meld,
     }
 
-    pub fn score<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
-        // transfer(&self.hand, &self.score_pile, card)
-        self.transfer(player.with_id(Hand), player.with_id(Score), card, ())
-            .and_then(|r| {
-                self.logger
-                    .operate(Operation::SimpleOp(SimpleOp::Score, player.id(), r), self)?;
-                Ok(r)
-            })
+    impl_simple_op! {
+        'c, score, score_from,
+        to: |player| player.with_id(Score),
+        param: (),
+        record: SimpleOp::Score,
     }
 
-    pub fn tuck<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
-        // transfer(&self.hand, &self.main_board, card)
-        self.transfer(player.with_id(Hand), player.with_id(Board), card, false)
-            .and_then(|r| {
-                self.logger
-                    .operate(Operation::SimpleOp(SimpleOp::Tuck, player.id(), r), self)?;
-                Ok(r)
-            })
+    impl_simple_op! {
+        'c, tuck, tuck_from,
+        to: |player| player.with_id(Board),
+        param: false,
+        record: SimpleOp::Tuck,
+    }
+
+    impl_simple_op! {
+        'c, r#return, return_from,
+        to: |player| MainCardPile_,
+        param: (),
+        record: SimpleOp::Return,
     }
 
     pub fn splay<'g>(
@@ -250,16 +292,6 @@ impl<'c> Players<'c> {
         direction: Splay,
     ) -> bool {
         player.board().borrow().is_splayed(color, direction)
-    }
-
-    pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
-        // transfer(&self.hand, Rc::clone(&self.main_pile), card)
-        self.transfer(player.with_id(Hand), MainCardPile_, card, ())
-            .and_then(|r| {
-                self.logger
-                    .operate(Operation::SimpleOp(SimpleOp::Return, player.id(), r), self)?;
-                Ok(r)
-            })
     }
 
     pub fn has_achievement(&self, view: &SingleAchievementView) -> bool {
@@ -356,14 +388,14 @@ impl<'c> Players<'c> {
 
     pub fn transfer<Fr, To, RP, AP>(
         &self,
-        from: Fr,
-        to: To,
+        from: &Fr,
+        to: &To,
         remove_param: RP,
         add_param: AP,
     ) -> InnResult<&'c Card>
     where
-        Fr: RemoveFromGame<'c, RP> + Into<Place>,
-        To: AddToGame<'c, AP> + Into<Place>,
+        Fr: RemoveFromGame<'c, RP> + Pick<Place>,
+        To: AddToGame<'c, AP> + Pick<Place>,
     {
         let card = from.remove_from(self, remove_param);
         card.map(|card| {
@@ -371,16 +403,16 @@ impl<'c> Players<'c> {
             // MAYRESOLVED: TODO: this does not allow observers to perform operations (log)
             // log event, after actual operation, to ensure that observers act after operation
             self.logger
-                .operate(Operation::Transfer(from.into(), to.into(), card), self)?;
+                .operate(Operation::Transfer(from.pick(), to.pick(), card), self)?;
             Ok(card)
         })
         .and_then(|r| r)
     }
 
-    pub fn transfer_card<Fr, To>(&self, from: Fr, to: To, card: &'c Card) -> InnResult<()>
+    pub fn transfer_card<Fr, To>(&self, from: &Fr, to: &To, card: &'c Card) -> InnResult<()>
     where
-        Fr: RemoveFromGame<'c, &'c Card> + Into<Place>,
-        To: AddToGame<'c, ()> + Into<Place>,
+        Fr: RemoveFromGame<'c, &'c Card> + Pick<Place>,
+        To: AddToGame<'c, ()> + Pick<Place>,
     {
         self.transfer(from, to, card, ()).map(|_| ())
     }

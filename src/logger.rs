@@ -32,7 +32,7 @@ pub enum Operation<'c> {
     Splay(PlayerId, Color, Splay),
     Transfer(Place, Place, &'c Card),
     Exchange(Place, Place, Vec<&'c Card>, Vec<&'c Card>),
-    SimpleOp(SimpleOp, PlayerId, &'c Card),
+    SimpleOp(SimpleOp, PlayerId, &'c Card, Place),
     Achieve(PlayerId, SingleAchievementView),
 }
 

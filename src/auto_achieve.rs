@@ -135,7 +135,7 @@ impl Monument {
 impl<'c> Achievement<'c> for Monument {
     fn update_interested(&mut self, event: &Item<'c>) -> Vec<PlayerId> {
         match event {
-            Item::Operation(Operation::SimpleOp(SimpleOp::Score, player, _))
+            Item::Operation(Operation::SimpleOp(SimpleOp::Score, player, _, _))
                 if *player == self.current_player =>
             {
                 self.scored += 1;
@@ -143,7 +143,7 @@ impl<'c> Achievement<'c> for Monument {
                     return vec![*player];
                 }
             }
-            Item::Operation(Operation::SimpleOp(SimpleOp::Tuck, player, _))
+            Item::Operation(Operation::SimpleOp(SimpleOp::Tuck, player, _, _))
                 if *player == self.current_player =>
             {
                 self.tucked += 1;
