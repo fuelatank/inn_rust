@@ -503,3 +503,28 @@ pub fn anatomy() -> Vec<Dogma> {
         Ok(())
     })]
 }
+
+pub fn enterprise() -> Vec<Dogma> {
+    vec![
+        demand(|player, opponent, game, ctx| {
+            if let Some(card) = ctx.choose_one_card(
+                opponent,
+                opponent
+                    .board()
+                    .borrow()
+                    .top_cards()
+                    .into_iter()
+                    .filter(|c| c.color() != Color::Purple && c.contains(Icon::Crown))
+                    .collect(),
+            ) {
+                game.transfer(&opponent.with_id(Board), &player.with_id(Board), card, true)?;
+                game.draw_and_meld(opponent, 4)?;
+            }
+            Ok(())
+        }),
+        shared(|player, game, ctx| {
+            ctx.may_splay(player, game, Color::Green, Splay::Right)?;
+            Ok(())
+        }),
+    ]
+}
