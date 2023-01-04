@@ -1,19 +1,28 @@
+use std::cmp::min;
+
 use serde::Serialize;
 
-use crate::card::Card;
 use crate::flow::FlowState;
 use crate::player::Player;
+use crate::{action::RefChoice, card::Card, game::Players};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum Choose<'a> {
+pub enum Choose<'c> {
+    // maybe usize?
     Card {
         min_num: u8,
         max_num: Option<u8>,
-        from: Vec<&'a Card>,
+        from: Vec<&'c Card>,
     },
     Opponent,
     Yn,
+}
+
+pub enum ActionCheckResult<'c, 'g> {
+    Zero(RefChoice<'c, 'g>), // suggestion
+    One(RefChoice<'c, 'g>),
+    Many,
 }
 
 pub struct ExecutionState<'c, 'g> {
@@ -46,6 +55,56 @@ impl<'c, 'g> ExecutionState<'c, 'g> {
                 card: self.card.unwrap(),
             },
         )
+    }
+
+    pub fn check_valid_actions(&self, game: &'g Players<'c>) -> ActionCheckResult<'c, 'g> {
+        match self.state {
+            Choose::Card {
+                min_num,
+                max_num,
+                ref from,
+            } => {
+                let len = from.len();
+                let real_max_num = if let Some(max_num) = max_num {
+                    min(len, max_num.into())
+                } else {
+                    len
+                };
+                let min_num: usize = min_num.into();
+
+                // min_num <= n <= real_max_num
+                // iff
+                // there's a valid choice with length n
+
+                if real_max_num < min_num {
+                    // no valid action
+                    // currently return empty vec, but this may change to None
+                    // with the change of return type, because empty vec doesn't
+                    // fit the restriction of min_num and max_num
+                    return ActionCheckResult::Zero(RefChoice::Card(Vec::new()));
+                }
+
+                if real_max_num == min_num {
+                    // there're (len choose min_num) possibilities
+                    // which equals 1 iff min_num == 0 or min_num == len
+                    if min_num == 0 {
+                        return ActionCheckResult::One(RefChoice::Card(Vec::new()));
+                    }
+                    if min_num == len {
+                        return ActionCheckResult::One(RefChoice::Card(from.clone()));
+                    }
+                }
+            }
+            Choose::Opponent => {
+                if game.num_players() == 2 {
+                    return ActionCheckResult::One(RefChoice::Opponent(
+                        game.players_from(self.actor.id() + 1).next().unwrap(),
+                    ));
+                }
+            }
+            Choose::Yn => {}
+        }
+        ActionCheckResult::Many
     }
 }
 

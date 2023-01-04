@@ -18,7 +18,7 @@ use crate::{
     logger::{FnPureObserver, Game, Item, Logger, Operation, SimpleOp, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
     player::{Player, PlayerBuilder},
-    state::{Choose, State},
+    state::{ActionCheckResult, Choose, State},
     structure::{
         AddToGame, Board, Hand, MainCardPile as MainCardPile_, Place, RemoveFromGame, Score,
         TestRemoveFromGame,
@@ -667,7 +667,24 @@ impl<'c> OuterGame<'c> {
             // and get current player and the obsType, which contains
             // some information if it is executing
             if let State::Executing(state) = fields.state {
-                match state.resume() {
+                // resume until can't choose action automatically
+                match loop {
+                    let new_state = state.resume();
+                    if let Some(Ok(st)) = &new_state {
+                        match st.check_valid_actions(fields.players_ref) {
+                            ActionCheckResult::Zero(suggestion) => {
+                                state.set_para(suggestion);
+                                continue;
+                            }
+                            ActionCheckResult::One(choice) => {
+                                state.set_para(choice);
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
+                    break new_state;
+                } {
                     Some(Ok(st)) => {
                         let (p, o) = st.to_obs();
                         let id = p.id();
@@ -759,35 +776,26 @@ mod tests {
         let archery = default_cards::archery();
         let code_of_laws = default_cards::code_of_laws();
         let agriculture = default_cards::agriculture();
-        // will be used as achievement
-        let monotheism = default_cards::monotheism();
-        let philosophy = default_cards::philosophy();
-        let cards = vec![
-            &pottery,
-            &archery,
-            &code_of_laws,
-            &agriculture,
-            &monotheism,
-            &philosophy,
-        ];
+        let oars = default_cards::oars();
+        let cards = vec![&pottery, &archery, &code_of_laws, &agriculture, &oars];
         let mut game = OuterGame::init::<VecSet<&Card>>(2, cards);
         // do not call start(), in order to reduce cards used
-        // card pile: 1[archery, code of laws, agriculture], 2[philosophy]
+        // card pile: 1[archery, code of laws, agriculture, oars]
         game.step(Action::Step(NoRefStepAction::Draw))
             .expect("Action should be valid");
-        // card pile: 1[code of laws, agriculture], 2[philosophy];
+        // card pile: 1[code of laws, agriculture, oars]
         // p1.hand[archery]; act1.cur.p2
         game.step(Action::Step(NoRefStepAction::Draw))
             .expect("Action should be valid");
-        // card pile: 1[agriculture], 2[philosophy]; p1.hand[archery]; act2.cur.p2.hand[code of laws]
+        // card pile: 1[agriculture, oars]; p1.hand[archery]; act2.cur.p2.hand[code of laws]
         println!("{:#?}", game.step(Action::Step(NoRefStepAction::Draw)));
-        // card pile: 1[], 2[philosophy];
+        // card pile: 1[oars];
         // act1.cur.p1.hand[archery]; p2.hand[code of laws, agriculture]
         println!(
             "{:#?}",
             game.step(Action::Step(NoRefStepAction::Meld(String::from("Archery"))))
         );
-        // card pile: 1[], 2[philosophy];
+        // card pile: 1[oars];
         // act2.cur.p1.board[archery]; p2.hand[code of laws, agriculture]
         {
             let obs = game
@@ -797,23 +805,23 @@ mod tests {
                 .expect("Action should be valid");
             // p2 must draw a 1, then give a card to p1
             // card pile: 1[], 2[];
-            // act2.p1.board[archery.exe]; cur.p2.hand[code of laws, philosophy, agriculture]
+            // act2.p1.board[archery.exe]; cur.p2.hand[code of laws, agriculture, oars]
             assert!(matches!(
                 obs.as_normal().unwrap().obstype,
                 ObsType::Executing(_)
             ))
         }
-        // choose to transfer Philosophy
+        // choose to transfer Oars
         {
             let obs = game
                 .step(Action::Executing(NoRefChoice::Card(vec![String::from(
-                    "Philosophy",
+                    "Oars",
                 )])))
                 .expect("Action should be valid")
                 .as_normal()
                 .unwrap();
             // card pile: 1[], 2[];
-            // p1.hand[philosophy].board[archery]; act1.cur.p2.hand[code of laws, agriculture]
+            // p1.hand[oars].board[archery]; act1.cur.p2.hand[code of laws, agriculture]
             println!("{:#?}", obs);
             assert_eq!(obs.turn.player_id(), 1);
             assert!(matches!(obs.obstype, ObsType::Main));
