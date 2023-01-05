@@ -1,5 +1,5 @@
 use crate::{
-    board::Board,
+    board::{Board, Stack},
     card::{Achievement, Card},
     containers::{Addable, BoxCardSet, CardSet, VecSet},
     enums::{Color, Splay},
@@ -68,8 +68,16 @@ impl<'c> Player<'c> {
         self.achievements.borrow_mut()
     }
 
+    pub fn stack(&self, color: Color) -> Ref<Stack<'c>> {
+        Ref::map(self.main_board.borrow(), |board| board.get_stack(color))
+    }
+
     pub fn is_splayed(&self, color: Color, direction: Splay) -> bool {
         self.main_board.borrow().is_splayed(color, direction)
+    }
+
+    pub fn can_splay(&self, color: Color, direction: Splay) -> bool {
+        self.stack(color).can_splay(direction)
     }
 
     pub fn self_view(&self) -> MainPlayerView {

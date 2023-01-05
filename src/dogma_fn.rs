@@ -146,13 +146,13 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         color: Color,
         direction: Splay,
     ) -> InnResult<bool> {
-        let board = player.board().borrow();
-        if !board.get_stack(color).can_splay(direction) {
-            return Ok(false);
+        if player.can_splay(color, direction) {
+            Ok(self
+                .may(player, |_| game.splay(player, color, direction))?
+                .is_some())
+        } else {
+            Ok(false)
         }
-        Ok(self
-            .may(player, |_| game.splay(player, color, direction))?
-            .is_some())
     }
 
     pub fn may_splays(
@@ -162,11 +162,10 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         colors: Vec<Color>,
         direction: Splay,
     ) -> InnResult<bool> {
-        let board = player.board().borrow();
         let available_top_cards: Vec<_> = colors
             .into_iter()
-            .filter(|&color| board.get_stack(color).can_splay(direction))
-            .map(|color| board.get_stack(color).top_card().unwrap())
+            .filter(|&color| player.can_splay(color, direction))
+            .map(|color| player.stack(color).top_card().unwrap())
             .collect();
         if available_top_cards.is_empty() {
             return Ok(false);
@@ -362,7 +361,7 @@ pub fn code_of_laws() -> Vec<Dogma> {
             player
                 .hand()
                 .as_iter()
-                .filter(|card| !player.board().borrow().get_stack(card.color()).is_empty())
+                .filter(|card| !player.stack(card.color()).is_empty())
                 .collect(),
         );
         let card = match opt_card {
@@ -370,13 +369,8 @@ pub fn code_of_laws() -> Vec<Dogma> {
             None => return Ok(()),
         };
         game.tuck(player, card)?;
-        if player
-            .board()
-            .borrow()
-            .get_stack(card.color())
-            .can_splay(Splay::Left)
-            && ctx.choose_yn(player)
-        {
+        // TODO: use may_splay, and/or implement may_splay use this method?
+        if player.can_splay(card.color(), Splay::Left) && ctx.choose_yn(player) {
             game.splay(player, card.color(), Splay::Left)?;
         }
         Ok(())
