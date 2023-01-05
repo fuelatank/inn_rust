@@ -1,7 +1,7 @@
 use crate::{
     board::Board,
     card::{Achievement, Card},
-    containers::{BoxCardSet, CardSet, VecSet, Addable},
+    containers::{Addable, BoxCardSet, CardSet, VecSet},
     enums::{Color, Splay},
     game::PlayerId,
     observation::{MainPlayerView, OtherPlayerView},

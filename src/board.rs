@@ -46,7 +46,7 @@ impl<'a> Stack<'a> {
     }
 
     /// Splay the stack.
-    /// 
+    ///
     /// Panics when already splayed that direction or the stack has less than two cards.
     pub fn splay(&mut self, direction: Splay) {
         assert!(self.can_splay(direction));

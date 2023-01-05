@@ -15,7 +15,10 @@ pub trait Pick<T> {
     fn pick(&self) -> T;
 }
 
-impl<T, U> Pick<U> for T where U: FromRef<T> {
+impl<T, U> Pick<U> for T
+where
+    U: FromRef<T>,
+{
     fn pick(&self) -> U {
         U::from_ref(self)
     }

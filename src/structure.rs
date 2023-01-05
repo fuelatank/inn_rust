@@ -5,7 +5,8 @@ use crate::{
     enums::Color,
     error::{InnResult, InnovationError, WinningSituation},
     game::Players,
-    player::Player, utils::{Pick, FromRef},
+    player::Player,
+    utils::{FromRef, Pick},
 };
 
 trait RemoveFromPlayer<'c, P> {

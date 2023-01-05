@@ -89,7 +89,7 @@ impl<'a> MainCardPile<'a> {
                 pile.achievements.add(Achievement::Normal(card));
             }
         }
-        
+
         pile
     }
 

@@ -9,7 +9,16 @@ use crate::{
 macro_rules! card_decl {
     ($name:ident, $age:expr, $color:expr, $icons:expr, $doc:expr) => {
         pub fn $name() -> Card {
-            Card::new(stringify!($name).from_case(Case::Snake).to_case(Case::Title), $age, $color, $icons, dogma_fn::$name(), $doc.into())
+            Card::new(
+                stringify!($name)
+                    .from_case(Case::Snake)
+                    .to_case(Case::Title),
+                $age,
+                $color,
+                $icons,
+                dogma_fn::$name(),
+                $doc.into(),
+            )
         }
     };
 }
