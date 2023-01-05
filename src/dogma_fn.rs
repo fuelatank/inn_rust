@@ -127,7 +127,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         direction: Splay,
     ) -> InnResult<bool> {
         let board = player.board().borrow();
-        if board.get_stack(color).len() <= 1 || board.is_splayed(color, direction) {
+        if !board.get_stack(color).can_splay(direction) {
             return Ok(false);
         }
         Ok(self
