@@ -20,7 +20,7 @@ pub enum Choose<'c> {
 }
 
 pub enum ActionCheckResult<'c, 'g> {
-    Zero(GenResume<'c, 'g>), // suggestion
+    Zero,
     One(GenResume<'c, 'g>),
     Many,
 }
@@ -78,10 +78,7 @@ impl<'c, 'g> ExecutionState<'c, 'g> {
 
                 if real_max_num < min_num {
                     // no valid action
-                    // currently return empty vec, but this may change to None
-                    // with the change of return type, because empty vec doesn't
-                    // fit the restriction of min_num and max_num
-                    return ActionCheckResult::Zero(RefChoice::Card(Vec::new()));
+                    return ActionCheckResult::Zero;
                 }
 
                 if real_max_num == min_num {

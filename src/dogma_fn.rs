@@ -21,9 +21,7 @@ pub struct Context<'a, 'c, 'g> {
 }
 
 impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
-    pub fn new(
-        s: Scope<'a, GenResume<'c, 'g>, GenYield<'c, 'g>>,
-    ) -> Context<'a, 'c, 'g> {
+    pub fn new(s: Scope<'a, GenResume<'c, 'g>, GenYield<'c, 'g>>) -> Context<'a, 'c, 'g> {
         Context { s }
     }
 
@@ -42,23 +40,16 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         player: &'g Player<'c>,
         from: Vec<&'c Card>,
     ) -> Option<&'c Card> {
-        // TODO: cards not enough, etc?
-        let cards = self
-            .yield_(
-                player,
-                Choose::Card {
-                    min_num: 1,
-                    max_num: Some(1),
-                    from,
-                },
-            )
-            .cards();
-        debug_assert!(cards.len() <= 1);
-        if !cards.is_empty() {
-            Some(cards[0])
-        } else {
-            None
-        }
+        // MAYFIXED: TODO: cards not enough, etc?
+        self.yield_(
+            player,
+            Choose::Card {
+                min_num: 1,
+                max_num: Some(1),
+                from,
+            },
+        )
+        .card()
     }
 
     pub fn choose_card_at_most(
@@ -68,21 +59,15 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         max_num: Option<u8>,
     ) -> Option<Vec<&'c Card>> {
         // choose at least one if possible
-        let cards = self
-            .yield_(
-                player,
-                Choose::Card {
-                    min_num: 1,
-                    max_num,
-                    from,
-                },
-            )
-            .cards();
-        if !cards.is_empty() {
-            Some(cards)
-        } else {
-            None
-        }
+        self.yield_(
+            player,
+            Choose::Card {
+                min_num: 1,
+                max_num,
+                from,
+            },
+        )
+        .cards()
     }
 
     pub fn choose_any_cards_up_to(
@@ -101,6 +86,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
             },
         )
         .cards()
+        .expect("The actor can choose 0 cards, so there should always be valid action.")
     }
 
     pub fn choose_cards_exact(
@@ -109,25 +95,21 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         from: Vec<&'c Card>,
         num: u8,
     ) -> Option<Vec<&'c Card>> {
-        let cards = self
-            .yield_(
-                player,
-                Choose::Card {
-                    min_num: num,
-                    max_num: Some(num),
-                    from,
-                },
-            )
-            .cards();
-        if cards.is_empty() {
-            None
-        } else {
-            Some(cards)
-        }
+        self.yield_(
+            player,
+            Choose::Card {
+                min_num: num,
+                max_num: Some(num),
+                from,
+            },
+        )
+        .cards()
     }
 
     pub fn choose_yn(&mut self, player: &'g Player<'c>) -> bool {
-        self.yield_(player, Choose::Yn).yn()
+        self.yield_(player, Choose::Yn)
+            .yn()
+            .expect("Actors should always have valid actions when choosing yes or no.")
     }
 
     pub fn may<T, F>(&mut self, player: &'g Player<'c>, f: F) -> InnResult<Option<T>>
@@ -388,6 +370,7 @@ pub fn code_of_laws() -> Vec<Dogma> {
             if s.yield_(Ok(ExecutionState::new(player, Choose::Yn)))
                 .expect("Generator got None")
                 .yn()
+                .expect("Actors should always have valid actions when choosing yes or no.")
             {
                 game.splay(player, card.color(), Splay::Left)?;
             }
@@ -466,14 +449,19 @@ pub fn optics() -> Vec<Dogma> {
                     )))
                     .expect("Generator got None")
                     .card();
+                // TODO: let-else?
                 let card = match opt_card {
                     Some(c) => c,
                     None => done!(),
                 };
+                // TODO: can only choose players that have lower score than you
                 let opponent = s
                     .yield_(Ok(ExecutionState::new(player, Choose::Opponent)))
                     .expect("Generator got None")
-                    .player();
+                    .player()
+                    .expect(
+                        "Actors should always have valid actions when choosing an opponent currently, \
+                        as choose_players_from() has not yet been implemented.");
                 game.transfer_card(&player.with_id(Score), &opponent.with_id(Score), card)
                     .unwrap();
                 done!()

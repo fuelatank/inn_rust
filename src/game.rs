@@ -6,7 +6,7 @@ use ouroboros::self_referencing;
 use strum::IntoEnumIterator;
 
 use crate::{
-    action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefStepAction},
+    action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefChoice, RefStepAction},
     auto_achieve::{AchievementManager, WinByAchievementChecker},
     card::{Achievement, Card, SpecialAchievement},
     card_pile::MainCardPile,
@@ -672,8 +672,8 @@ impl<'c> OuterGame<'c> {
                     let new_state = state.resume();
                     if let Some(Ok(st)) = &new_state {
                         match st.check_valid_actions(fields.players_ref) {
-                            ActionCheckResult::Zero(suggestion) => {
-                                state.set_para(suggestion);
+                            ActionCheckResult::Zero => {
+                                state.set_para(RefChoice::NoValidAction);
                                 continue;
                             }
                             ActionCheckResult::One(choice) => {
