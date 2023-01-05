@@ -52,6 +52,26 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         .card()
     }
 
+    pub fn may_choose_one_card(
+        &mut self,
+        player: &'g Player<'c>,
+        from: Vec<&'c Card>,
+    ) -> Option<&'c Card> {
+        // TODO: use what form? min_num = 0 or yn.then(1 card) or other?
+        let cards = self
+            .yield_(
+                player,
+                Choose::Card {
+                    min_num: 0,
+                    max_num: Some(1),
+                    from,
+                },
+            )
+            .cards()?;
+        debug_assert!(cards.len() <= 1);
+        cards.get(0).copied()
+    }
+
     pub fn choose_card_at_most(
         &mut self,
         player: &'g Player<'c>,
@@ -335,48 +355,32 @@ pub fn agriculture() -> Vec<Dogma> {
     })]
 }
 
-// TODO: simplify
 pub fn code_of_laws() -> Vec<Dogma> {
-    vec![Dogma::Share(Box::new(|player, game| {
-        Gn::new_scoped_local(move |mut s: Scope<GenResume, _>| {
-            let opt_card = s
-                .yield_(Ok(ExecutionState::new(
-                    player,
-                    Choose::Card {
-                        min_num: 0,
-                        max_num: Some(1),
-                        from: player
-                            .hand()
-                            .as_iter()
-                            .filter(|card| {
-                                !player.board().borrow().get_stack(card.color()).is_empty()
-                            })
-                            .collect(),
-                    },
-                )))
-                .expect("Generator got None")
-                .card();
-            let card = match opt_card {
-                Some(c) => c,
-                None => done!(),
-            };
-            game.tuck(player, card).unwrap_or_else(|e| {
-                s.yield_(Err(e));
-                panic!("shortened message")
-            });
-            if game.is_splayed(player, card.color(), Splay::Left) {
-                done!()
-            }
-            if s.yield_(Ok(ExecutionState::new(player, Choose::Yn)))
-                .expect("Generator got None")
-                .yn()
-                .expect("Actors should always have valid actions when choosing yes or no.")
-            {
-                game.splay(player, card.color(), Splay::Left)?;
-            }
-            done!()
-        })
-    }))]
+    vec![shared(|player, game, ctx| {
+        let opt_card = ctx.may_choose_one_card(
+            player,
+            player
+                .hand()
+                .as_iter()
+                .filter(|card| !player.board().borrow().get_stack(card.color()).is_empty())
+                .collect(),
+        );
+        let card = match opt_card {
+            Some(c) => c,
+            None => return Ok(()),
+        };
+        game.tuck(player, card)?;
+        if player
+            .board()
+            .borrow()
+            .get_stack(card.color())
+            .can_splay(Splay::Left)
+            && ctx.choose_yn(player)
+        {
+            game.splay(player, card.color(), Splay::Left)?;
+        }
+        Ok(())
+    })]
 }
 
 pub fn monotheism() -> Vec<Dogma> {
@@ -429,45 +433,26 @@ pub fn philosophy() -> Vec<Dogma> {
     ]
 }
 
-// TODO: simplify
 pub fn optics() -> Vec<Dogma> {
-    vec![Dogma::Share(Box::new(|player, game| {
-        Gn::new_scoped_local(move |mut s: Scope<GenResume, _>| {
-            let card = game.draw_and_meld(player, 3).unwrap();
-            if card.contains(Icon::Crown) {
-                game.draw_and_score(player, 4)?;
-                done!()
-            } else {
-                let opt_card = s
-                    .yield_(Ok(ExecutionState::new(
-                        player,
-                        Choose::Card {
-                            min_num: 1,
-                            max_num: Some(1),
-                            from: player.score_pile.borrow().as_vec(),
-                        },
-                    )))
-                    .expect("Generator got None")
-                    .card();
-                // TODO: let-else?
-                let card = match opt_card {
-                    Some(c) => c,
-                    None => done!(),
-                };
-                // TODO: can only choose players that have lower score than you
-                let opponent = s
-                    .yield_(Ok(ExecutionState::new(player, Choose::Opponent)))
-                    .expect("Generator got None")
-                    .player()
-                    .expect(
-                        "Actors should always have valid actions when choosing an opponent currently, \
-                        as choose_players_from() has not yet been implemented.");
-                game.transfer_card(&player.with_id(Score), &opponent.with_id(Score), card)
-                    .unwrap();
-                done!()
-            }
-        })
-    }))]
+    vec![shared(|player, game, ctx| {
+        let card = game.draw_and_meld(player, 3)?;
+        if card.contains(Icon::Crown) {
+            game.draw_and_score(player, 4)?;
+            Ok(())
+        } else {
+            let card = match ctx.choose_one_card(player, player.score_pile().as_vec()) {
+                Some(card) => card,
+                None => return Ok(()),
+            };
+            // TODO: can only choose players that have lower score than you
+            let opponent = ctx.yield_(player, Choose::Opponent).player().expect(
+                "Actors should always have valid actions when choosing an opponent currently, \
+                    as choose_players_from() has not yet been implemented.",
+            );
+            game.transfer_card(&player.with_id(Score), &opponent.with_id(Score), card)?;
+            Ok(())
+        }
+    })]
 }
 
 pub fn anatomy() -> Vec<Dogma> {
