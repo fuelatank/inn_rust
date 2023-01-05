@@ -378,10 +378,9 @@ pub fn monotheism() -> Vec<Dogma> {
         demand(|player, opponent, game, ctx| {
             let available_cards: Vec<_> = opponent
                 .board()
-                .borrow()
                 .top_cards()
                 .into_iter()
-                .filter(|&card| player.board().borrow().get_stack(card.color()).is_empty())
+                .filter(|&card| player.stack(card.color()).is_empty())
                 .collect();
             // you must transfer a top card in available_cards
             // from your board to my score pile! If you do, draw and tuck a 1!
@@ -453,7 +452,6 @@ pub fn anatomy() -> Vec<Dogma> {
                 opponent,
                 opponent
                     .board()
-                    .borrow()
                     .top_cards()
                     .into_iter()
                     .filter(|c| c.age() == score_card.age())
@@ -473,7 +471,6 @@ pub fn enterprise() -> Vec<Dogma> {
                 opponent,
                 opponent
                     .board()
-                    .borrow()
                     .top_cards()
                     .into_iter()
                     .filter(|c| c.color() != Color::Purple && c.contains(Icon::Crown))

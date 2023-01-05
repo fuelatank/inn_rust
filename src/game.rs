@@ -275,11 +275,7 @@ impl<'c> Players<'c> {
         direction: Splay,
     ) -> InnResult<()> {
         // error when not able to splay?
-        player
-            .board()
-            .borrow_mut()
-            .get_stack_mut(color)
-            .splay(direction);
+        player.board_mut().get_stack_mut(color).splay(direction);
         self.logger
             .operate(Operation::Splay(player.id(), color, direction), self)?;
         Ok(())
@@ -291,7 +287,7 @@ impl<'c> Players<'c> {
         color: Color,
         direction: Splay,
     ) -> bool {
-        player.board().borrow().is_splayed(color, direction)
+        player.board().is_splayed(color, direction)
     }
 
     pub fn has_achievement(&self, view: &SingleAchievementView) -> bool {
@@ -318,11 +314,11 @@ impl<'c> Players<'c> {
         Gn::new_scoped_local(move |mut s| {
             let id = player.id();
             let main_icon = card.main_icon();
-            let main_icon_count = player.board().borrow().icon_count()[&main_icon];
+            let main_icon_count = player.board().icon_count()[&main_icon];
             // check eligible players before actual execution
             let players_from_next = self.players_from(id + 1);
             let can_be_shared: Vec<_> = players_from_next
-                .map(|p| p.board().borrow().icon_count()[&main_icon] >= main_icon_count)
+                .map(|p| p.board().icon_count()[&main_icon] >= main_icon_count)
                 .collect();
             // execution
             for dogma in card.dogmas() {
@@ -566,7 +562,7 @@ impl<'c> OuterGame<'c> {
                                 && players.has_achievement(&SingleAchievementView::Normal(*age))
                         }
                         NoRefStepAction::Execute(c) => {
-                            player.board().borrow().contains(players.find_card(c))
+                            player.board().contains(players.find_card(c))
                         }
                         _ => panic!("just checked, action can't be Draw"),
                     }

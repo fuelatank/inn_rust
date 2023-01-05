@@ -136,7 +136,7 @@ where
     Board_<'c>: Removeable<&'c Card, P>,
 {
     fn remove_from(&self, player: &Player<'c>, param: &'p P) -> InnResult<&'c Card> {
-        <Board_ as Removeable<&'c Card, P>>::remove(&mut *player.board().borrow_mut(), param)
+        <Board_ as Removeable<&'c Card, P>>::remove(&mut *player.board_mut(), param)
             .ok_or(InnovationError::CardNotFound)
     }
 }
@@ -144,16 +144,16 @@ where
 impl<'c> AddToPlayer<'c, bool> for Board {
     fn add_to(&self, card: &'c Card, player: &Player<'c>, is_top: bool) {
         if is_top {
-            player.board().borrow_mut().meld(card)
+            player.board_mut().meld(card)
         } else {
-            player.board().borrow_mut().tuck(card)
+            player.board_mut().tuck(card)
         }
     }
 }
 
 impl<'c> AddToPlayer<'c, usize> for Board {
     fn add_to(&self, card: &'c Card, player: &Player<'c>, index: usize) {
-        player.board().borrow_mut().insert(card, index)
+        player.board_mut().insert(card, index)
     }
 }
 

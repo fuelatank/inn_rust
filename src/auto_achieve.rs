@@ -174,7 +174,7 @@ impl<'c> Achievement<'c> for Empire {
     }
 
     fn further_check(&self, _game: &Players<'c>, player: &Player<'c>) -> bool {
-        let mut icons = player.board().borrow().icon_count().into_map();
+        let mut icons = player.board().icon_count().into_map();
         icons.remove(&Icon::Empty);
         icons.into_iter().all(|(_, count)| count >= 3)
     }
@@ -188,7 +188,7 @@ impl<'c> Achievement<'c> for World {
     }
 
     fn further_check(&self, _game: &Players<'c>, player: &Player<'c>) -> bool {
-        player.board().borrow().icon_count()[&Icon::Clock] >= 12
+        player.board().icon_count()[&Icon::Clock] >= 12
     }
 }
 
@@ -205,7 +205,7 @@ impl<'c> Achievement<'c> for Wonder {
     }
 
     fn further_check(&self, _game: &Players<'c>, player: &Player<'c>) -> bool {
-        let board = player.board().borrow();
+        let board = player.board();
         Color::iter()
             .map(|color| board.get_stack(color))
             .all(|stack| stack.is_splayed(Splay::Right) || stack.is_splayed(Splay::Up))
@@ -220,7 +220,7 @@ impl<'c> Achievement<'c> for Universe {
     }
 
     fn further_check(&self, _game: &Players<'c>, player: &Player<'c>) -> bool {
-        let top_cards = player.board().borrow().top_cards();
+        let top_cards = player.board().top_cards();
         top_cards.len() == 5 && top_cards.into_iter().all(|card| card.age() >= 8)
     }
 }

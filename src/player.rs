@@ -52,8 +52,12 @@ impl<'c> Player<'c> {
         self.score_pile.borrow()
     }
 
-    pub fn board(&self) -> &RefCell<Board<'c>> {
-        &self.main_board
+    pub fn board(&self) -> Ref<Board<'c>> {
+        self.main_board.borrow()
+    }
+
+    pub fn board_mut(&self) -> RefMut<Board<'c>> {
+        self.main_board.borrow_mut()
     }
 
     pub fn total_score(&self) -> usize {
