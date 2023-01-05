@@ -4,11 +4,10 @@ use generator::{done, Gn, Scope};
 use strum::IntoEnumIterator;
 
 use crate::{
-    action::RefChoice,
     card::Card,
     enums::{Color, Icon, Splay},
     error::InnResult,
-    flow::{Dogma, FlowState},
+    flow::{Dogma, FlowState, GenResume, GenYield},
     game::{Players, RcCell},
     player::Player,
     state::{Choose, ExecutionState},
@@ -18,21 +17,21 @@ use crate::{
 // wrapper of Scope
 // which lifetime in Scope???
 pub struct Context<'a, 'c, 'g> {
-    s: Scope<'a, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>>,
+    s: Scope<'a, GenResume<'c, 'g>, GenYield<'c, 'g>>,
 }
 
 impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
     pub fn new(
-        s: Scope<'a, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>>,
+        s: Scope<'a, GenResume<'c, 'g>, GenYield<'c, 'g>>,
     ) -> Context<'a, 'c, 'g> {
         Context { s }
     }
 
-    pub fn into_raw(self) -> Scope<'a, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>> {
+    pub fn into_raw(self) -> Scope<'a, GenResume<'c, 'g>, GenYield<'c, 'g>> {
         self.s
     }
 
-    pub fn yield_(&mut self, player: &'g Player<'c>, choose: Choose<'c>) -> RefChoice<'c, 'g> {
+    pub fn yield_(&mut self, player: &'g Player<'c>, choose: Choose<'c>) -> GenResume<'c, 'g> {
         self.s
             .yield_(Ok(ExecutionState::new(player, choose)))
             .expect("Generator got None")
@@ -357,7 +356,7 @@ pub fn agriculture() -> Vec<Dogma> {
 // TODO: simplify
 pub fn code_of_laws() -> Vec<Dogma> {
     vec![Dogma::Share(Box::new(|player, game| {
-        Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
+        Gn::new_scoped_local(move |mut s: Scope<GenResume, _>| {
             let opt_card = s
                 .yield_(Ok(ExecutionState::new(
                     player,
@@ -450,7 +449,7 @@ pub fn philosophy() -> Vec<Dogma> {
 // TODO: simplify
 pub fn optics() -> Vec<Dogma> {
     vec![Dogma::Share(Box::new(|player, game| {
-        Gn::new_scoped_local(move |mut s: Scope<RefChoice, _>| {
+        Gn::new_scoped_local(move |mut s: Scope<GenResume, _>| {
             let card = game.draw_and_meld(player, 3).unwrap();
             if card.contains(Icon::Crown) {
                 game.draw_and_score(player, 4)?;

@@ -2,7 +2,7 @@ use std::cmp::min;
 
 use serde::Serialize;
 
-use crate::flow::FlowState;
+use crate::flow::{FlowState, GenResume};
 use crate::player::Player;
 use crate::{action::RefChoice, card::Card, game::Players};
 
@@ -20,8 +20,8 @@ pub enum Choose<'c> {
 }
 
 pub enum ActionCheckResult<'c, 'g> {
-    Zero(RefChoice<'c, 'g>), // suggestion
-    One(RefChoice<'c, 'g>),
+    Zero(GenResume<'c, 'g>), // suggestion
+    One(GenResume<'c, 'g>),
     Many,
 }
 

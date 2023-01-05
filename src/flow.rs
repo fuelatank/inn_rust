@@ -4,8 +4,10 @@ use crate::{
 use generator::LocalGenerator;
 use serde::Serialize;
 
+pub type GenYield<'c, 'g> = InnResult<ExecutionState<'c, 'g>>;
+pub type GenResume<'c, 'g> = RefChoice<'c, 'g>;
 pub type FlowState<'c, 'g> =
-    LocalGenerator<'g, RefChoice<'c, 'g>, InnResult<ExecutionState<'c, 'g>>>;
+    LocalGenerator<'g, GenResume<'c, 'g>, GenYield<'c, 'g>>;
 
 pub type ShareFlow = Box<dyn for<'c, 'g> Fn(&'g Player<'c>, &'g Players<'c>) -> FlowState<'c, 'g>>;
 pub type DemandFlow =
