@@ -400,7 +400,7 @@ impl<'c> Players<'c> {
         let card = from.remove_from(self, remove_param);
         card.map(|card| {
             to.add_to(card, self, add_param);
-            // MAYRESOLVED: TODO: this does not allow observers to perform operations (log)
+            // MAYFIXED: TODO: this does not allow observers to perform operations (log)
             // log event, after actual operation, to ensure that observers act after operation
             self.logger
                 .operate(Operation::Transfer(from.pick(), to.pick(), card), self)?;

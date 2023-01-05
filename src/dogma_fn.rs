@@ -307,7 +307,7 @@ pub fn oars() -> Vec<Dogma> {
         demand(move |player, opponent, game, ctx| {
             let card = ctx.choose_one_card(opponent, opponent.hand().has_icon(Icon::Crown));
             if let Some(card) = card {
-                // MAYRESOLVED: TODO: handle the Result
+                // MAYFIXED: TODO: handle the Result
                 game.transfer_card(&opponent.with_id(Hand), &player.with_id(Score), card)?;
                 *transferred.borrow_mut() = true;
             }

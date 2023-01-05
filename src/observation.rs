@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn obstype_serialization() {
         assert_eq!(to_value(&ObsType::Main).unwrap(), json!("main"));
-        // MAYRESOLVED: TODO: test for Executing, actual Card needed
+        // MAYFIXED: TODO: test for Executing, actual Card needed
         let card = Card::new_noop("PlaceHolder".to_owned(), 4, Color::Red, [Icon::Empty; 4]);
         let card_value = to_value(&card).unwrap();
         assert_eq!(

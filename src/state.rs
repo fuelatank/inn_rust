@@ -10,6 +10,7 @@ use crate::{action::RefChoice, card::Card, game::Players};
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Choose<'c> {
     // maybe usize?
+    // maybe RangeBound or Bound?
     Card {
         min_num: u8,
         max_num: Option<u8>,
