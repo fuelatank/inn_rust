@@ -241,7 +241,7 @@ where
 pub fn pottery() -> Vec<Dogma> {
     vec![
         shared(|player, game, ctx| {
-            let cards = ctx.choose_any_cards_up_to(player, player.hand().as_vec(), Some(3));
+            let cards = ctx.choose_any_cards_up_to(player, player.hand().to_vec(), Some(3));
             if !cards.is_empty() {
                 let n = cards.len();
                 for card in cards {
@@ -264,7 +264,7 @@ pub fn tools() -> Vec<Dogma> {
             // need confirmation of rule, any or exact 3 cards?
             let cards = ctx
                 .may(player, |ctx| {
-                    Ok(ctx.choose_cards_exact(player, player.hand().as_vec(), 3))
+                    Ok(ctx.choose_cards_exact(player, player.hand().to_vec(), 3))
                 })?
                 .flatten();
             if cards.is_some() {
@@ -293,18 +293,14 @@ pub fn archery() -> Vec<Dogma> {
         game.draw(opponent, 1)?;
         let age = opponent
             .hand()
-            .as_iter()
+            .iter()
             .max_by_key(|c| c.age())
             .expect("After drawn a 1, opponent should have at least one card.")
             .age();
         let card = ctx
             .choose_one_card(
                 opponent,
-                opponent
-                    .hand()
-                    .as_iter()
-                    .filter(|c| c.age() == age)
-                    .collect(),
+                opponent.hand().iter().filter(|c| c.age() == age).collect(),
             )
             .expect("After drawn a 1, opponent should have at least one card.");
         game.transfer_card(&opponent.with_id(Hand), &player.with_id(Hand), card)?;
@@ -344,7 +340,7 @@ pub fn oars() -> Vec<Dogma> {
 pub fn agriculture() -> Vec<Dogma> {
     vec![shared(|player, game, ctx| {
         let card = ctx.may(player, |ctx| {
-            Ok(ctx.choose_one_card(player, player.hand().as_vec()))
+            Ok(ctx.choose_one_card(player, player.hand().to_vec()))
         })?;
         if let Some(card) = card.flatten() {
             game.r#return(player, card)?;
@@ -360,7 +356,7 @@ pub fn code_of_laws() -> Vec<Dogma> {
             player,
             player
                 .hand()
-                .as_iter()
+                .iter()
                 .filter(|card| !player.stack(card.color()).is_empty())
                 .collect(),
         );
@@ -416,9 +412,9 @@ pub fn philosophy() -> Vec<Dogma> {
             Ok(())
         }),
         shared(|player, game, ctx| {
-            if !player.score_pile().as_vec().is_empty() && ctx.choose_yn(player) {
+            if !player.score_pile().to_vec().is_empty() && ctx.choose_yn(player) {
                 let card = ctx
-                    .choose_one_card(player, player.score_pile().as_vec())
+                    .choose_one_card(player, player.score_pile().to_vec())
                     .unwrap();
                 game.score(player, card)?;
             }
@@ -434,7 +430,7 @@ pub fn optics() -> Vec<Dogma> {
             game.draw_and_score(player, 4)?;
             Ok(())
         } else {
-            let card = match ctx.choose_one_card(player, player.score_pile().as_vec()) {
+            let card = match ctx.choose_one_card(player, player.score_pile().to_vec()) {
                 Some(card) => card,
                 None => return Ok(()),
             };
@@ -451,7 +447,7 @@ pub fn optics() -> Vec<Dogma> {
 
 pub fn anatomy() -> Vec<Dogma> {
     vec![demand(|_player, opponent, game, ctx| {
-        if let Some(score_card) = ctx.choose_one_card(opponent, opponent.hand().as_vec()) {
+        if let Some(score_card) = ctx.choose_one_card(opponent, opponent.hand().to_vec()) {
             game.return_from(opponent, score_card, &opponent.with_id(Score))?;
             if let Some(board_card) = ctx.choose_one_card(
                 opponent,

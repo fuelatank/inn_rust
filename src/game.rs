@@ -464,7 +464,7 @@ impl<'c> Players<'c> {
                 self.draw(player, 1)?;
             }
             for player in self.players_from(0) {
-                let card = ctx.choose_one_card(player, player.hand().as_vec()).expect("Already checked, and all players have two cards, so they can always choose one");
+                let card = ctx.choose_one_card(player, player.hand().to_vec()).expect("Already checked, and all players have two cards, so they can always choose one");
                 self.meld(player, card)?;
             }
             Ok(())
@@ -558,7 +558,7 @@ impl<'c> OuterGame<'c> {
                     let player = &players.players[fields.turn.player_id()];
                     match step {
                         NoRefStepAction::Meld(c) => {
-                            player.hand().as_vec().contains(&players.find_card(c))
+                            player.hand().to_vec().contains(&players.find_card(c))
                         }
                         NoRefStepAction::Achieve(age) => {
                             player.age() >= *age

@@ -85,7 +85,7 @@ impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Hand {
 
 impl<'c, 'a> TestRemoveFromPlayer<'c, &'a Card> for Hand {
     fn test_remove(&self, player: &Player<'c>, param: &'a Card) -> InnResult<()> {
-        if player.hand().as_iter().any(|card| param == card) {
+        if player.hand().iter().any(|card| param == card) {
             Ok(())
         } else {
             Err(InnovationError::CardNotFound)
@@ -114,7 +114,7 @@ impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Score {
 
 impl<'c, 'a> TestRemoveFromPlayer<'c, &'a Card> for Score {
     fn test_remove(&self, player: &Player<'c>, param: &'a Card) -> InnResult<()> {
-        if player.score_pile().as_iter().any(|card| param == card) {
+        if player.score_pile().iter().any(|card| param == card) {
             Ok(())
         } else {
             Err(InnovationError::CardNotFound)
