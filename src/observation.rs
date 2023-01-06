@@ -27,6 +27,18 @@ pub enum SingleAchievementView {
     Normal(u8),
 }
 
+impl From<u8> for SingleAchievementView {
+    fn from(v: u8) -> Self {
+        Self::Normal(v)
+    }
+}
+
+impl From<SpecialAchievement> for SingleAchievementView {
+    fn from(v: SpecialAchievement) -> Self {
+        Self::Special(v)
+    }
+}
+
 impl<'a> PartialEq<Achievement<'a>> for SingleAchievementView {
     fn eq(&self, other: &Achievement) -> bool {
         match (self, other) {

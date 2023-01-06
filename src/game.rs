@@ -169,6 +169,10 @@ impl<'c> Players<'c> {
             .map(move |i| &self.players[(i + main_player_id) % self.players.len()])
     }
 
+    pub fn opponents_of(&self, player_id: PlayerId) -> impl Iterator<Item = &Player<'c>> {
+        self.players_from(player_id).skip(1)
+    }
+
     pub fn ids_from(&self, main_player_id: PlayerId) -> impl Iterator<Item = PlayerId> {
         let len = self.players.len();
         (0..len).map(move |i| (i + main_player_id) % len)
@@ -299,14 +303,26 @@ impl<'c> Players<'c> {
         player: &'g Player<'c>,
         view: &SingleAchievementView,
     ) -> InnResult<()> {
+        if self.achieve_if_available(player, view)? {
+            Ok(())
+        } else {
+            Err(InnovationError::CardNotFound)
+        }
+    }
+
+    pub fn achieve_if_available<'g>(
+        &'g self,
+        player: &'g Player<'c>,
+        view: &SingleAchievementView,
+    ) -> InnResult<bool> {
         match self.main_card_pile.borrow_mut().remove(view) {
             Some(achievement) => {
                 player.achievements_mut().add(achievement);
                 self.logger
                     .operate(Operation::Achieve(player.id(), view.clone()), self)?;
-                Ok(())
+                Ok(true)
             }
-            None => Err(InnovationError::CardNotFound),
+            None => Ok(false),
         }
     }
 

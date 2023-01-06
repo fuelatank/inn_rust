@@ -4,7 +4,7 @@ use generator::{done, Gn, Scope};
 use strum::IntoEnumIterator;
 
 use crate::{
-    card::Card,
+    card::{Card, SpecialAchievement},
     enums::{
         Color::{self, *},
         Icon::*,
@@ -323,6 +323,20 @@ pub fn archery() -> Vec<Dogma> {
     })]
 }
 
+pub fn metalworking() -> Vec<Dogma> {
+    vec![shared(|player, game, _ctx| {
+        loop {
+            // TODO: draw and reveal
+            let card = game.draw(player, 1)?;
+            if card.contains(Castle) {
+                game.score(player, card)?;
+            } else {
+                break Ok(());
+            }
+        }
+    })]
+}
+
 // inner state
 // but need to ensure the execution order, or avoid multiple mutable borrows
 // i.e., ensure the first is dropped before the second is created
@@ -352,6 +366,36 @@ pub fn oars() -> Vec<Dogma> {
     ]
 }
 
+pub fn clothing() -> Vec<Dogma> {
+    vec![
+        shared(|player, game, ctx| {
+            if let Some(card) = ctx.choose_one_card(
+                player,
+                player
+                    .hand()
+                    .filtered_vec(|c| player.stack(c.color()).is_empty()),
+            ) {
+                game.meld(player, card)?;
+            }
+            Ok(())
+        }),
+        shared(|player, game, _ctx| {
+            let num_scores = Color::iter()
+                .filter(|&color| {
+                    !player.stack(color).is_empty()
+                        && game
+                            .opponents_of(player.id())
+                            .all(|op| op.stack(color).is_empty())
+                })
+                .count();
+            for _ in 0..num_scores {
+                game.draw_and_score(player, 1)?;
+            }
+            Ok(())
+        }),
+    ]
+}
+
 pub fn agriculture() -> Vec<Dogma> {
     vec![shared(|player, game, ctx| {
         let card = ctx.may(player, |ctx| {
@@ -365,15 +409,63 @@ pub fn agriculture() -> Vec<Dogma> {
     })]
 }
 
+pub fn domestication() -> Vec<Dogma> {
+    vec![shared(|player, game, ctx| {
+        if let Some(min_age) = player.hand().iter().map(|c| c.age()).min() {
+            let card = ctx
+                .choose_one_card(player, player.hand().filtered_vec(|c| c.age() == min_age))
+                .expect(
+                    "There's a min age in player's hand, so there should be \
+                    a card that can be chosen.",
+                );
+            game.meld(player, card)?;
+        }
+        game.draw(player, 1)?;
+        Ok(())
+    })]
+}
+
+pub fn masonry() -> Vec<Dogma> {
+    vec![shared(|player, game, ctx| {
+        let to_melds = ctx.choose_any_cards_up_to(player, player.hand().has_icon(Castle), None);
+        let len = to_melds.len();
+        for card in to_melds {
+            game.meld(player, card)?;
+        }
+        if len >= 4 {
+            game.achieve_if_available(player, &SpecialAchievement::Monument.into())?;
+        }
+        Ok(())
+    })]
+}
+
+pub fn city_states() -> Vec<Dogma> {
+    vec![demand(|player, opponent, game, ctx| {
+        if opponent.board().icon_count()[&Castle] >= 4 {
+            if let Some(card) = ctx.choose_one_card(
+                opponent,
+                opponent
+                    .board()
+                    .top_cards()
+                    .into_iter()
+                    .filter(|c| c.contains(Castle))
+                    .collect(),
+            ) {
+                game.transfer(&opponent.with_id(Board), &player.with_id(Board), card, true)?;
+                game.draw(opponent, 1)?;
+            }
+        }
+        Ok(())
+    })]
+}
+
 pub fn code_of_laws() -> Vec<Dogma> {
     vec![shared(|player, game, ctx| {
         let opt_card = ctx.may_choose_one_card(
             player,
             player
                 .hand()
-                .iter()
-                .filter(|card| !player.stack(card.color()).is_empty())
-                .collect(),
+                .filtered_vec(|card| !player.stack(card.color()).is_empty()),
         );
         let card = match opt_card {
             Some(c) => c,
@@ -383,6 +475,17 @@ pub fn code_of_laws() -> Vec<Dogma> {
         // TODO: use may_splay, and/or implement may_splay use this method?
         if player.can_splay(card.color(), Left) && ctx.choose_yn(player) {
             game.splay(player, card.color(), Left)?;
+        }
+        Ok(())
+    })]
+}
+
+pub fn mysticism() -> Vec<Dogma> {
+    vec![shared(|player, game, _ctx| {
+        let card = game.draw(player, 1)?;
+        if !player.stack(card.color()).is_empty() {
+            game.meld(player, card)?;
+            game.draw(player, 1)?;
         }
         Ok(())
     })]
