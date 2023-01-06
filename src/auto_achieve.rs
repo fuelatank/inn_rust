@@ -4,7 +4,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     card::SpecialAchievement,
-    enums::{Color, Icon, Splay},
+    card_attrs::{Color, Icon, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     game::{PlayerId, Players},
     logger::{InternalObserver, Item, Operation, SimpleOp},

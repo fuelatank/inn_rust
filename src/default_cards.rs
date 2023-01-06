@@ -2,8 +2,8 @@ use convert_case::{Case, Casing};
 
 use crate::{
     card::Card,
+    card_attrs::{Color::*, Icon::*},
     dogma_fn,
-    enums::{Color::*, Icon::*},
 };
 
 macro_rules! card_decl {

@@ -1,5 +1,5 @@
 use crate::{
-    enums::{Color, Icon},
+    card_attrs::{Color, Icon},
     flow::Dogma,
     observation::SingleAchievementView,
 };

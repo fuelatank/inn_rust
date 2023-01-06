@@ -148,7 +148,7 @@ impl<'a> GameState<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        enums::{Color, Icon},
+        card_attrs::{Color, Icon},
         state::Choose,
     };
 

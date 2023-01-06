@@ -1,8 +1,8 @@
 use crate::{
     board::{Board, Stack},
     card::{Achievement, Card},
+    card_attrs::{Color, Splay},
     containers::{Addable, BoxCardSet, CardSet, VecSet},
-    enums::{Color, Splay},
     game::PlayerId,
     observation::{MainPlayerView, OtherPlayerView},
 };

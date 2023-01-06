@@ -5,7 +5,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     card::{Card, SpecialAchievement},
-    enums::{
+    card_attrs::{
         Color::{self, *},
         Icon::*,
         Splay::{self, *},

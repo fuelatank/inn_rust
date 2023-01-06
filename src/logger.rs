@@ -7,8 +7,8 @@ use std::{
 use crate::{
     action::Action,
     card::Card,
+    card_attrs::{Color, Splay},
     card_pile::CardOrder,
-    enums::{Color, Splay},
     error::InnResult,
     game::{PlayerId, Players},
     observation::SingleAchievementView,

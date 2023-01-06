@@ -1,8 +1,8 @@
 use crate::{
     board::Board as Board_,
     card::Card,
+    card_attrs::Color,
     containers::{Addable, Removeable},
-    enums::Color,
     error::{InnResult, InnovationError, WinningSituation},
     game::Players,
     player::Player,
