@@ -313,10 +313,7 @@ pub fn archery() -> Vec<Dogma> {
             .expect("After drawn a 1, opponent should have at least one card.")
             .age();
         let card = ctx
-            .choose_one_card(
-                opponent,
-                opponent.hand().iter().filter(|c| c.age() == age).collect(),
-            )
+            .choose_one_card(opponent, opponent.hand().filtered_vec(|c| c.age() == age))
             .expect("After drawn a 1, opponent should have at least one card.");
         game.transfer_card(&opponent.with_id(Hand), &player.with_id(Hand), card)?;
         Ok(())
@@ -554,7 +551,7 @@ pub fn optics() -> Vec<Dogma> {
             // TODO: can only choose players that have lower score than you
             let opponent = ctx.yield_(player, Choose::Opponent).player().expect(
                 "Actors should always have valid actions when choosing an opponent currently, \
-                    as choose_players_from() has not yet been implemented.",
+                as choose_players_from() has not yet been implemented.",
             );
             game.transfer_card(&player.with_id(Score), &opponent.with_id(Score), card)?;
             Ok(())
