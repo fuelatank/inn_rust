@@ -1,7 +1,7 @@
 use crate::{
     card::{Achievement, Card, SpecialAchievement},
     containers::{Addable, Removeable, VecSet},
-    observation::SingleAchievementView,
+    observation::SingleAchievementView, card_attrs::Age,
 };
 use std::collections::VecDeque;
 
@@ -93,7 +93,7 @@ impl<'a> MainCardPile<'a> {
         pile
     }
 
-    fn pop_age(&mut self, age: u8) -> Option<&'a Card> {
+    fn pop_age(&mut self, age: Age) -> Option<&'a Card> {
         if age >= 11 {
             return None;
         }
@@ -137,8 +137,8 @@ impl<'a> Addable<&'a Card> for MainCardPile<'a> {
     }
 }
 
-impl<'a> Removeable<&'a Card, u8> for MainCardPile<'a> {
-    fn remove(&mut self, age: &u8) -> Option<&'a Card> {
+impl<'a> Removeable<&'a Card, Age> for MainCardPile<'a> {
+    fn remove(&mut self, age: &Age) -> Option<&'a Card> {
         self.pop_age(*age)
     }
 }

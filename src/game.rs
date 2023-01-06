@@ -9,7 +9,7 @@ use crate::{
     action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefChoice, RefStepAction},
     auto_achieve::{AchievementManager, WinByAchievementChecker},
     card::{Achievement, Card, SpecialAchievement},
-    card_attrs::{Color, Splay},
+    card_attrs::{Color, Splay, Age},
     card_pile::MainCardPile,
     containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
     dogma_fn::mk_execution,
@@ -182,7 +182,7 @@ impl<'c> Players<'c> {
         &self.main_card_pile
     }
 
-    pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
+    pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: Age) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.hand, &age)
         self.transfer(&MainCardPile_, &player.with_id(Hand), age, ())
             .and_then(|r| {
@@ -194,7 +194,7 @@ impl<'c> Players<'c> {
             })
     }
 
-    pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
+    pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: Age) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.main_board, &age)
         self.transfer(&MainCardPile_, &player.with_id(Board), age, true)
             .and_then(|r| {
@@ -211,7 +211,7 @@ impl<'c> Players<'c> {
             })
     }
 
-    pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
+    pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: Age) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.score_pile, &age)
         self.transfer(&MainCardPile_, &player.with_id(Score), age, ())
             .and_then(|r| {
@@ -228,7 +228,7 @@ impl<'c> Players<'c> {
             })
     }
 
-    pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
+    pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: Age) -> InnResult<&'c Card> {
         self.transfer(&MainCardPile_, &player.with_id(Board), age, false)
             .and_then(|r| {
                 self.logger.operate(

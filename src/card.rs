@@ -1,5 +1,5 @@
 use crate::{
-    card_attrs::{Color, Icon},
+    card_attrs::{Color, Icon, Age},
     flow::Dogma,
     observation::SingleAchievementView,
 };
@@ -15,7 +15,7 @@ fn main_icon(icons: [Icon; 4]) -> Icon {
 #[derive(Serialize)]
 pub struct Card {
     name: String,
-    age: u8,
+    age: Age,
     color: Color,
     icons: [Icon; 4],
     main_icon: Icon,
@@ -24,7 +24,7 @@ pub struct Card {
 }
 
 impl Card {
-    pub fn new_noop(name: String, age: u8, color: Color, icons: [Icon; 4]) -> Card {
+    pub fn new_noop(name: String, age: Age, color: Color, icons: [Icon; 4]) -> Card {
         Card {
             name,
             age,
@@ -38,7 +38,7 @@ impl Card {
 
     pub fn new(
         name: String,
-        age: u8,
+        age: Age,
         color: Color,
         icons: [Icon; 4],
         dogmas: Vec<Dogma>,
@@ -55,7 +55,7 @@ impl Card {
         }
     }
 
-    pub fn age(&self) -> u8 {
+    pub fn age(&self) -> Age {
         self.age
     }
 

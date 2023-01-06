@@ -1,7 +1,7 @@
 use counter::Counter;
 use serde::Serialize;
 
-use crate::card_attrs::{Color, Splay};
+use crate::card_attrs::{Color, Splay, Age};
 use crate::containers::{Addable, Removeable};
 use crate::{card::Card, card_attrs::Icon};
 use std::collections::VecDeque;
@@ -165,7 +165,7 @@ impl<'a> Board<'a> {
         top_cards.into_iter().max_by_key(|card| card.age())
     }
 
-    pub fn highest_age(&self) -> u8 {
+    pub fn highest_age(&self) -> Age {
         match self.highest_top_card() {
             Some(card) => card.age(),
             None => 0,

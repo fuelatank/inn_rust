@@ -1,14 +1,14 @@
 use serde::Deserialize;
 
-use crate::card::Card;
 use crate::game::Players;
 use crate::player::Player;
+use crate::{card::Card, card_attrs::Age};
 
 #[derive(Clone)]
 pub enum RefStepAction<'c> {
     Draw,
     Meld(&'c Card),
-    Achieve(u8),
+    Achieve(Age),
     Execute(&'c Card),
 }
 
@@ -17,7 +17,7 @@ pub enum RefStepAction<'c> {
 pub enum NoRefStepAction {
     Draw,
     Meld(String),
-    Achieve(u8),
+    Achieve(Age),
     Execute(String),
 }
 

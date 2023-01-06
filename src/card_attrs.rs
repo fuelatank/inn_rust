@@ -1,6 +1,8 @@
 use serde::Serialize;
 use strum_macros::EnumIter;
 
+pub type Age = u8;
+
 #[derive(Copy, Clone, Debug, EnumIter, PartialEq, Serialize)]
 pub enum Color {
     Blue,

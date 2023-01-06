@@ -1,7 +1,7 @@
 use crate::{
     board::{Board, Stack},
     card::{Achievement, Card},
-    card_attrs::{Color, Splay},
+    card_attrs::{Color, Splay, Age},
     containers::{Addable, BoxCardSet, CardSet, VecSet},
     game::PlayerId,
     observation::{MainPlayerView, OtherPlayerView},
@@ -40,7 +40,7 @@ impl<'c> Player<'c> {
         (self.id(), t)
     }
 
-    pub fn age(&self) -> u8 {
+    pub fn age(&self) -> Age {
         self.main_board.borrow().highest_age()
     }
 

@@ -1,7 +1,7 @@
 use crate::{
     board::Board as Board_,
     card::Card,
-    card_attrs::Color,
+    card_attrs::{Color, Age},
     containers::{Addable, Removeable},
     error::{InnResult, InnovationError, WinningSituation},
     game::Players,
@@ -160,8 +160,8 @@ impl<'c> AddToPlayer<'c, usize> for Board {
 #[derive(Copy, Clone, Debug)]
 pub struct MainCardPile;
 
-impl<'c> RemoveFromGame<'c, u8> for MainCardPile {
-    fn remove_from(&self, game: &Players<'c>, param: u8) -> InnResult<&'c Card> {
+impl<'c> RemoveFromGame<'c, Age> for MainCardPile {
+    fn remove_from(&self, game: &Players<'c>, param: Age) -> InnResult<&'c Card> {
         game.main_card_pile()
             .borrow_mut()
             .remove(&param)
@@ -239,7 +239,7 @@ impl FromRef<MainCardPile> for Place {
 }
 
 pub enum RemoveParam<'c> {
-    Age(u8),
+    Age(Age),
     Card(&'c Card),
     Top(bool),
     ColoredTop(Color, bool),
@@ -255,7 +255,7 @@ pub enum AddParam {
 }
 
 impl<'c> RemoveParam<'c> {
-    pub fn age(self) -> InnResult<u8> {
+    pub fn age(self) -> InnResult<Age> {
         if let RemoveParam::Age(age) = self {
             Ok(age)
         } else {

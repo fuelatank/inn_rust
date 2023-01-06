@@ -5,6 +5,7 @@ use serde::{Serialize, Serializer};
 use crate::{
     board::Board,
     card::{Achievement, Card, SpecialAchievement},
+    card_attrs::Age,
     game::PlayerId,
     state::ExecutionObs,
     turn::Turn,
@@ -14,7 +15,7 @@ use crate::{
 type BoardView<'a> = Ref<'a, Board<'a>>;
 
 type CardView<'a> = Vec<&'a Card>;
-type AgeView = Vec<u8>;
+type AgeView = Vec<Age>;
 
 fn serialize_board<S: Serializer>(board: &BoardView, serializer: S) -> Result<S::Ok, S::Error> {
     board.serialize(serializer)
@@ -24,11 +25,11 @@ fn serialize_board<S: Serializer>(board: &BoardView, serializer: S) -> Result<S:
 #[serde(tag = "type", content = "view", rename_all = "snake_case")]
 pub enum SingleAchievementView {
     Special(SpecialAchievement),
-    Normal(u8),
+    Normal(Age),
 }
 
-impl From<u8> for SingleAchievementView {
-    fn from(v: u8) -> Self {
+impl From<Age> for SingleAchievementView {
+    fn from(v: Age) -> Self {
         Self::Normal(v)
     }
 }
