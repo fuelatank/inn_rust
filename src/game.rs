@@ -601,16 +601,16 @@ impl<'c> OuterGame<'c> {
             (Action::Executing(choice), ObsType::Executing(obs)) => match (choice, &obs.state) {
                 (
                     NoRefChoice::Card(cards),
-                    Choose::Card {
+                    &Choose::Card {
                         min_num,
                         max_num,
-                        from,
+                        ref from,
                     },
                 ) => {
                     let len = cards.len();
-                    len >= *min_num
+                    len >= min_num
                         && match max_num {
-                            Some(max) => len <= *max,
+                            Some(max) => len <= max,
                             None => true,
                         }
                         && {
