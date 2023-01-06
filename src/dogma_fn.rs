@@ -5,7 +5,11 @@ use strum::IntoEnumIterator;
 
 use crate::{
     card::Card,
-    enums::{Color, Icon, Splay},
+    enums::{
+        Color::{self, *},
+        Icon::*,
+        Splay::{self, *},
+    },
     error::InnResult,
     flow::{Dogma, FlowState, GenResume, GenYield},
     game::{Players, RcCell},
@@ -331,7 +335,7 @@ pub fn oars() -> Vec<Dogma> {
     let view = Rc::clone(&transferred);
     vec![
         demand(move |player, opponent, game, ctx| {
-            let card = ctx.choose_one_card(opponent, opponent.hand().has_icon(Icon::Crown));
+            let card = ctx.choose_one_card(opponent, opponent.hand().has_icon(Crown));
             if let Some(card) = card {
                 // MAYFIXED: TODO: handle the Result
                 game.transfer_card(&opponent.with_id(Hand), &player.with_id(Score), card)?;
@@ -377,8 +381,8 @@ pub fn code_of_laws() -> Vec<Dogma> {
         };
         game.tuck(player, card)?;
         // TODO: use may_splay, and/or implement may_splay use this method?
-        if player.can_splay(card.color(), Splay::Left) && ctx.choose_yn(player) {
-            game.splay(player, card.color(), Splay::Left)?;
+        if player.can_splay(card.color(), Left) && ctx.choose_yn(player) {
+            game.splay(player, card.color(), Left)?;
         }
         Ok(())
     })]
@@ -418,7 +422,7 @@ pub fn monotheism() -> Vec<Dogma> {
 pub fn philosophy() -> Vec<Dogma> {
     vec![
         shared(|player, game, ctx| {
-            ctx.may_splays(player, game, Color::iter().collect(), Splay::Left)?;
+            ctx.may_splays(player, game, Color::iter().collect(), Left)?;
             Ok(())
         }),
         shared(|player, game, ctx| {
@@ -436,7 +440,7 @@ pub fn philosophy() -> Vec<Dogma> {
 pub fn optics() -> Vec<Dogma> {
     vec![shared(|player, game, ctx| {
         let card = game.draw_and_meld(player, 3)?;
-        if card.contains(Icon::Crown) {
+        if card.contains(Crown) {
             game.draw_and_score(player, 4)?;
             Ok(())
         } else {
@@ -484,7 +488,7 @@ pub fn enterprise() -> Vec<Dogma> {
                     .board()
                     .top_cards()
                     .into_iter()
-                    .filter(|c| c.color() != Color::Purple && c.contains(Icon::Crown))
+                    .filter(|c| c.color() != Purple && c.contains(Crown))
                     .collect(),
             ) {
                 game.transfer(&opponent.with_id(Board), &player.with_id(Board), card, true)?;
@@ -493,7 +497,7 @@ pub fn enterprise() -> Vec<Dogma> {
             Ok(())
         }),
         shared(|player, game, ctx| {
-            ctx.may_splay(player, game, Color::Green, Splay::Right)?;
+            ctx.may_splay(player, game, Green, Right)?;
             Ok(())
         }),
     ]
@@ -502,7 +506,7 @@ pub fn enterprise() -> Vec<Dogma> {
 pub fn reformation() -> Vec<Dogma> {
     vec![
         shared(|player, game, ctx| {
-            let num_leaves = player.board().icon_count()[&Icon::Leaf];
+            let num_leaves = player.board().icon_count()[&Leaf];
             if num_leaves >= 2 && ctx.choose_yn(player) {
                 let num_cards = min(num_leaves % 2, player.hand().to_vec().len());
                 let cards = ctx
@@ -519,12 +523,7 @@ pub fn reformation() -> Vec<Dogma> {
             Ok(())
         }),
         shared(|player, game, ctx| {
-            ctx.may_splays(
-                player,
-                game,
-                vec![Color::Yellow, Color::Purple],
-                Splay::Right,
-            )?;
+            ctx.may_splays(player, game, vec![Yellow, Purple], Right)?;
             Ok(())
         }),
     ]
@@ -533,7 +532,7 @@ pub fn reformation() -> Vec<Dogma> {
 pub fn computers() -> Vec<Dogma> {
     vec![
         shared(|player, game, ctx| {
-            ctx.may_splays(player, game, vec![Color::Red, Color::Green], Splay::Up)?;
+            ctx.may_splays(player, game, vec![Red, Green], Up)?;
             Ok(())
         }),
         shared(|player, game, ctx| {
