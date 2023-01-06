@@ -5,6 +5,7 @@ use serde::{Serialize, Serializer};
 use crate::{
     board::Board,
     card::{Achievement, Card, SpecialAchievement},
+    card_attrs::Age,
     game::PlayerId,
     state::ExecutionObs,
     turn::Turn,
@@ -14,7 +15,7 @@ use crate::{
 type BoardView<'a> = Ref<'a, Board<'a>>;
 
 type CardView<'a> = Vec<&'a Card>;
-type AgeView = Vec<u8>;
+type AgeView = Vec<Age>;
 
 fn serialize_board<S: Serializer>(board: &BoardView, serializer: S) -> Result<S::Ok, S::Error> {
     board.serialize(serializer)
@@ -24,7 +25,19 @@ fn serialize_board<S: Serializer>(board: &BoardView, serializer: S) -> Result<S:
 #[serde(tag = "type", content = "view", rename_all = "snake_case")]
 pub enum SingleAchievementView {
     Special(SpecialAchievement),
-    Normal(u8),
+    Normal(Age),
+}
+
+impl From<Age> for SingleAchievementView {
+    fn from(v: Age) -> Self {
+        Self::Normal(v)
+    }
+}
+
+impl From<SpecialAchievement> for SingleAchievementView {
+    fn from(v: SpecialAchievement) -> Self {
+        Self::Special(v)
+    }
 }
 
 impl<'a> PartialEq<Achievement<'a>> for SingleAchievementView {
@@ -136,7 +149,7 @@ impl<'a> GameState<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        enums::{Color, Icon},
+        card_attrs::{Color, Icon},
         state::Choose,
     };
 
@@ -146,7 +159,7 @@ mod tests {
     #[test]
     fn obstype_serialization() {
         assert_eq!(to_value(&ObsType::Main).unwrap(), json!("main"));
-        // MAYRESOLVED: TODO: test for Executing, actual Card needed
+        // MAYFIXED: TODO: test for Executing, actual Card needed
         let card = Card::new_noop("PlaceHolder".to_owned(), 4, Color::Red, [Icon::Empty; 4]);
         let card_value = to_value(&card).unwrap();
         assert_eq!(

@@ -1,5 +1,5 @@
 use crate::card::{Achievement, Card};
-use crate::enums::Icon;
+use crate::card_attrs::Icon;
 use std::cell::RefCell;
 use std::ops::Deref;
 
@@ -23,9 +23,9 @@ pub trait Removeable<T, P> {
 }
 
 pub trait CardSet<'a, T: 'a>: Addable<&'a T> + Removeable<&'a T, T> {
-    fn as_vec(&'_ self) -> Vec<&'a T>;
-    fn as_iter(&self) -> Box<dyn Iterator<Item = &'a T> + 'a> {
-        Box::new(self.as_vec().into_iter())
+    fn to_vec(&self) -> Vec<&'a T>;
+    fn iter(&self) -> Box<dyn Iterator<Item = &'a T> + 'a> {
+        Box::new(self.to_vec().into_iter())
     }
 }
 
@@ -46,7 +46,7 @@ impl<'a, 'b, T> dyn CardSet<'a, T> + 'b {
     where
         P: FnMut(&&'a T) -> bool,
     {
-        self.as_iter().filter(predicate).collect()
+        self.iter().filter(predicate).collect()
     }
 }
 
@@ -106,7 +106,7 @@ impl<'a, T: PartialEq> Removeable<&'a T, T> for VecSet<&'a T> {
 }
 
 impl<'a, T: PartialEq> CardSet<'a, T> for VecSet<&'a T> {
-    fn as_vec(&self) -> Vec<&'a T> {
+    fn to_vec(&self) -> Vec<&'a T> {
         self.clone_inner()
     }
 }

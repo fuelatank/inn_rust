@@ -1,11 +1,12 @@
 use crate::{
     board::Board as Board_,
     card::Card,
+    card_attrs::{Color, Age},
     containers::{Addable, Removeable},
-    enums::Color,
     error::{InnResult, InnovationError, WinningSituation},
     game::Players,
     player::Player,
+    utils::{FromRef, Pick},
 };
 
 trait RemoveFromPlayer<'c, P> {
@@ -69,6 +70,7 @@ where
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct Hand;
 
 impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Hand {
@@ -83,7 +85,7 @@ impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Hand {
 
 impl<'c, 'a> TestRemoveFromPlayer<'c, &'a Card> for Hand {
     fn test_remove(&self, player: &Player<'c>, param: &'a Card) -> InnResult<()> {
-        if player.hand().as_iter().any(|card| param == card) {
+        if player.hand().iter().any(|card| param == card) {
             Ok(())
         } else {
             Err(InnovationError::CardNotFound)
@@ -97,6 +99,7 @@ impl<'c> AddToPlayer<'c, ()> for Hand {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct Score;
 
 impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Score {
@@ -111,7 +114,7 @@ impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Score {
 
 impl<'c, 'a> TestRemoveFromPlayer<'c, &'a Card> for Score {
     fn test_remove(&self, player: &Player<'c>, param: &'a Card) -> InnResult<()> {
-        if player.score_pile().as_iter().any(|card| param == card) {
+        if player.score_pile().iter().any(|card| param == card) {
             Ok(())
         } else {
             Err(InnovationError::CardNotFound)
@@ -125,14 +128,15 @@ impl<'c> AddToPlayer<'c, ()> for Score {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct Board;
 
-impl<'c, P> RemoveFromPlayer<'c, P> for Board
+impl<'c, 'p, P> RemoveFromPlayer<'c, &'p P> for Board
 where
     Board_<'c>: Removeable<&'c Card, P>,
 {
-    fn remove_from(&self, player: &Player<'c>, param: P) -> InnResult<&'c Card> {
-        <Board_ as Removeable<&'c Card, P>>::remove(&mut *player.board().borrow_mut(), &param)
+    fn remove_from(&self, player: &Player<'c>, param: &'p P) -> InnResult<&'c Card> {
+        <Board_ as Removeable<&'c Card, P>>::remove(&mut *player.board_mut(), param)
             .ok_or(InnovationError::CardNotFound)
     }
 }
@@ -140,23 +144,24 @@ where
 impl<'c> AddToPlayer<'c, bool> for Board {
     fn add_to(&self, card: &'c Card, player: &Player<'c>, is_top: bool) {
         if is_top {
-            player.board().borrow_mut().meld(card)
+            player.board_mut().meld(card)
         } else {
-            player.board().borrow_mut().tuck(card)
+            player.board_mut().tuck(card)
         }
     }
 }
 
 impl<'c> AddToPlayer<'c, usize> for Board {
     fn add_to(&self, card: &'c Card, player: &Player<'c>, index: usize) {
-        player.board().borrow_mut().insert(card, index)
+        player.board_mut().insert(card, index)
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct MainCardPile;
 
-impl<'c> RemoveFromGame<'c, u8> for MainCardPile {
-    fn remove_from(&self, game: &Players<'c>, param: u8) -> InnResult<&'c Card> {
+impl<'c> RemoveFromGame<'c, Age> for MainCardPile {
+    fn remove_from(&self, game: &Players<'c>, param: Age) -> InnResult<&'c Card> {
         game.main_card_pile()
             .borrow_mut()
             .remove(&param)
@@ -180,20 +185,20 @@ pub enum PlayerPlace {
     Board,
 }
 
-impl From<Hand> for PlayerPlace {
-    fn from(_: Hand) -> Self {
+impl FromRef<Hand> for PlayerPlace {
+    fn from_ref(_: &Hand) -> Self {
         PlayerPlace::Hand
     }
 }
 
-impl From<Score> for PlayerPlace {
-    fn from(_: Score) -> Self {
+impl FromRef<Score> for PlayerPlace {
+    fn from_ref(_: &Score) -> Self {
         PlayerPlace::Score
     }
 }
 
-impl From<Board> for PlayerPlace {
-    fn from(_: Board) -> Self {
+impl FromRef<Board> for PlayerPlace {
+    fn from_ref(_: &Board) -> Self {
         PlayerPlace::Board
     }
 }
@@ -218,23 +223,23 @@ impl Place {
     }
 }
 
-impl<T> From<(usize, T)> for Place
+impl<T> FromRef<(usize, T)> for Place
 where
-    T: Into<PlayerPlace>,
+    T: Pick<PlayerPlace>,
 {
-    fn from(t: (usize, T)) -> Self {
-        Place::Player(t.0, t.1.into())
+    fn from_ref(t: &(usize, T)) -> Self {
+        Place::Player(t.0, t.1.pick())
     }
 }
 
-impl From<MainCardPile> for Place {
-    fn from(_: MainCardPile) -> Self {
+impl FromRef<MainCardPile> for Place {
+    fn from_ref(_: &MainCardPile) -> Self {
         Place::MainCardPile
     }
 }
 
 pub enum RemoveParam<'c> {
-    Age(u8),
+    Age(Age),
     Card(&'c Card),
     Top(bool),
     ColoredTop(Color, bool),
@@ -250,7 +255,7 @@ pub enum AddParam {
 }
 
 impl<'c> RemoveParam<'c> {
-    pub fn age(self) -> InnResult<u8> {
+    pub fn age(self) -> InnResult<Age> {
         if let RemoveParam::Age(age) = self {
             Ok(age)
         } else {

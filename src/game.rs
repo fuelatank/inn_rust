@@ -6,24 +6,25 @@ use ouroboros::self_referencing;
 use strum::IntoEnumIterator;
 
 use crate::{
-    action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefStepAction},
+    action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefChoice, RefStepAction},
     auto_achieve::{AchievementManager, WinByAchievementChecker},
     card::{Achievement, Card, SpecialAchievement},
+    card_attrs::{Color, Splay, Age},
     card_pile::MainCardPile,
     containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
     dogma_fn::mk_execution,
-    enums::{Color, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     flow::{Dogma, FlowState},
     logger::{FnPureObserver, Game, Item, Logger, Operation, SimpleOp, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
     player::{Player, PlayerBuilder},
-    state::{Choose, State},
+    state::{ActionCheckResult, Choose, State},
     structure::{
         AddToGame, Board, Hand, MainCardPile as MainCardPile_, Place, RemoveFromGame, Score,
         TestRemoveFromGame,
     },
     turn::{LoggingTurn, Turn, TurnBuilder},
+    utils::Pick,
 };
 
 pub type RcCell<T> = Rc<RefCell<T>>;
@@ -34,6 +35,32 @@ pub struct Players<'c> {
     logger: Subject<'c>,
     main_card_pile: RcCell<MainCardPile<'c>>,
     players: Vec<Player<'c>>,
+}
+
+macro_rules! impl_simple_op {
+    (
+        $card_lt:lifetime, $op_name:ident, $op_from_name:ident,
+        to: |$player:ident| $to:expr,
+        param: $param:expr,
+        record: $simple_op:expr$(,)?
+    ) => {
+        pub fn $op_name(&self, player: &Player<$card_lt>, card: &$card_lt Card) -> InnResult<()> {
+            self.$op_from_name(player, card, &player.with_id(Hand))
+        }
+
+        pub fn $op_from_name<Fr>(&self, $player: &Player<$card_lt>, card: &$card_lt Card, from: &Fr) -> InnResult<()>
+        where
+            Fr: RemoveFromGame<$card_lt, &$card_lt Card> + Pick<Place>,
+        {
+            self.transfer(from, &$to, card, $param)
+                .and_then(|r| {
+                    self.logger.operate(
+                        Operation::SimpleOp($simple_op, $player.id(), r, from.pick()),
+                        self,
+                    )
+                })
+        }
+    };
 }
 
 impl<'c> Players<'c> {
@@ -142,6 +169,10 @@ impl<'c> Players<'c> {
             .map(move |i| &self.players[(i + main_player_id) % self.players.len()])
     }
 
+    pub fn opponents_of(&self, player_id: PlayerId) -> impl Iterator<Item = &Player<'c>> {
+        self.players_from(player_id).skip(1)
+    }
+
     pub fn ids_from(&self, main_player_id: PlayerId) -> impl Iterator<Item = PlayerId> {
         let len = self.players.len();
         (0..len).map(move |i| (i + main_player_id) % len)
@@ -151,79 +182,94 @@ impl<'c> Players<'c> {
         &self.main_card_pile
     }
 
-    pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
+    pub fn draw<'g>(&'g self, player: &'g Player<'c>, age: Age) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.hand, &age)
-        self.transfer(MainCardPile_, player.with_id(Hand), age, ())
+        self.transfer(&MainCardPile_, &player.with_id(Hand), age, ())
             .and_then(|r| {
-                self.logger
-                    .operate(Operation::SimpleOp(SimpleOp::Draw, player.id(), r), self)?;
+                self.logger.operate(
+                    Operation::SimpleOp(SimpleOp::Draw, player.id(), r, MainCardPile_.pick()),
+                    self,
+                )?;
                 Ok(r)
             })
     }
 
-    pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
+    pub fn draw_and_meld<'g>(&'g self, player: &'g Player<'c>, age: Age) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.main_board, &age)
-        self.transfer(MainCardPile_, player.with_id(Board), age, true)
+        self.transfer(&MainCardPile_, &player.with_id(Board), age, true)
             .and_then(|r| {
                 self.logger.operate(
-                    Operation::SimpleOp(SimpleOp::DrawAndMeld, player.id(), r),
+                    Operation::SimpleOp(
+                        SimpleOp::DrawAndMeld,
+                        player.id(),
+                        r,
+                        MainCardPile_.pick(),
+                    ),
                     self,
                 )?;
                 Ok(r)
             })
     }
 
-    pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
+    pub fn draw_and_score<'g>(&'g self, player: &'g Player<'c>, age: Age) -> InnResult<&'c Card> {
         // transfer(Rc::clone(&self.main_pile), &self.score_pile, &age)
-        self.transfer(MainCardPile_, player.with_id(Score), age, ())
+        self.transfer(&MainCardPile_, &player.with_id(Score), age, ())
             .and_then(|r| {
                 self.logger.operate(
-                    Operation::SimpleOp(SimpleOp::DrawAndScore, player.id(), r),
+                    Operation::SimpleOp(
+                        SimpleOp::DrawAndScore,
+                        player.id(),
+                        r,
+                        MainCardPile_.pick(),
+                    ),
                     self,
                 )?;
                 Ok(r)
             })
     }
 
-    pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: u8) -> InnResult<&'c Card> {
-        self.transfer(MainCardPile_, player.with_id(Board), age, false)
+    pub fn draw_and_tuck<'g>(&'g self, player: &'g Player<'c>, age: Age) -> InnResult<&'c Card> {
+        self.transfer(&MainCardPile_, &player.with_id(Board), age, false)
             .and_then(|r| {
                 self.logger.operate(
-                    Operation::SimpleOp(SimpleOp::DrawAndTuck, player.id(), r),
+                    Operation::SimpleOp(
+                        SimpleOp::DrawAndTuck,
+                        player.id(),
+                        r,
+                        MainCardPile_.pick(),
+                    ),
                     self,
                 )?;
                 Ok(r)
             })
     }
 
-    pub fn meld<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
-        // transfer(&self.hand, &self.main_board, card)
-        self.transfer(player.with_id(Hand), player.with_id(Board), card, true)
-            .and_then(|r| {
-                self.logger
-                    .operate(Operation::SimpleOp(SimpleOp::Meld, player.id(), r), self)?;
-                Ok(r)
-            })
+    impl_simple_op! {
+        'c, meld, meld_from,
+        to: |player| player.with_id(Board),
+        param: true,
+        record: SimpleOp::Meld,
     }
 
-    pub fn score<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
-        // transfer(&self.hand, &self.score_pile, card)
-        self.transfer(player.with_id(Hand), player.with_id(Score), card, ())
-            .and_then(|r| {
-                self.logger
-                    .operate(Operation::SimpleOp(SimpleOp::Score, player.id(), r), self)?;
-                Ok(r)
-            })
+    impl_simple_op! {
+        'c, score, score_from,
+        to: |player| player.with_id(Score),
+        param: (),
+        record: SimpleOp::Score,
     }
 
-    pub fn tuck<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
-        // transfer(&self.hand, &self.main_board, card)
-        self.transfer(player.with_id(Hand), player.with_id(Board), card, false)
-            .and_then(|r| {
-                self.logger
-                    .operate(Operation::SimpleOp(SimpleOp::Tuck, player.id(), r), self)?;
-                Ok(r)
-            })
+    impl_simple_op! {
+        'c, tuck, tuck_from,
+        to: |player| player.with_id(Board),
+        param: false,
+        record: SimpleOp::Tuck,
+    }
+
+    impl_simple_op! {
+        'c, r#return, return_from,
+        to: |player| MainCardPile_,
+        param: (),
+        record: SimpleOp::Return,
     }
 
     pub fn splay<'g>(
@@ -233,11 +279,7 @@ impl<'c> Players<'c> {
         direction: Splay,
     ) -> InnResult<()> {
         // error when not able to splay?
-        player
-            .board()
-            .borrow_mut()
-            .get_stack_mut(color)
-            .splay(direction);
+        player.board_mut().get_stack_mut(color).splay(direction);
         self.logger
             .operate(Operation::Splay(player.id(), color, direction), self)?;
         Ok(())
@@ -249,17 +291,7 @@ impl<'c> Players<'c> {
         color: Color,
         direction: Splay,
     ) -> bool {
-        player.board().borrow().is_splayed(color, direction)
-    }
-
-    pub fn r#return<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> InnResult<&'c Card> {
-        // transfer(&self.hand, Rc::clone(&self.main_pile), card)
-        self.transfer(player.with_id(Hand), MainCardPile_, card, ())
-            .and_then(|r| {
-                self.logger
-                    .operate(Operation::SimpleOp(SimpleOp::Return, player.id(), r), self)?;
-                Ok(r)
-            })
+        player.board().is_splayed(color, direction)
     }
 
     pub fn has_achievement(&self, view: &SingleAchievementView) -> bool {
@@ -271,26 +303,68 @@ impl<'c> Players<'c> {
         player: &'g Player<'c>,
         view: &SingleAchievementView,
     ) -> InnResult<()> {
+        if self.achieve_if_available(player, view)? {
+            Ok(())
+        } else {
+            Err(InnovationError::CardNotFound)
+        }
+    }
+
+    pub fn achieve_if_available<'g>(
+        &'g self,
+        player: &'g Player<'c>,
+        view: &SingleAchievementView,
+    ) -> InnResult<bool> {
         match self.main_card_pile.borrow_mut().remove(view) {
             Some(achievement) => {
                 player.achievements_mut().add(achievement);
                 self.logger
                     .operate(Operation::Achieve(player.id(), view.clone()), self)?;
-                Ok(())
+                Ok(true)
             }
-            None => Err(InnovationError::CardNotFound),
+            None => Ok(false),
         }
+    }
+
+    pub fn execute_shared_alone<'g>(
+        &'g self,
+        player: &'g Player<'c>,
+        card: &'c Card,
+    ) -> FlowState<'c, 'g> {
+        // this used an extra layer of generator
+        // may eliminate this by passing in ctx?
+        Gn::new_scoped_local(move |mut s| {
+            for dogma in card.dogmas() {
+                if let Dogma::Share(flow) = dogma {
+                    let mut gen = flow(player, self);
+
+                    // s.yield_from(gen); but with or(card)
+                    let mut state = gen.resume();
+                    while let Some(st) = state {
+                        let a = s
+                            .yield_(
+                                st.map(|st| st.or(card))
+                                    .map_err(|e| e.or_set_current_player(player.id())),
+                            )
+                            .expect("Generator got None");
+                        gen.set_para(a);
+                        state = gen.resume();
+                    }
+                }
+            }
+            done!()
+        })
     }
 
     pub fn execute<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s| {
             let id = player.id();
             let main_icon = card.main_icon();
-            let main_icon_count = player.board().borrow().icon_count()[&main_icon];
+            let main_icon_count = player.board().icon_count()[&main_icon];
             // check eligible players before actual execution
             let players_from_next = self.players_from(id + 1);
             let can_be_shared: Vec<_> = players_from_next
-                .map(|p| p.board().borrow().icon_count()[&main_icon] >= main_icon_count)
+                .map(|p| p.board().icon_count()[&main_icon] >= main_icon_count)
                 .collect();
             // execution
             for dogma in card.dogmas() {
@@ -356,31 +430,31 @@ impl<'c> Players<'c> {
 
     pub fn transfer<Fr, To, RP, AP>(
         &self,
-        from: Fr,
-        to: To,
+        from: &Fr,
+        to: &To,
         remove_param: RP,
         add_param: AP,
     ) -> InnResult<&'c Card>
     where
-        Fr: RemoveFromGame<'c, RP> + Into<Place>,
-        To: AddToGame<'c, AP> + Into<Place>,
+        Fr: RemoveFromGame<'c, RP> + Pick<Place>,
+        To: AddToGame<'c, AP> + Pick<Place>,
     {
         let card = from.remove_from(self, remove_param);
         card.map(|card| {
             to.add_to(card, self, add_param);
-            // MAYRESOLVED: TODO: this does not allow observers to perform operations (log)
+            // MAYFIXED: TODO: this does not allow observers to perform operations (log)
             // log event, after actual operation, to ensure that observers act after operation
             self.logger
-                .operate(Operation::Transfer(from.into(), to.into(), card), self)?;
+                .operate(Operation::Transfer(from.pick(), to.pick(), card), self)?;
             Ok(card)
         })
         .and_then(|r| r)
     }
 
-    pub fn transfer_card<Fr, To>(&self, from: Fr, to: To, card: &'c Card) -> InnResult<()>
+    pub fn transfer_card<Fr, To>(&self, from: &Fr, to: &To, card: &'c Card) -> InnResult<()>
     where
-        Fr: RemoveFromGame<'c, &'c Card> + Into<Place>,
-        To: AddToGame<'c, ()> + Into<Place>,
+        Fr: RemoveFromGame<'c, &'c Card> + Pick<Place>,
+        To: AddToGame<'c, ()> + Pick<Place>,
     {
         self.transfer(from, to, card, ()).map(|_| ())
     }
@@ -432,7 +506,7 @@ impl<'c> Players<'c> {
                 self.draw(player, 1)?;
             }
             for player in self.players_from(0) {
-                let card = ctx.choose_one_card(player, player.hand().as_vec()).expect("Already checked, and all players have two cards, so they can always choose one");
+                let card = ctx.choose_one_card(player, player.hand().to_vec()).expect("Already checked, and all players have two cards, so they can always choose one");
                 self.meld(player, card)?;
             }
             Ok(())
@@ -526,7 +600,7 @@ impl<'c> OuterGame<'c> {
                     let player = &players.players[fields.turn.player_id()];
                     match step {
                         NoRefStepAction::Meld(c) => {
-                            player.hand().as_vec().contains(&players.find_card(c))
+                            player.hand().to_vec().contains(&players.find_card(c))
                         }
                         NoRefStepAction::Achieve(age) => {
                             player.age() >= *age
@@ -534,7 +608,7 @@ impl<'c> OuterGame<'c> {
                                 && players.has_achievement(&SingleAchievementView::Normal(*age))
                         }
                         NoRefStepAction::Execute(c) => {
-                            player.board().borrow().contains(players.find_card(c))
+                            player.board().contains(players.find_card(c))
                         }
                         _ => panic!("just checked, action can't be Draw"),
                     }
@@ -543,16 +617,16 @@ impl<'c> OuterGame<'c> {
             (Action::Executing(choice), ObsType::Executing(obs)) => match (choice, &obs.state) {
                 (
                     NoRefChoice::Card(cards),
-                    Choose::Card {
+                    &Choose::Card {
                         min_num,
                         max_num,
-                        from,
+                        ref from,
                     },
                 ) => {
-                    let len = cards.len() as u8;
-                    len >= *min_num
+                    let len = cards.len();
+                    len >= min_num
                         && match max_num {
-                            Some(max) => len <= *max,
+                            Some(max) => len <= max,
                             None => true,
                         }
                         && {
@@ -635,7 +709,24 @@ impl<'c> OuterGame<'c> {
             // and get current player and the obsType, which contains
             // some information if it is executing
             if let State::Executing(state) = fields.state {
-                match state.resume() {
+                // resume until can't choose action automatically
+                match loop {
+                    let new_state = state.resume();
+                    if let Some(Ok(st)) = &new_state {
+                        match st.check_valid_actions(fields.players_ref) {
+                            ActionCheckResult::Zero => {
+                                state.set_para(RefChoice::NoValidAction);
+                                continue;
+                            }
+                            ActionCheckResult::One(choice) => {
+                                state.set_para(choice);
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
+                    break new_state;
+                } {
                     Some(Ok(st)) => {
                         let (p, o) = st.to_obs();
                         let id = p.id();
@@ -727,35 +818,26 @@ mod tests {
         let archery = default_cards::archery();
         let code_of_laws = default_cards::code_of_laws();
         let agriculture = default_cards::agriculture();
-        // will be used as achievement
-        let monotheism = default_cards::monotheism();
-        let philosophy = default_cards::philosophy();
-        let cards = vec![
-            &pottery,
-            &archery,
-            &code_of_laws,
-            &agriculture,
-            &monotheism,
-            &philosophy,
-        ];
+        let oars = default_cards::oars();
+        let cards = vec![&pottery, &archery, &code_of_laws, &agriculture, &oars];
         let mut game = OuterGame::init::<VecSet<&Card>>(2, cards);
         // do not call start(), in order to reduce cards used
-        // card pile: 1[archery, code of laws, agriculture], 2[philosophy]
+        // card pile: 1[archery, code of laws, agriculture, oars]
         game.step(Action::Step(NoRefStepAction::Draw))
             .expect("Action should be valid");
-        // card pile: 1[code of laws, agriculture], 2[philosophy];
+        // card pile: 1[code of laws, agriculture, oars]
         // p1.hand[archery]; act1.cur.p2
         game.step(Action::Step(NoRefStepAction::Draw))
             .expect("Action should be valid");
-        // card pile: 1[agriculture], 2[philosophy]; p1.hand[archery]; act2.cur.p2.hand[code of laws]
+        // card pile: 1[agriculture, oars]; p1.hand[archery]; act2.cur.p2.hand[code of laws]
         println!("{:#?}", game.step(Action::Step(NoRefStepAction::Draw)));
-        // card pile: 1[], 2[philosophy];
+        // card pile: 1[oars];
         // act1.cur.p1.hand[archery]; p2.hand[code of laws, agriculture]
         println!(
             "{:#?}",
             game.step(Action::Step(NoRefStepAction::Meld(String::from("Archery"))))
         );
-        // card pile: 1[], 2[philosophy];
+        // card pile: 1[oars];
         // act2.cur.p1.board[archery]; p2.hand[code of laws, agriculture]
         {
             let obs = game
@@ -765,23 +847,23 @@ mod tests {
                 .expect("Action should be valid");
             // p2 must draw a 1, then give a card to p1
             // card pile: 1[], 2[];
-            // act2.p1.board[archery.exe]; cur.p2.hand[code of laws, philosophy, agriculture]
+            // act2.p1.board[archery.exe]; cur.p2.hand[code of laws, agriculture, oars]
             assert!(matches!(
                 obs.as_normal().unwrap().obstype,
                 ObsType::Executing(_)
             ))
         }
-        // choose to transfer Philosophy
+        // choose to transfer Oars
         {
             let obs = game
                 .step(Action::Executing(NoRefChoice::Card(vec![String::from(
-                    "Philosophy",
+                    "Oars",
                 )])))
                 .expect("Action should be valid")
                 .as_normal()
                 .unwrap();
             // card pile: 1[], 2[];
-            // p1.hand[philosophy].board[archery]; act1.cur.p2.hand[code of laws, agriculture]
+            // p1.hand[oars].board[archery]; act1.cur.p2.hand[code of laws, agriculture]
             println!("{:#?}", obs);
             assert_eq!(obs.turn.player_id(), 1);
             assert!(matches!(obs.obstype, ObsType::Main));

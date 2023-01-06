@@ -4,7 +4,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     card::SpecialAchievement,
-    enums::{Color, Icon, Splay},
+    card_attrs::{Color, Icon, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     game::{PlayerId, Players},
     logger::{InternalObserver, Item, Operation, SimpleOp},
@@ -80,7 +80,7 @@ impl<'c> InternalObserver<'c> for AchievementManager<'c> {
                 .map(|id| game.player_at(id))
             {
                 if check.borrow().further_check(game, player) {
-                    // MAYRESOLVED: TODO: achieve
+                    // MAYFIXED: TODO: achieve
                     // TODO: how to pass winning message?
                     game.try_achieve(player, &SingleAchievementView::Special(*card)).expect("Achieve could only happen when achievement is available; otherwise it will be removed from the manager. Or winning is unimplemented.");
                     should_remove.push(*card);
@@ -135,7 +135,7 @@ impl Monument {
 impl<'c> Achievement<'c> for Monument {
     fn update_interested(&mut self, event: &Item<'c>) -> Vec<PlayerId> {
         match event {
-            Item::Operation(Operation::SimpleOp(SimpleOp::Score, player, _))
+            Item::Operation(Operation::SimpleOp(SimpleOp::Score, player, _, _))
                 if *player == self.current_player =>
             {
                 self.scored += 1;
@@ -143,7 +143,7 @@ impl<'c> Achievement<'c> for Monument {
                     return vec![*player];
                 }
             }
-            Item::Operation(Operation::SimpleOp(SimpleOp::Tuck, player, _))
+            Item::Operation(Operation::SimpleOp(SimpleOp::Tuck, player, _, _))
                 if *player == self.current_player =>
             {
                 self.tucked += 1;
@@ -174,7 +174,7 @@ impl<'c> Achievement<'c> for Empire {
     }
 
     fn further_check(&self, _game: &Players<'c>, player: &Player<'c>) -> bool {
-        let mut icons = player.board().borrow().icon_count().into_map();
+        let mut icons = player.board().icon_count().into_map();
         icons.remove(&Icon::Empty);
         icons.into_iter().all(|(_, count)| count >= 3)
     }
@@ -188,7 +188,7 @@ impl<'c> Achievement<'c> for World {
     }
 
     fn further_check(&self, _game: &Players<'c>, player: &Player<'c>) -> bool {
-        player.board().borrow().icon_count()[&Icon::Clock] >= 12
+        player.board().icon_count()[&Icon::Clock] >= 12
     }
 }
 
@@ -205,7 +205,7 @@ impl<'c> Achievement<'c> for Wonder {
     }
 
     fn further_check(&self, _game: &Players<'c>, player: &Player<'c>) -> bool {
-        let board = player.board().borrow();
+        let board = player.board();
         Color::iter()
             .map(|color| board.get_stack(color))
             .all(|stack| stack.is_splayed(Splay::Right) || stack.is_splayed(Splay::Up))
@@ -220,7 +220,7 @@ impl<'c> Achievement<'c> for Universe {
     }
 
     fn further_check(&self, _game: &Players<'c>, player: &Player<'c>) -> bool {
-        let top_cards = player.board().borrow().top_cards();
+        let top_cards = player.board().top_cards();
         top_cards.len() == 5 && top_cards.into_iter().all(|card| card.age() >= 8)
     }
 }

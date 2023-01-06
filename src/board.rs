@@ -1,9 +1,9 @@
 use counter::Counter;
 use serde::Serialize;
 
+use crate::card_attrs::{Color, Splay, Age};
 use crate::containers::{Addable, Removeable};
-use crate::enums::{Color, Splay};
-use crate::{card::Card, enums::Icon};
+use crate::{card::Card, card_attrs::Icon};
 use std::collections::VecDeque;
 
 #[derive(Debug, Default, Clone, Serialize)]
@@ -46,7 +46,7 @@ impl<'a> Stack<'a> {
     }
 
     /// Splay the stack.
-    /// 
+    ///
     /// Panics when already splayed that direction or the stack has less than two cards.
     pub fn splay(&mut self, direction: Splay) {
         assert!(self.can_splay(direction));
@@ -165,7 +165,7 @@ impl<'a> Board<'a> {
         top_cards.into_iter().max_by_key(|card| card.age())
     }
 
-    pub fn highest_age(&self) -> u8 {
+    pub fn highest_age(&self) -> Age {
         match self.highest_top_card() {
             Some(card) => card.age(),
             None => 0,

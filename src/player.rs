@@ -1,8 +1,8 @@
 use crate::{
-    board::Board,
+    board::{Board, Stack},
     card::{Achievement, Card},
-    containers::{BoxCardSet, CardSet, VecSet, Addable},
-    enums::{Color, Splay},
+    card_attrs::{Color, Splay, Age},
+    containers::{Addable, BoxCardSet, CardSet, VecSet},
     game::PlayerId,
     observation::{MainPlayerView, OtherPlayerView},
 };
@@ -40,7 +40,7 @@ impl<'c> Player<'c> {
         (self.id(), t)
     }
 
-    pub fn age(&self) -> u8 {
+    pub fn age(&self) -> Age {
         self.main_board.borrow().highest_age()
     }
 
@@ -52,12 +52,16 @@ impl<'c> Player<'c> {
         self.score_pile.borrow()
     }
 
-    pub fn board(&self) -> &RefCell<Board<'c>> {
-        &self.main_board
+    pub fn board(&self) -> Ref<Board<'c>> {
+        self.main_board.borrow()
+    }
+
+    pub fn board_mut(&self) -> RefMut<Board<'c>> {
+        self.main_board.borrow_mut()
     }
 
     pub fn total_score(&self) -> usize {
-        self.score_pile().as_iter().map(|i| i.age() as usize).sum()
+        self.score_pile().iter().map(|i| i.age() as usize).sum()
     }
 
     pub fn achievements(&self) -> Ref<VecSet<Achievement<'c>>> {
@@ -68,14 +72,22 @@ impl<'c> Player<'c> {
         self.achievements.borrow_mut()
     }
 
+    pub fn stack(&self, color: Color) -> Ref<Stack<'c>> {
+        Ref::map(self.main_board.borrow(), |board| board.get_stack(color))
+    }
+
     pub fn is_splayed(&self, color: Color, direction: Splay) -> bool {
         self.main_board.borrow().is_splayed(color, direction)
     }
 
+    pub fn can_splay(&self, color: Color, direction: Splay) -> bool {
+        self.stack(color).can_splay(direction)
+    }
+
     pub fn self_view(&self) -> MainPlayerView {
         MainPlayerView {
-            hand: self.hand.borrow().as_vec(),
-            score: self.score_pile.borrow().as_vec(),
+            hand: self.hand.borrow().to_vec(),
+            score: self.score_pile.borrow().to_vec(),
             board: self.main_board.borrow(), /* what if it's mut borrowed? */
             achievements: self
                 .achievements
@@ -89,10 +101,10 @@ impl<'c> Player<'c> {
 
     pub fn other_view(&self) -> OtherPlayerView {
         OtherPlayerView {
-            hand: self.hand().as_vec().into_iter().map(|c| c.age()).collect(),
+            hand: self.hand().to_vec().into_iter().map(|c| c.age()).collect(),
             score: self
                 .score_pile()
-                .as_vec()
+                .to_vec()
                 .into_iter()
                 .map(|c| c.age())
                 .collect(),
