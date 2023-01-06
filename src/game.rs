@@ -310,6 +310,36 @@ impl<'c> Players<'c> {
         }
     }
 
+    pub fn execute_shared_alone<'g>(
+        &'g self,
+        player: &'g Player<'c>,
+        card: &'c Card,
+    ) -> FlowState<'c, 'g> {
+        // this used an extra layer of generator
+        // may eliminate this by passing in ctx?
+        Gn::new_scoped_local(move |mut s| {
+            for dogma in card.dogmas() {
+                if let Dogma::Share(flow) = dogma {
+                    let mut gen = flow(player, self);
+
+                    // s.yield_from(gen); but with or(card)
+                    let mut state = gen.resume();
+                    while let Some(st) = state {
+                        let a = s
+                            .yield_(
+                                st.map(|st| st.or(card))
+                                    .map_err(|e| e.or_set_current_player(player.id())),
+                            )
+                            .expect("Generator got None");
+                        gen.set_para(a);
+                        state = gen.resume();
+                    }
+                }
+            }
+            done!()
+        })
+    }
+
     pub fn execute<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> FlowState<'c, 'g> {
         Gn::new_scoped_local(move |mut s| {
             let id = player.id();

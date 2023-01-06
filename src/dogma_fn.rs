@@ -1,4 +1,4 @@
-use std::{cell::RefCell, convert::TryInto, rc::Rc};
+use std::{cell::RefCell, cmp::min, convert::TryInto, rc::Rc};
 
 use generator::{done, Gn, Scope};
 use strum::IntoEnumIterator;
@@ -33,6 +33,17 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         self.s
             .yield_(Ok(ExecutionState::new(player, choose)))
             .expect("Generator got None")
+    }
+
+    // TODO: implementation? use is_done or resume or send or ...?
+    /// Manual yield from a (local) generator.
+    pub fn yield_from(&mut self, mut gen: FlowState<'c, 'g>) {
+        let mut res = gen.resume();
+        while let Some(request) = res {
+            let choice = self.s.yield_(request).expect("Generator got None");
+            gen.set_para(choice);
+            res = gen.resume();
+        }
     }
 
     pub fn choose_one_card(
@@ -483,6 +494,51 @@ pub fn enterprise() -> Vec<Dogma> {
         }),
         shared(|player, game, ctx| {
             ctx.may_splay(player, game, Color::Green, Splay::Right)?;
+            Ok(())
+        }),
+    ]
+}
+
+pub fn reformation() -> Vec<Dogma> {
+    vec![
+        shared(|player, game, ctx| {
+            let num_leaves = player.board().icon_count()[&Icon::Leaf];
+            if num_leaves >= 2 && ctx.choose_yn(player) {
+                let num_cards = min(num_leaves % 2, player.hand().to_vec().len());
+                let cards = ctx
+                    .choose_cards_exact(
+                        player,
+                        player.hand().to_vec(),
+                        num_cards.try_into().unwrap(),
+                    )
+                    .expect("Player should be able to choose cards of computed number.");
+                for card in cards {
+                    game.tuck(player, card)?;
+                }
+            }
+            Ok(())
+        }),
+        shared(|player, game, ctx| {
+            ctx.may_splays(
+                player,
+                game,
+                vec![Color::Yellow, Color::Purple],
+                Splay::Right,
+            )?;
+            Ok(())
+        }),
+    ]
+}
+
+pub fn computers() -> Vec<Dogma> {
+    vec![
+        shared(|player, game, ctx| {
+            ctx.may_splays(player, game, vec![Color::Red, Color::Green], Splay::Up)?;
+            Ok(())
+        }),
+        shared(|player, game, ctx| {
+            let card = game.draw_and_meld(player, 10)?;
+            ctx.yield_from(game.execute_shared_alone(player, card));
             Ok(())
         }),
     ]
