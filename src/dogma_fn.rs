@@ -507,8 +507,8 @@ pub fn reformation() -> Vec<Dogma> {
     vec![
         shared(|player, game, ctx| {
             let num_leaves = player.board().icon_count()[&Leaf];
-            if num_leaves >= 2 && ctx.choose_yn(player) {
-                let num_cards = min(num_leaves % 2, player.hand().to_vec().len());
+            let num_cards = min(num_leaves % 2, player.hand().to_vec().len());
+            if num_cards >= 1 && ctx.choose_yn(player) {
                 let cards = ctx
                     .choose_cards_exact(
                         player,
