@@ -9,11 +9,10 @@ use crate::{action::RefChoice, card::Card, game::Players};
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Choose<'c> {
-    // maybe usize?
     // maybe RangeBound or Bound?
     Card {
-        min_num: u8,
-        max_num: Option<u8>,
+        min_num: usize,
+        max_num: Option<usize>,
         from: Vec<&'c Card>,
     },
     Opponent,
@@ -67,11 +66,10 @@ impl<'c, 'g> ExecutionState<'c, 'g> {
             } => {
                 let len = from.len();
                 let real_max_num = if let Some(max_num) = max_num {
-                    min(len, max_num.into())
+                    min(len, max_num)
                 } else {
                     len
                 };
-                let min_num: usize = min_num.into();
 
                 // min_num <= n <= real_max_num
                 // iff

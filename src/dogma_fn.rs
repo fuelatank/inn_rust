@@ -91,7 +91,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         &mut self,
         player: &'g Player<'c>,
         from: Vec<&'c Card>,
-        max_num: Option<u8>,
+        max_num: Option<usize>,
     ) -> Option<Vec<&'c Card>> {
         // choose at least one if possible
         self.yield_(
@@ -109,7 +109,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         &mut self,
         player: &'g Player<'c>,
         from: Vec<&'c Card>,
-        max_num: Option<u8>,
+        max_num: Option<usize>,
     ) -> Vec<&'c Card> {
         // can choose 0 to max_num cards
         self.yield_(
@@ -128,7 +128,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         &mut self,
         player: &'g Player<'c>,
         from: Vec<&'c Card>,
-        num: u8,
+        num: usize,
     ) -> Option<Vec<&'c Card>> {
         self.yield_(
             player,
@@ -510,11 +510,7 @@ pub fn reformation() -> Vec<Dogma> {
             let num_cards = min(num_leaves % 2, player.hand().to_vec().len());
             if num_cards >= 1 && ctx.choose_yn(player) {
                 let cards = ctx
-                    .choose_cards_exact(
-                        player,
-                        player.hand().to_vec(),
-                        num_cards.try_into().unwrap(),
-                    )
+                    .choose_cards_exact(player, player.hand().to_vec(), num_cards)
                     .expect("Player should be able to choose cards of computed number.");
                 for card in cards {
                     game.tuck(player, card)?;

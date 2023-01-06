@@ -607,7 +607,7 @@ impl<'c> OuterGame<'c> {
                         from,
                     },
                 ) => {
-                    let len = cards.len() as u8;
+                    let len = cards.len();
                     len >= *min_num
                         && match max_num {
                             Some(max) => len <= *max,
