@@ -9,7 +9,7 @@ use crate::{
     action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefChoice, RefStepAction},
     auto_achieve::{AchievementManager, WinByAchievementChecker},
     card::{Achievement, Card, SpecialAchievement},
-    card_attrs::{Color, Splay, Age},
+    card_attrs::{Age, Color, Splay},
     card_pile::MainCardPile,
     containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
     dogma_fn::mk_execution,
@@ -799,6 +799,60 @@ impl<'c> OuterGame<'c> {
 
     pub fn current_game(&self) -> Option<Game<'c>> {
         self.borrow_logger().borrow().current_game().cloned()
+    }
+}
+
+pub struct GameConfig<'c> {
+    all_cards: Vec<&'c Card>,
+    draw_deck: Vec<&'c Card>,
+    achievements: Vec<Achievement<'c>>,
+    players: Vec<PlayerBuilder<'c>>,
+    turn: TurnBuilder,
+}
+
+impl<'c> GameConfig<'c> {
+    pub fn new(all_cards: Vec<&'c Card>) -> GameConfig<'c> {
+        Self {
+            all_cards,
+            draw_deck: Vec::new(),
+            achievements: Vec::new(),
+            players: Vec::new(),
+            turn: TurnBuilder::new(),
+        }
+    }
+
+    pub fn draw_deck(mut self, cards: Vec<&'c Card>) -> GameConfig<'c> {
+        self.draw_deck = cards;
+        self
+    }
+
+    pub fn achievements(mut self, cards: Vec<Achievement<'c>>) -> GameConfig<'c> {
+        self.achievements = cards;
+        self
+    }
+
+    pub fn player(mut self, builder: PlayerBuilder<'c>) -> GameConfig<'c> {
+        self.players.push(builder);
+        self
+    }
+
+    pub fn first_player(mut self, player: usize) -> GameConfig<'c> {
+        self.turn = self.turn.first_player(player);
+        self
+    }
+
+    pub fn second_action(mut self, is_second_action: bool) -> GameConfig<'c> {
+        self.turn = self.turn.second_action(is_second_action);
+        self
+    }
+
+    pub fn build(self) -> OuterGame<'c> {
+        OuterGame::config(
+            self.all_cards,
+            MainCardPile::new(self.draw_deck, self.achievements),
+            self.players,
+            self.turn,
+        )
     }
 }
 
