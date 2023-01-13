@@ -846,13 +846,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        action::NoRefChoice,
-        card_pile::split_cards,
-        containers::VecSet,
-        default_cards,
-        logger::{FnObserver, Logger},
-        state::ExecutionObs,
-        utils::vec_eq_unordered,
+        action::NoRefChoice, containers::VecSet, default_cards, logger::FnObserver,
+        state::ExecutionObs, utils::vec_eq_unordered,
     };
 
     #[test]
@@ -920,16 +915,11 @@ mod tests {
         let pottery = default_cards::pottery();
         let agriculture = default_cards::agriculture();
         let cards = vec![&archery, &pottery, &agriculture];
-        let logger = RefCell::new(Logger::new());
-        // TODO: GameStart, GameEnd message, etc.
-        logger.borrow_mut().start(split_cards(cards.clone()));
         let mut game = GameConfig::new(cards)
             .draw_deck(vec![&pottery])
             .player(PlayerBuilder::new::<VecSet<&Card>>().board(vec![&archery]))
             .player(PlayerBuilder::new::<VecSet<&Card>>().hand(vec![&agriculture]))
-            .observe_owned(FnObserver::new(|ev| {
-                logger.borrow_mut().log(ev.clone())
-            }))
+            .observe_owned(FnObserver::new(|ev| println!("Event: {ev:?}")))
             .build();
         {
             // p1 executes 'Archery'.
@@ -979,9 +969,5 @@ mod tests {
             assert!(vec_eq_unordered(&obs.main_player.hand, [&pottery]));
             assert!(matches!(obs.obstype, ObsType::Main));
         }
-        println!(
-            "Log messages: {:?}",
-            logger.borrow().current_game().unwrap().items
-        );
     }
 }

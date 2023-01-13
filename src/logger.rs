@@ -36,6 +36,7 @@ pub enum Operation<'c> {
     Achieve(PlayerId, SingleAchievementView),
 }
 
+// TODO: GameStart, GameEnd message, etc.
 #[derive(Clone, Debug)]
 pub enum Item<'c> {
     Action(Action),
