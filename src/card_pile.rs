@@ -3,7 +3,7 @@ use crate::{
     containers::{Addable, Removeable, VecSet},
     observation::SingleAchievementView, card_attrs::Age,
 };
-use std::collections::VecDeque;
+use std::{collections::VecDeque, array};
 
 pub type CardOrder<'c> = [Vec<&'c Card>; 10];
 
@@ -147,4 +147,12 @@ impl<'a> Removeable<Achievement<'a>, SingleAchievementView> for MainCardPile<'a>
     fn remove(&mut self, achievement: &SingleAchievementView) -> Option<Achievement<'a>> {
         self.achievements.try_remove(|a| a == achievement)
     }
+}
+
+pub fn split_cards<'a>(cards: impl IntoIterator<Item = &'a Card>) -> CardOrder<'a> {
+    let mut ordered = array::from_fn(|_| Vec::new());
+    for card in cards {
+        ordered[<u8 as Into<usize>>::into(card.age()) - 1].push(card);
+    }
+    ordered
 }

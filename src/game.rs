@@ -15,7 +15,7 @@ use crate::{
     dogma_fn::mk_execution,
     error::{InnResult, InnovationError, WinningSituation},
     flow::{Dogma, FlowState},
-    logger::{FnPureObserver, Game, Item, Logger, Operation, SimpleOp, Subject},
+    logger::{Item, Observer, Operation, SimpleOp, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
     player::{Player, PlayerBuilder},
     state::{ActionCheckResult, Choose, State},
@@ -73,12 +73,7 @@ impl<'c> Players<'c> {
         }
     }
 
-    pub fn new<C>(
-        num_players: usize,
-        cards: Vec<&'c Card>,
-        logger: RcCell<Logger<'c>>,
-        first_player: PlayerId,
-    ) -> Players<'c>
+    pub fn new<C>(num_players: usize, cards: Vec<&'c Card>, first_player: PlayerId) -> Players<'c>
     where
         C: CardSet<'c, Card> + Default + 'c,
     {
@@ -86,23 +81,22 @@ impl<'c> Players<'c> {
         Players::from_builders(
             cards,
             pile,
-            logger,
             (0..num_players)
                 .map(|_| PlayerBuilder::new::<C>())
                 .collect(),
             first_player,
+            Subject::new(),
         )
     }
 
     pub fn from_builders(
         cards: Vec<&'c Card>,
         main_pile: MainCardPile<'c>,
-        logger: RcCell<Logger<'c>>,
         players: Vec<PlayerBuilder<'c>>,
         first_player: PlayerId,
+        mut subject: Subject<'c>,
     ) -> Players<'c> {
         let pile = Rc::new(RefCell::new(main_pile));
-        let mut subject = Subject::new();
         subject.register_internal_owned(AchievementManager::new(
             SpecialAchievement::iter()
                 .filter(|&sa| {
@@ -113,11 +107,6 @@ impl<'c> Players<'c> {
             first_player,
         ));
         subject.register_internal_owned(WinByAchievementChecker);
-        // Should logger cards be initialized here, or in other methods?
-        logger.borrow_mut().start(pile.borrow().contents());
-        subject.register_external_owned(FnPureObserver::new(move |ev| {
-            logger.borrow_mut().log(ev.clone())
-        }));
         Players {
             cards,
             logger: subject,
@@ -526,7 +515,6 @@ pub struct OuterGame<'c> {
     #[borrows(players)]
     #[covariant]
     turn: LoggingTurn<'c, 'this>,
-    logger: RcCell<Logger<'c>>,
     #[borrows()]
     #[covariant]
     state: State<'c, 'this>,
@@ -538,19 +526,12 @@ impl<'c> OuterGame<'c> {
     where
         C: CardSet<'c, Card> + Default + 'c,
     {
-        let logger = Rc::new(RefCell::new(Logger::new()));
         // TODO: structure not clear
         let turn = Turn::new(num_players);
         OuterGameBuilder {
-            players: Players::new::<C>(
-                num_players,
-                cards,
-                Rc::clone(&logger),
-                turn.current_player(),
-            ),
+            players: Players::new::<C>(num_players, cards, turn.current_player()),
             players_ref_builder: |players| players,
             turn_builder: |players| LoggingTurn::new(turn, players),
-            logger,
             state: State::Main,
             next_action_type: ObsType::Main,
         }
@@ -562,21 +543,20 @@ impl<'c> OuterGame<'c> {
         main_pile: MainCardPile<'c>,
         players: Vec<PlayerBuilder<'c>>,
         turn: TurnBuilder,
+        subject: Subject<'c>,
     ) -> OuterGame<'c> {
-        let logger = Rc::new(RefCell::new(Logger::new()));
         // TODO: structure not clear
         let turn = turn.build(players.len());
         OuterGameBuilder {
             players: Players::from_builders(
                 cards,
                 main_pile,
-                Rc::clone(&logger),
                 players,
                 turn.current_player(),
+                subject,
             ),
             players_ref_builder: |players| players,
             turn_builder: |players| LoggingTurn::new(turn, players),
-            logger,
             state: State::Main,
             next_action_type: ObsType::Main,
         }
@@ -650,8 +630,8 @@ impl<'c> OuterGame<'c> {
             return Err(InnovationError::InvalidAction);
         }
         self.with_mut(|fields| {
-            fields.logger.borrow_mut().act(action.clone());
             let game = *fields.players_ref;
+            game.notify(Item::Action(action.clone()))?;
             let action = action.to_ref(game);
             match action {
                 RefAction::Step(action) => match fields.state {
@@ -792,14 +772,6 @@ impl<'c> OuterGame<'c> {
             winners,
         }
     }
-
-    pub fn history(&self) -> Vec<Game<'c>> {
-        self.borrow_logger().borrow().history().to_vec()
-    }
-
-    pub fn current_game(&self) -> Option<Game<'c>> {
-        self.borrow_logger().borrow().current_game().cloned()
-    }
 }
 
 pub struct GameConfig<'c> {
@@ -808,6 +780,7 @@ pub struct GameConfig<'c> {
     achievements: Vec<Achievement<'c>>,
     players: Vec<PlayerBuilder<'c>>,
     turn: TurnBuilder,
+    subject: Subject<'c>,
 }
 
 impl<'c> GameConfig<'c> {
@@ -818,6 +791,7 @@ impl<'c> GameConfig<'c> {
             achievements: Vec::new(),
             players: Vec::new(),
             turn: TurnBuilder::new(),
+            subject: Subject::new(),
         }
     }
 
@@ -846,12 +820,23 @@ impl<'c> GameConfig<'c> {
         self
     }
 
+    pub fn observe(mut self, observer: &Rc<RefCell<dyn Observer<'c>>>) -> GameConfig<'c> {
+        self.subject.register_external(observer);
+        self
+    }
+
+    pub fn observe_owned(mut self, observer: impl Observer<'c> + 'c) -> GameConfig<'c> {
+        self.subject.register_external_owned(observer);
+        self
+    }
+
     pub fn build(self) -> OuterGame<'c> {
         OuterGame::config(
             self.all_cards,
             MainCardPile::new(self.draw_deck, self.achievements),
             self.players,
             self.turn,
+            self.subject,
         )
     }
 }
@@ -861,7 +846,12 @@ mod tests {
 
     use super::*;
     use crate::{
-        action::NoRefChoice, containers::VecSet, default_cards, state::ExecutionObs,
+        action::NoRefChoice,
+        card_pile::split_cards,
+        containers::VecSet,
+        default_cards,
+        logger::{FnPureObserver, Logger},
+        state::ExecutionObs,
         utils::vec_eq_unordered,
     };
 
@@ -930,15 +920,17 @@ mod tests {
         let pottery = default_cards::pottery();
         let agriculture = default_cards::agriculture();
         let cards = vec![&archery, &pottery, &agriculture];
-        let mut game = OuterGame::config(
-            cards,
-            MainCardPile::new(vec![&pottery], Vec::new()),
-            vec![
-                PlayerBuilder::new::<VecSet<&Card>>().board(vec![&archery]),
-                PlayerBuilder::new::<VecSet<&Card>>().hand(vec![&agriculture]),
-            ],
-            TurnBuilder::new(),
-        );
+        let logger = RefCell::new(Logger::new());
+        // TODO: GameStart, GameEnd message, etc.
+        logger.borrow_mut().start(split_cards(cards.clone()));
+        let mut game = GameConfig::new(cards)
+            .draw_deck(vec![&pottery])
+            .player(PlayerBuilder::new::<VecSet<&Card>>().board(vec![&archery]))
+            .player(PlayerBuilder::new::<VecSet<&Card>>().hand(vec![&agriculture]))
+            .observe_owned(FnPureObserver::new(|ev| {
+                logger.borrow_mut().log(ev.clone())
+            }))
+            .build();
         {
             // p1 executes 'Archery'.
             // p1 has 2 Castles, while p2 doesn't have any.
@@ -987,6 +979,9 @@ mod tests {
             assert!(vec_eq_unordered(&obs.main_player.hand, [&pottery]));
             assert!(matches!(obs.obstype, ObsType::Main));
         }
-        println!("Log messages: {:?}", game.current_game().unwrap().items);
+        println!(
+            "Log messages: {:?}",
+            logger.borrow().current_game().unwrap().items
+        );
     }
 }
