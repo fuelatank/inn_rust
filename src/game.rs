@@ -850,7 +850,7 @@ mod tests {
         card_pile::split_cards,
         containers::VecSet,
         default_cards,
-        logger::{FnPureObserver, Logger},
+        logger::{FnObserver, Logger},
         state::ExecutionObs,
         utils::vec_eq_unordered,
     };
@@ -927,7 +927,7 @@ mod tests {
             .draw_deck(vec![&pottery])
             .player(PlayerBuilder::new::<VecSet<&Card>>().board(vec![&archery]))
             .player(PlayerBuilder::new::<VecSet<&Card>>().hand(vec![&agriculture]))
-            .observe_owned(FnPureObserver::new(|ev| {
+            .observe_owned(FnObserver::new(|ev| {
                 logger.borrow_mut().log(ev.clone())
             }))
             .build();
