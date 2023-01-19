@@ -1,7 +1,7 @@
 use crate::{
     board::Board as Board_,
     card::Card,
-    card_attrs::{Color, Age},
+    card_attrs::{Age, Color},
     containers::{Addable, Removeable},
     error::{InnResult, InnovationError, WinningSituation},
     game::Players,

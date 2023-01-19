@@ -36,6 +36,7 @@ pub enum Operation<'c> {
     Achieve(PlayerId, SingleAchievementView),
 }
 
+// TODO: GameStart, GameEnd message, etc.
 #[derive(Clone, Debug)]
 pub enum Item<'c> {
     Action(Action),
@@ -193,15 +194,15 @@ impl<'c> InternalObserver<'c> for FnInternalObserver<'c> {
     }
 }
 
-pub struct FnPureObserver<'c>(Box<dyn FnMut(&Item<'c>) + 'c>);
+pub struct FnObserver<'c>(Box<dyn FnMut(&Item<'c>) + 'c>);
 
-impl<'c> FnPureObserver<'c> {
+impl<'c> FnObserver<'c> {
     pub fn new(f: impl FnMut(&Item<'c>) + 'c) -> Self {
         Self(Box::new(f))
     }
 }
 
-impl<'c> Observer<'c> for FnPureObserver<'c> {
+impl<'c> Observer<'c> for FnObserver<'c> {
     fn on_notify(&mut self, event: &Item<'c>) {
         self.0(event);
     }

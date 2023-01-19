@@ -1,7 +1,7 @@
 use counter::Counter;
 use serde::Serialize;
 
-use crate::card_attrs::{Color, Splay, Age};
+use crate::card_attrs::{Age, Color, Splay};
 use crate::containers::{Addable, Removeable};
 use crate::{card::Card, card_attrs::Icon};
 use std::collections::VecDeque;
