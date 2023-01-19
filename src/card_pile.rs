@@ -1,8 +1,7 @@
 use rand::{seq::SliceRandom, thread_rng};
 
 use crate::{
-    card::{Achievement, Card, SpecialAchievement},
-    card_attrs::Age,
+    card::{Achievement, Age, Card, SpecialAchievement},
     containers::{Addable, Removeable, VecSet},
     observation::SingleAchievementView,
 };

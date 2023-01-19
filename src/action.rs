@@ -1,8 +1,8 @@
 use serde::Deserialize;
 
+use crate::card::{Age, Card};
 use crate::game::Players;
 use crate::player::Player;
-use crate::{card::Card, card_attrs::Age};
 
 #[derive(Clone)]
 pub enum RefStepAction<'c> {

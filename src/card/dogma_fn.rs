@@ -4,14 +4,16 @@ use generator::{done, Gn, Scope};
 use strum::IntoEnumIterator;
 
 use crate::{
-    card::{Card, SpecialAchievement},
-    card_attrs::{
+    card::{
+        flow::{FlowState, GenResume, GenYield},
+        Card,
         Color::{self, *},
+        Dogma,
         Icon::*,
+        SpecialAchievement,
         Splay::{self, *},
     },
     error::InnResult,
-    flow::{Dogma, FlowState, GenResume, GenYield},
     game::{Players, RcCell},
     player::Player,
     state::{Choose, ExecutionState},

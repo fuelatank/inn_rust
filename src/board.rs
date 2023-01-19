@@ -1,9 +1,10 @@
 use counter::Counter;
 use serde::Serialize;
 
-use crate::card_attrs::{Age, Color, Splay};
-use crate::containers::{Addable, Removeable};
-use crate::{card::Card, card_attrs::Icon};
+use crate::{
+    card::{Age, Card, Color, Icon, Splay},
+    containers::{Addable, Removeable},
+};
 use std::collections::VecDeque;
 
 #[derive(Debug, Default, Clone, Serialize)]

@@ -1,7 +1,6 @@
 use crate::{
     board::{Board, Stack},
-    card::{Achievement, Card},
-    card_attrs::{Age, Color, Splay},
+    card::{Achievement, Age, Card, Color, Splay},
     containers::{Addable, BoxCardSet, CardSet, VecSet},
     game::PlayerId,
     observation::{MainPlayerView, OtherPlayerView},

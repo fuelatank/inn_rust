@@ -1,6 +1,5 @@
 use crate::{
-    card_attrs::{Age, Color, Icon},
-    flow::Dogma,
+    card::{Age, Color, Dogma, Icon},
     observation::SingleAchievementView,
 };
 use counter::Counter;

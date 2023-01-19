@@ -4,8 +4,7 @@ use serde::{Serialize, Serializer};
 
 use crate::{
     board::Board,
-    card::{Achievement, Card, SpecialAchievement},
-    card_attrs::Age,
+    card::{Achievement, Age, Card, SpecialAchievement},
     game::PlayerId,
     state::ExecutionObs,
     turn::Turn,
@@ -149,7 +148,7 @@ impl<'a> GameState<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        card_attrs::{Color, Icon},
+        card::{Color, Icon},
         state::Choose,
     };
 

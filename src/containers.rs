@@ -1,5 +1,4 @@
-use crate::card::{Achievement, Card};
-use crate::card_attrs::Icon;
+use crate::card::{Achievement, Card, Icon};
 use std::cell::RefCell;
 use std::ops::Deref;
 

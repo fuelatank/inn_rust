@@ -8,13 +8,13 @@ use strum::IntoEnumIterator;
 use crate::{
     action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefChoice, RefStepAction},
     auto_achieve::{AchievementManager, WinByAchievementChecker},
-    card::{Achievement, Card, SpecialAchievement},
-    card_attrs::{Age, Color, Splay},
+    card::{
+        dogma_fn::mk_execution, flow::FlowState, Achievement, Age, Card, Color, Dogma,
+        SpecialAchievement, Splay,
+    },
     card_pile::MainCardPile,
     containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
-    dogma_fn::mk_execution,
     error::{InnResult, InnovationError, WinningSituation},
-    flow::{Dogma, FlowState},
     logger::{Item, Observer, Operation, SimpleOp, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
     player::{Player, PlayerBuilder},
@@ -849,7 +849,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        action::NoRefChoice, default_cards, logger::FnObserver, state::ExecutionObs,
+        action::NoRefChoice, card::default_cards, logger::FnObserver, state::ExecutionObs,
         utils::vec_eq_unordered,
     };
 
