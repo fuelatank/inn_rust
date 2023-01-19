@@ -839,8 +839,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        action::NoRefChoice, containers::VecSet, default_cards, logger::FnObserver,
-        state::ExecutionObs, utils::vec_eq_unordered,
+        action::NoRefChoice, default_cards, logger::FnObserver, state::ExecutionObs,
+        utils::vec_eq_unordered,
     };
 
     #[test]
@@ -853,8 +853,8 @@ mod tests {
         // TODO: simplify
         let mut game = GameConfig::new(cards.clone())
             .main_pile(MainCardPile::builder().draw_deck(cards).build())
-            .player(Player::builder::<VecSet<&Card>>())
-            .player(Player::builder::<VecSet<&Card>>())
+            .player(Default::default())
+            .player(Default::default())
             .build();
         // do not call start(), in order to reduce cards used
         // card pile: 1[archery, code of laws, agriculture, oars]
@@ -913,8 +913,8 @@ mod tests {
         let cards = vec![&archery, &pottery, &agriculture];
         let mut game = GameConfig::new(cards)
             .main_pile(MainCardPile::builder().draw_deck(vec![&pottery]).build())
-            .player(Player::builder::<VecSet<&Card>>().board(vec![&archery]))
-            .player(Player::builder::<VecSet<&Card>>().hand(vec![&agriculture]))
+            .player(PlayerBuilder::default().board(vec![&archery]))
+            .player(PlayerBuilder::default().hand(vec![&agriculture]))
             .observe_owned(FnObserver::new(|ev| println!("Event: {ev:?}")))
             .build();
         {

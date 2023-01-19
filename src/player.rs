@@ -190,3 +190,9 @@ impl<'c> PlayerBuilder<'c> {
         }
     }
 }
+
+impl<'c> Default for PlayerBuilder<'c> {
+    fn default() -> Self {
+        PlayerBuilder::new::<VecSet<_>>()
+    }
+}
