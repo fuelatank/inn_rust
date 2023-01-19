@@ -66,12 +66,12 @@ impl<'a> PartialEq<SingleAchievementView> for Achievement<'a> {
 type AchievementView = Vec<SingleAchievementView>;
 
 pub struct TurnView {
-    main_action_index: usize,
+    main_step_index: usize,
 }
 
 impl TurnView {
-    pub fn is_second_action(&self) -> bool {
-        self.main_action_index % 2 == 0
+    pub fn is_second_step(&self) -> bool {
+        self.main_step_index % 2 == 0
     }
 }
 

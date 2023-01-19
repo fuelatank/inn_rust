@@ -1,3 +1,14 @@
+//! Naming conventions:
+//!
+//! `Action` means action in the interface.
+//! Example: game.step(Action) -> Observation
+//!
+//! `Step` means action in Innovation.
+//! Example: Each player can take two steps. Meld action.
+//!
+//! `Choice` means actions made in execution.
+//! Example: I demand you transfer a 1 (make a choice) to my hand!
+
 use serde::Deserialize;
 
 use crate::card::{Age, Card};
@@ -5,7 +16,7 @@ use crate::game::Players;
 use crate::player::Player;
 
 #[derive(Clone)]
-pub enum RefStepAction<'c> {
+pub enum RefStep<'c> {
     Draw,
     Meld(&'c Card),
     Achieve(Age),
@@ -14,7 +25,7 @@ pub enum RefStepAction<'c> {
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum NoRefStepAction {
+pub enum NoRefStep {
     Draw,
     Meld(String),
     Achieve(Age),
@@ -81,14 +92,14 @@ impl<'c, 'g> RefChoice<'c, 'g> {
 }
 
 pub enum RefAction<'c, 'g> {
-    Step(RefStepAction<'c>),
+    Step(RefStep<'c>),
     Executing(RefChoice<'c, 'g>),
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(untagged)]
 pub enum Action {
-    Step(NoRefStepAction),
+    Step(NoRefStep),
     Executing(NoRefChoice),
 }
 
@@ -96,10 +107,10 @@ impl Action {
     pub fn to_ref<'c, 'g>(self, game: &'g Players<'c>) -> RefAction<'c, 'g> {
         match self {
             Action::Step(s) => RefAction::Step(match s {
-                NoRefStepAction::Draw => RefStepAction::Draw,
-                NoRefStepAction::Meld(name) => RefStepAction::Meld(game.find_card(&name)),
-                NoRefStepAction::Achieve(a) => RefStepAction::Achieve(a),
-                NoRefStepAction::Execute(name) => RefStepAction::Execute(game.find_card(&name)),
+                NoRefStep::Draw => RefStep::Draw,
+                NoRefStep::Meld(name) => RefStep::Meld(game.find_card(&name)),
+                NoRefStep::Achieve(a) => RefStep::Achieve(a),
+                NoRefStep::Execute(name) => RefStep::Execute(game.find_card(&name)),
             }),
             Action::Executing(e) => RefAction::Executing(match e {
                 NoRefChoice::Card(names) => RefChoice::Card(
@@ -121,7 +132,7 @@ mod tests {
     use serde_json::from_str;
     use Action::*;
     use NoRefChoice::*;
-    use NoRefStepAction::*;
+    use NoRefStep::*;
 
     #[test]
     fn action_deserialization() {

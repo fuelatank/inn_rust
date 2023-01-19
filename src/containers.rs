@@ -1,20 +1,7 @@
 use crate::card::{Achievement, Card, Icon};
-use std::cell::RefCell;
-use std::ops::Deref;
 
 pub trait Addable<T> {
     fn add(&mut self, elem: T);
-
-    /*fn optional_add(&mut self, elem: Option<&'a T>) -> bool {
-        //
-        // return success?
-        match elem {
-            Some(value) => {
-                true
-            }
-            None => false
-        }
-    }*/
 }
 
 pub trait Removeable<T, P> {
@@ -112,17 +99,3 @@ impl<'a, T: PartialEq> CardSet<'a, T> for VecSet<&'a T> {
 
 pub type BoxCardSet<'a> = Box<dyn CardSet<'a, Card> + 'a>;
 pub type BoxAchievementSet<'a> = Box<dyn CardSet<'a, Achievement<'a>> + 'a>;
-
-pub fn transfer<'a, T, P, R, S, A, B>(from: A, to: B, param: &P) -> Option<&'a T>
-where
-    R: Removeable<&'a T, P>,
-    S: Addable<&'a T>,
-    A: Deref<Target = RefCell<R>>,
-    B: Deref<Target = RefCell<S>>,
-{
-    let c = from.borrow_mut().remove(param);
-    if let Some(card) = c {
-        to.borrow_mut().add(card);
-    }
-    c
-}
