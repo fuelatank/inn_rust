@@ -1,7 +1,7 @@
 use crate::{
     board::{Board, Stack},
     card::{Achievement, Card},
-    card_attrs::{Color, Splay, Age},
+    card_attrs::{Age, Color, Splay},
     containers::{Addable, BoxCardSet, CardSet, VecSet},
     game::PlayerId,
     observation::{MainPlayerView, OtherPlayerView},
@@ -30,6 +30,13 @@ impl<'c> Player<'c> {
             score_pile: RefCell::new(score_pile),
             achievements: RefCell::new(achievements),
         }
+    }
+
+    pub fn builder<C>() -> PlayerBuilder<'c>
+    where
+        C: CardSet<'c, Card> + Default + 'c,
+    {
+        PlayerBuilder::new::<C>()
     }
 
     pub fn id(&self) -> usize {

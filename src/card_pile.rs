@@ -89,6 +89,10 @@ impl<'a> MainCardPile<'a> {
             .build()
     }
 
+    pub fn builder() -> MainCardPileBuilder<'a> {
+        MainCardPileBuilder::new()
+    }
+
     fn pop_age(&mut self, age: Age) -> Option<&'a Card> {
         if age >= 11 {
             return None;
