@@ -1,5 +1,5 @@
 use crate::{
-    card_attrs::{Color, Icon, Age},
+    card_attrs::{Age, Color, Icon},
     flow::Dogma,
     observation::SingleAchievementView,
 };
