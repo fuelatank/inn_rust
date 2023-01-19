@@ -1,9 +1,12 @@
+use rand::{seq::SliceRandom, thread_rng};
+
 use crate::{
     card::{Achievement, Card, SpecialAchievement},
+    card_attrs::Age,
     containers::{Addable, Removeable, VecSet},
-    observation::SingleAchievementView, card_attrs::Age,
+    observation::SingleAchievementView,
 };
-use std::{collections::VecDeque, array};
+use std::{array, collections::VecDeque};
 
 pub type CardOrder<'c> = [Vec<&'c Card>; 10];
 
@@ -78,19 +81,12 @@ impl<'a> MainCardPile<'a> {
         cards: Vec<&'a Card>,
         special_achievements: Vec<SpecialAchievement>,
     ) -> MainCardPile<'a> {
-        let mut pile = MainCardPile::new(
-            cards,
-            special_achievements.into_iter().map(Achievement::Special),
-        );
-
-        // pick one (if exists) card of each of the first 9 ages as achievement
-        for age in pile.piles.iter_mut().take(9) {
-            if let Some(card) = age.remove(&()) {
-                pile.achievements.add(Achievement::Normal(card));
-            }
-        }
-
-        pile
+        MainCardPileBuilder::new()
+            .draw_deck(cards)
+            .shuffled()
+            .pick_normal()
+            .special_achievements(special_achievements)
+            .build()
     }
 
     fn pop_age(&mut self, age: Age) -> Option<&'a Card> {
@@ -146,6 +142,58 @@ impl<'a> Removeable<&'a Card, Age> for MainCardPile<'a> {
 impl<'a> Removeable<Achievement<'a>, SingleAchievementView> for MainCardPile<'a> {
     fn remove(&mut self, achievement: &SingleAchievementView) -> Option<Achievement<'a>> {
         self.achievements.try_remove(|a| a == achievement)
+    }
+}
+
+#[derive(Default)]
+pub struct MainCardPileBuilder<'a> {
+    piles: Vec<&'a Card>,
+    achievements: Vec<Achievement<'a>>,
+    pick_normal_after_init: bool,
+}
+
+impl<'a> MainCardPileBuilder<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn draw_deck(mut self, cards: Vec<&'a Card>) -> Self {
+        self.piles = cards;
+        self
+    }
+
+    pub fn achievements(mut self, achievements: Vec<Achievement<'a>>) -> Self {
+        self.achievements = achievements;
+        self
+    }
+
+    pub fn special_achievements(mut self, achievements: Vec<SpecialAchievement>) -> Self {
+        self.achievements
+            .extend(achievements.into_iter().map(Achievement::Special));
+        self
+    }
+
+    pub fn shuffled(mut self) -> Self {
+        self.piles.shuffle(&mut thread_rng());
+        self
+    }
+
+    pub fn pick_normal(mut self) -> Self {
+        self.pick_normal_after_init = true;
+        self
+    }
+
+    pub fn build(self) -> MainCardPile<'a> {
+        let mut pile = MainCardPile::new(self.piles, self.achievements);
+        if self.pick_normal_after_init {
+            // pick one (if exists) card of each of the first 9 ages as achievement
+            for age in pile.piles.iter_mut().take(9) {
+                if let Some(card) = age.remove(&()) {
+                    pile.achievements.add(Achievement::Normal(card));
+                }
+            }
+        }
+        pile
     }
 }
 

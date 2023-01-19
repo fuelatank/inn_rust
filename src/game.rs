@@ -776,8 +776,7 @@ impl<'c> OuterGame<'c> {
 
 pub struct GameConfig<'c> {
     all_cards: Vec<&'c Card>,
-    draw_deck: Vec<&'c Card>,
-    achievements: Vec<Achievement<'c>>,
+    main_pile: MainCardPile<'c>,
     players: Vec<PlayerBuilder<'c>>,
     turn: TurnBuilder,
     subject: Subject<'c>,
@@ -787,21 +786,15 @@ impl<'c> GameConfig<'c> {
     pub fn new(all_cards: Vec<&'c Card>) -> GameConfig<'c> {
         Self {
             all_cards,
-            draw_deck: Vec::new(),
-            achievements: Vec::new(),
+            main_pile: MainCardPile::empty(),
             players: Vec::new(),
             turn: TurnBuilder::new(),
             subject: Subject::new(),
         }
     }
 
-    pub fn draw_deck(mut self, cards: Vec<&'c Card>) -> GameConfig<'c> {
-        self.draw_deck = cards;
-        self
-    }
-
-    pub fn achievements(mut self, cards: Vec<Achievement<'c>>) -> GameConfig<'c> {
-        self.achievements = cards;
+    pub fn main_pile(mut self, pile: MainCardPile<'c>) -> GameConfig<'c> {
+        self.main_pile = pile;
         self
     }
 
@@ -833,7 +826,7 @@ impl<'c> GameConfig<'c> {
     pub fn build(self) -> OuterGame<'c> {
         OuterGame::config(
             self.all_cards,
-            MainCardPile::new(self.draw_deck, self.achievements),
+            self.main_pile,
             self.players,
             self.turn,
             self.subject,
@@ -846,20 +839,23 @@ mod tests {
 
     use super::*;
     use crate::{
-        action::NoRefChoice, containers::VecSet, default_cards, logger::FnObserver,
-        state::ExecutionObs, utils::vec_eq_unordered,
+        action::NoRefChoice, card_pile::MainCardPileBuilder, containers::VecSet, default_cards,
+        logger::FnObserver, state::ExecutionObs, utils::vec_eq_unordered,
     };
 
     #[test]
     fn create_game_player() {
-        // will be used as achievement
-        let pottery = default_cards::pottery();
         let archery = default_cards::archery();
         let code_of_laws = default_cards::code_of_laws();
         let agriculture = default_cards::agriculture();
         let oars = default_cards::oars();
-        let cards = vec![&pottery, &archery, &code_of_laws, &agriculture, &oars];
-        let mut game = OuterGame::init::<VecSet<&Card>>(2, cards);
+        let cards = vec![&archery, &code_of_laws, &agriculture, &oars];
+        // TODO: simplify
+        let mut game = GameConfig::new(cards.clone())
+            .main_pile(MainCardPileBuilder::new().draw_deck(cards).build())
+            .player(PlayerBuilder::new::<VecSet<&Card>>())
+            .player(PlayerBuilder::new::<VecSet<&Card>>())
+            .build();
         // do not call start(), in order to reduce cards used
         // card pile: 1[archery, code of laws, agriculture, oars]
         game.step(Action::Step(NoRefStepAction::Draw))
@@ -916,7 +912,7 @@ mod tests {
         let agriculture = default_cards::agriculture();
         let cards = vec![&archery, &pottery, &agriculture];
         let mut game = GameConfig::new(cards)
-            .draw_deck(vec![&pottery])
+            .main_pile(MainCardPileBuilder::new().draw_deck(vec![&pottery]).build())
             .player(PlayerBuilder::new::<VecSet<&Card>>().board(vec![&archery]))
             .player(PlayerBuilder::new::<VecSet<&Card>>().hand(vec![&agriculture]))
             .observe_owned(FnObserver::new(|ev| println!("Event: {ev:?}")))
