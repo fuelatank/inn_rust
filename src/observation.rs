@@ -65,16 +65,6 @@ impl<'a> PartialEq<SingleAchievementView> for Achievement<'a> {
 
 type AchievementView = Vec<SingleAchievementView>;
 
-pub struct TurnView {
-    main_step_index: usize,
-}
-
-impl TurnView {
-    pub fn is_second_step(&self) -> bool {
-        self.main_step_index % 2 == 0
-    }
-}
-
 #[derive(Debug, Serialize)]
 pub struct MainPlayerView<'a> {
     pub hand: CardView<'a>,
