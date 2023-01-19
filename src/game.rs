@@ -1,5 +1,5 @@
-use std::cell::RefCell;
 use std::rc::Rc;
+use std::{cell::RefCell, iter::repeat_with};
 
 use generator::{done, Gn};
 use ouroboros::self_referencing;
@@ -787,7 +787,7 @@ impl<'c> GameConfig<'c> {
         Self {
             all_cards,
             main_pile: MainCardPile::empty(),
-            players: Vec::new(),
+            players: vec![Default::default(), Default::default()],
             turn: TurnBuilder::new(),
             subject: Subject::new(),
         }
@@ -798,8 +798,18 @@ impl<'c> GameConfig<'c> {
         self
     }
 
-    pub fn player(mut self, builder: PlayerBuilder<'c>) -> GameConfig<'c> {
-        self.players.push(builder);
+    pub fn player(mut self, index: usize, builder: PlayerBuilder<'c>) -> GameConfig<'c> {
+        self.players[index] = builder;
+        self
+    }
+
+    pub fn players(mut self, builders: Vec<PlayerBuilder<'c>>) -> GameConfig<'c> {
+        self.players = builders;
+        self
+    }
+
+    pub fn default_players(mut self, num_players: usize) -> GameConfig<'c> {
+        self.players = repeat_with(Default::default).take(num_players).collect();
         self
     }
 
@@ -850,11 +860,9 @@ mod tests {
         let agriculture = default_cards::agriculture();
         let oars = default_cards::oars();
         let cards = vec![&archery, &code_of_laws, &agriculture, &oars];
-        // TODO: simplify
+        // MAYFIXED: TODO: simplify
         let mut game = GameConfig::new(cards.clone())
             .main_pile(MainCardPile::builder().draw_deck(cards).build())
-            .player(Default::default())
-            .player(Default::default())
             .build();
         // do not call start(), in order to reduce cards used
         // card pile: 1[archery, code of laws, agriculture, oars]
@@ -913,8 +921,10 @@ mod tests {
         let cards = vec![&archery, &pottery, &agriculture];
         let mut game = GameConfig::new(cards)
             .main_pile(MainCardPile::builder().draw_deck(vec![&pottery]).build())
-            .player(PlayerBuilder::default().board(vec![&archery]))
-            .player(PlayerBuilder::default().hand(vec![&agriculture]))
+            .players(vec![
+                PlayerBuilder::default().board(vec![&archery]),
+                PlayerBuilder::default().hand(vec![&agriculture]),
+            ])
             .observe_owned(FnObserver::new(|ev| println!("Event: {ev:?}")))
             .build();
         {
