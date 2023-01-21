@@ -352,6 +352,7 @@ pub fn oars() -> Vec<Dogma> {
             if let Some(card) = card {
                 // MAYFIXED: TODO: handle the Result
                 game.transfer_card(&opponent.with_id(Hand), &player.with_id(Score), card)?;
+                game.draw(opponent, 1)?;
                 *transferred.borrow_mut() = true;
             }
             Ok(())

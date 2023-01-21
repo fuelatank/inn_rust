@@ -173,9 +173,8 @@ impl<'c> Achievement<'c> for Empire {
     }
 
     fn further_check(&self, _game: &Players<'c>, player: &Player<'c>) -> bool {
-        let mut icons = player.board().icon_count().into_map();
-        icons.remove(&Icon::Empty);
-        icons.into_iter().all(|(_, count)| count >= 3)
+        let icons = player.board().icon_count();
+        Icon::iter().all(|icon| icons[&icon] >= 3)
     }
 }
 
