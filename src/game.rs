@@ -538,7 +538,7 @@ impl<'c> OuterGame<'c> {
         .build()
     }
 
-    pub fn config(
+    pub fn from_config(
         cards: Vec<&'c Card>,
         main_pile: MainCardPile<'c>,
         players: Vec<PlayerBuilder<'c>>,
@@ -832,7 +832,7 @@ impl<'c> GameConfig<'c> {
     }
 
     pub fn build(self) -> OuterGame<'c> {
-        OuterGame::config(
+        OuterGame::from_config(
             self.all_cards,
             self.main_pile,
             self.players,
