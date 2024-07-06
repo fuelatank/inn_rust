@@ -4,14 +4,16 @@ use generator::{done, Gn, Scope};
 use strum::IntoEnumIterator;
 
 use crate::{
-    card::{Card, SpecialAchievement},
-    card_attrs::{
+    card::{
+        flow::{FlowState, GenResume, GenYield},
+        Card,
         Color::{self, *},
+        Dogma,
         Icon::*,
+        SpecialAchievement,
         Splay::{self, *},
     },
     error::InnResult,
-    flow::{Dogma, FlowState, GenResume, GenYield},
     game::{Players, RcCell},
     player::Player,
     state::{Choose, ExecutionState},
@@ -350,6 +352,7 @@ pub fn oars() -> Vec<Dogma> {
             if let Some(card) = card {
                 // MAYFIXED: TODO: handle the Result
                 game.transfer_card(&opponent.with_id(Hand), &player.with_id(Score), card)?;
+                game.draw(opponent, 1)?;
                 *transferred.borrow_mut() = true;
             }
             Ok(())

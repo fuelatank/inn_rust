@@ -3,8 +3,7 @@ use std::cell::RefCell;
 use strum::IntoEnumIterator;
 
 use crate::{
-    card::SpecialAchievement,
-    card_attrs::{Color, Icon, Splay},
+    card::{Color, Icon, SpecialAchievement, Splay},
     error::{InnResult, InnovationError, WinningSituation},
     game::{PlayerId, Players},
     logger::{InternalObserver, Item, Operation, SimpleOp},
@@ -174,9 +173,8 @@ impl<'c> Achievement<'c> for Empire {
     }
 
     fn further_check(&self, _game: &Players<'c>, player: &Player<'c>) -> bool {
-        let mut icons = player.board().icon_count().into_map();
-        icons.remove(&Icon::Empty);
-        icons.into_iter().all(|(_, count)| count >= 3)
+        let icons = player.board().icon_count();
+        Icon::iter().all(|icon| icons[&icon] >= 3)
     }
 }
 

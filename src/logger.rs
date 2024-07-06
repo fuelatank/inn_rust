@@ -6,8 +6,7 @@ use std::{
 
 use crate::{
     action::Action,
-    card::Card,
-    card_attrs::{Color, Splay},
+    card::{Card, Color, Splay},
     card_pile::CardOrder,
     error::InnResult,
     game::{PlayerId, Players},

@@ -1,10 +1,6 @@
 use convert_case::{Case, Casing};
 
-use crate::{
-    card::Card,
-    card_attrs::{Color::*, Icon::*},
-    dogma_fn,
-};
+use crate::card::{dogma_fn, Card, Color::*, Icon::*};
 
 macro_rules! card_decl {
     ($name:ident, $age:expr, $color:expr, $icons:expr, $doc:expr) => {

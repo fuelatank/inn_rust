@@ -6,15 +6,15 @@ use ouroboros::self_referencing;
 use strum::IntoEnumIterator;
 
 use crate::{
-    action::{Action, NoRefChoice, NoRefStepAction, RefAction, RefChoice, RefStepAction},
+    action::{Action, NoRefChoice, NoRefStep, RefAction, RefChoice, RefStep},
     auto_achieve::{AchievementManager, WinByAchievementChecker},
-    card::{Achievement, Card, SpecialAchievement},
-    card_attrs::{Age, Color, Splay},
+    card::{
+        flow::FlowState, mk_execution, Achievement, Age, Card, Color, Dogma, SpecialAchievement,
+        Splay,
+    },
     card_pile::MainCardPile,
     containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
-    dogma_fn::mk_execution,
     error::{InnResult, InnovationError, WinningSituation},
-    flow::{Dogma, FlowState},
     logger::{Item, Observer, Operation, SimpleOp, Subject},
     observation::{EndObservation, GameState, ObsType, Observation, SingleAchievementView},
     player::{Player, PlayerBuilder},
@@ -538,7 +538,7 @@ impl<'c> OuterGame<'c> {
         .build()
     }
 
-    pub fn config(
+    pub fn from_config(
         cards: Vec<&'c Card>,
         main_pile: MainCardPile<'c>,
         players: Vec<PlayerBuilder<'c>>,
@@ -573,23 +573,21 @@ impl<'c> OuterGame<'c> {
     fn is_available_action(&self, action: &Action) -> bool {
         self.with(|fields| match (action, fields.next_action_type) {
             (Action::Step(step), ObsType::Main) => {
-                if let NoRefStepAction::Draw = step {
+                if let NoRefStep::Draw = step {
                     true
                 } else {
                     let players = fields.players;
                     let player = &players.players[fields.turn.player_id()];
                     match step {
-                        NoRefStepAction::Meld(c) => {
+                        NoRefStep::Meld(c) => {
                             player.hand().to_vec().contains(&players.find_card(c))
                         }
-                        NoRefStepAction::Achieve(age) => {
+                        NoRefStep::Achieve(age) => {
                             player.age() >= *age
                                 && player.total_score() >= 5 * (*age as usize)
                                 && players.has_achievement(&SingleAchievementView::Normal(*age))
                         }
-                        NoRefStepAction::Execute(c) => {
-                            player.board().contains(players.find_card(c))
-                        }
+                        NoRefStep::Execute(c) => player.board().contains(players.find_card(c)),
                         _ => panic!("just checked, action can't be Draw"),
                     }
                 }
@@ -634,26 +632,26 @@ impl<'c> OuterGame<'c> {
             game.notify(Item::Action(action.clone()))?;
             let action = action.to_ref(game);
             match action {
-                RefAction::Step(action) => match fields.state {
+                RefAction::Step(step) => match fields.state {
                     State::Main => {
                         let player = game.player_at(fields.turn.player_id());
-                        match action {
-                            RefStepAction::Draw => {
+                        match step {
+                            RefStep::Draw => {
                                 // This current executor finder appears here and in Players.execute
                                 // because either he's executing something or not.
                                 game.draw(player, player.age())
                                     .map_err(|e| e.or_set_current_player(player.id()))?;
-                                fields.turn.next_action()?;
+                                fields.turn.next_step()?;
                             }
-                            RefStepAction::Meld(card) => {
+                            RefStep::Meld(card) => {
                                 game.meld(player, card)?;
-                                fields.turn.next_action()?;
+                                fields.turn.next_step()?;
                             }
-                            RefStepAction::Achieve(age) => {
+                            RefStep::Achieve(age) => {
                                 game.try_achieve(player, &SingleAchievementView::Normal(age)).expect("Have checked action, corresponding achievement should be available.");
-                                fields.turn.next_action()?;
+                                fields.turn.next_step()?;
                             }
-                            RefStepAction::Execute(card) => {
+                            RefStep::Execute(card) => {
                                 *fields.state = State::Executing(game.execute(player, card));
                             }
                         }
@@ -662,10 +660,10 @@ impl<'c> OuterGame<'c> {
                         panic!("State and action mismatched");
                     }
                 },
-                RefAction::Executing(action) => match fields.state {
+                RefAction::Executing(choice) => match fields.state {
                     State::Main => panic!("State and action mismatched"),
                     State::Executing(state) => {
-                        state.set_para(action);
+                        state.set_para(choice);
                     }
                 },
             }
@@ -728,7 +726,7 @@ impl<'c> OuterGame<'c> {
                     }
                     None => {
                         *fields.state = State::Main;
-                        fields.turn.next_action()?;
+                        fields.turn.next_step()?;
                         ok_normal(fields.turn.player_id(), ObsType::Main)
                     }
                 }
@@ -818,8 +816,8 @@ impl<'c> GameConfig<'c> {
         self
     }
 
-    pub fn second_action(mut self, is_second_action: bool) -> GameConfig<'c> {
-        self.turn = self.turn.second_action(is_second_action);
+    pub fn second_step(mut self, is_second_step: bool) -> GameConfig<'c> {
+        self.turn = self.turn.second_step(is_second_step);
         self
     }
 
@@ -834,7 +832,7 @@ impl<'c> GameConfig<'c> {
     }
 
     pub fn build(self) -> OuterGame<'c> {
-        OuterGame::config(
+        OuterGame::from_config(
             self.all_cards,
             self.main_pile,
             self.players,
@@ -849,7 +847,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        action::NoRefChoice, default_cards, logger::FnObserver, state::ExecutionObs,
+        action::NoRefChoice, card::default_cards, logger::FnObserver, state::ExecutionObs,
         utils::vec_eq_unordered,
     };
 
@@ -866,27 +864,25 @@ mod tests {
             .build();
         // do not call start(), in order to reduce cards used
         // card pile: 1[archery, code of laws, agriculture, oars]
-        game.step(Action::Step(NoRefStepAction::Draw))
+        game.step(Action::Step(NoRefStep::Draw))
             .expect("Action should be valid");
         // card pile: 1[code of laws, agriculture, oars]
         // p1.hand[archery]; act1.cur.p2
-        game.step(Action::Step(NoRefStepAction::Draw))
+        game.step(Action::Step(NoRefStep::Draw))
             .expect("Action should be valid");
         // card pile: 1[agriculture, oars]; p1.hand[archery]; act2.cur.p2.hand[code of laws]
-        println!("{:#?}", game.step(Action::Step(NoRefStepAction::Draw)));
+        println!("{:#?}", game.step(Action::Step(NoRefStep::Draw)));
         // card pile: 1[oars];
         // act1.cur.p1.hand[archery]; p2.hand[code of laws, agriculture]
         println!(
             "{:#?}",
-            game.step(Action::Step(NoRefStepAction::Meld(String::from("Archery"))))
+            game.step(Action::Step(NoRefStep::Meld(String::from("Archery"))))
         );
         // card pile: 1[oars];
         // act2.cur.p1.board[archery]; p2.hand[code of laws, agriculture]
         {
             let obs = game
-                .step(Action::Step(NoRefStepAction::Execute(String::from(
-                    "Archery",
-                ))))
+                .step(Action::Step(NoRefStep::Execute(String::from("Archery"))))
                 .expect("Action should be valid");
             // p2 must draw a 1, then give a card to p1
             // card pile: 1[], 2[];
@@ -932,7 +928,7 @@ mod tests {
             // p1 has 2 Castles, while p2 doesn't have any.
             // p1 demands p2 to draw a card 'Pottery' and transfer a 1 to p1's hand.
             let obs = game
-                .step(Action::Step(NoRefStepAction::Execute("Archery".to_owned())))
+                .step(Action::Step(NoRefStep::Execute("Archery".to_owned())))
                 .expect("should be able to execute in this configured game")
                 .as_normal()
                 .expect("game should not end in this configured game");
@@ -947,7 +943,7 @@ mod tests {
                 card,
             }) if vec_eq_unordered(&from, [&agriculture, &pottery]) && card == &archery));
         }
-        assert!(game.step(Action::Step(NoRefStepAction::Draw)).is_err());
+        assert!(game.step(Action::Step(NoRefStep::Draw)).is_err());
         assert!(game.step(Action::Executing(NoRefChoice::Yn(true))).is_err());
         assert!(game
             .step(Action::Executing(NoRefChoice::Card(vec![])))

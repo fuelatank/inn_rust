@@ -24,7 +24,7 @@ impl Color {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Copy, Clone, Serialize)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone, EnumIter, Serialize)]
 pub enum Icon {
     Castle,
     Factory,
@@ -32,6 +32,7 @@ pub enum Icon {
     Crown,
     Lightbulb,
     Leaf,
+    #[strum(disabled)]
     Empty,
 }
 

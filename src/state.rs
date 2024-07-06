@@ -2,7 +2,7 @@ use std::cmp::min;
 
 use serde::Serialize;
 
-use crate::flow::{FlowState, GenResume};
+use crate::card::flow::{FlowState, GenResume};
 use crate::player::Player;
 use crate::{action::RefChoice, card::Card, game::Players};
 
