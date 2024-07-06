@@ -41,11 +41,11 @@ card_decls! {
     "You may return up to three cards from your hand. If you returned any cards, \
     draw and score a card of value equal to the number of cards you returned.";
 
-    tools, 1, Blue, [Empty, Lightblub, Lightblub, Castle],
+    tools, 1, Blue, [Empty, Lightbulb, Lightbulb, Castle],
     "You may return three cards from your hand. If you do, draw and meld a 3.\n\
     You may return a 3 from your hand. If you do, draw three 1.";
 
-    archery, 1, Red, [Castle, Lightblub, Empty, Castle],
+    archery, 1, Red, [Castle, Lightbulb, Empty, Castle],
     "I demand you draw a 1, then transfer the highest card in your hand to my hand!";
 
     metalworking, 1, Red, [Castle, Castle, Empty, Castle],
@@ -90,7 +90,7 @@ card_decls! {
     any card on my board to my score pile! If you do, draw and tuck a 1!\n\
     Draw and tuck a 1.";
 
-    philosophy, 2, Purple, [Empty, Lightblub, Lightblub, Lightblub],
+    philosophy, 2, Purple, [Empty, Lightbulb, Lightbulb, Lightbulb],
     "You may splay left any one color of your cards.\n\
     You may score a card from your hand.";
 

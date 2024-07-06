@@ -30,7 +30,7 @@ pub enum Icon {
     Factory,
     Clock,
     Crown,
-    Lightblub,
+    Lightbulb,
     Leaf,
     Empty,
 }
