@@ -369,12 +369,13 @@ pub fn oars() -> Vec<Dogma> {
 pub fn clothing() -> Vec<Dogma> {
     vec![
         shared(|player, game, ctx| {
-            if let Some(card) = ctx.choose_one_card(
+            let card = ctx.choose_one_card(
                 player,
                 player
                     .hand()
                     .filtered_vec(|c| player.stack(c.color()).is_empty()),
-            ) {
+            ); // make this a separate statement to avoid hand borrowing issue
+            if let Some(card) = card {
                 game.meld(player, card)?;
             }
             Ok(())
@@ -640,4 +641,54 @@ pub fn computers() -> Vec<Dogma> {
             Ok(())
         }),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{cell::RefCell, rc::Rc};
+
+    use crate::{
+        action::{Action, NoRefStep},
+        card::default_cards,
+        card_pile::MainCardPile,
+        game::GameConfig,
+        logger::{Logger, Observer},
+        player::PlayerBuilder,
+    };
+
+    #[test]
+    fn clothing_borrowing() {
+        let clothing = default_cards::clothing();
+        let agriculture = default_cards::agriculture();
+        let mut game = GameConfig::new(vec![&clothing, &agriculture])
+            .player(
+                0,
+                PlayerBuilder::default()
+                    .board(vec![&clothing])
+                    .hand(vec![&agriculture]),
+            )
+            .build();
+        game.step(Action::Step(NoRefStep::Execute("Clothing".to_owned())))
+            .unwrap();
+    }
+
+    #[test]
+    fn enterprise_borrowing<'a>() {
+        let enterprise = default_cards::enterprise();
+        let optics = default_cards::optics();
+        let anatomy = default_cards::anatomy();
+        let mut logger = Logger::new();
+        logger.start(Default::default()); // TODO: make recording starting card order "optional"
+        let logger: Rc<RefCell<dyn Observer>> = Rc::new(RefCell::new(logger));
+        let mut game = GameConfig::new(vec![&optics, &enterprise, &anatomy])
+            .main_pile(MainCardPile::builder().draw_deck(vec![&anatomy]).build())
+            .players(vec![
+                PlayerBuilder::default().board(vec![&enterprise]),
+                PlayerBuilder::default().board(vec![&optics]),
+            ])
+            .observe(&logger)
+            .build();
+        game.step(Action::Step(NoRefStep::Execute("Enterprise".to_owned())))
+            .unwrap();
+    }
 }

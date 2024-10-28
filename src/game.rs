@@ -821,7 +821,7 @@ impl<'c> GameConfig<'c> {
         self
     }
 
-    pub fn observe(mut self, observer: &Rc<RefCell<dyn Observer<'c>>>) -> GameConfig<'c> {
+    pub fn observe(mut self, observer: &Rc<RefCell<dyn Observer<'c> + 'c>>) -> GameConfig<'c> {
         self.subject.register_external(observer);
         self
     }

@@ -50,9 +50,9 @@ pub struct Subject<'c> {
     // empty observers in notify(). But, inside it still need to be Weak<RefCell>,
     // because we want to make it general so that the observers can borrow
     // each other in its turn. (Although not a common case)
-    observers: RefCell<Vec<Weak<RefCell<dyn InternalObserver<'c>>>>>,
+    observers: RefCell<Vec<Weak<RefCell<dyn InternalObserver<'c> + 'c>>>>,
     owned_observers: Vec<RefCell<Box<dyn InternalObserver<'c> + 'c>>>,
-    ext_observers: RefCell<Vec<Weak<RefCell<dyn Observer<'c>>>>>,
+    ext_observers: RefCell<Vec<Weak<RefCell<dyn Observer<'c> + 'c>>>>,
     owned_ext_observers: Vec<RefCell<Box<dyn Observer<'c> + 'c>>>,
     waiting: RefCell<VecDeque<Item<'c>>>,
     processing: RefCell<()>, // can't be bool because we need to mutate it
@@ -73,7 +73,7 @@ impl<'c> Subject<'c> {
     /// Register an external observer to the system.
     ///
     /// The caller should have a strong reference of the observer to prevent dropping.
-    pub fn register_external(&mut self, new_observer: &Rc<RefCell<dyn Observer<'c>>>) {
+    pub fn register_external(&mut self, new_observer: &Rc<RefCell<dyn Observer<'c> + 'c>>) {
         self.ext_observers
             .borrow_mut()
             .push(Rc::downgrade(new_observer));
@@ -88,7 +88,7 @@ impl<'c> Subject<'c> {
     /// Register an internal observer to the system.
     ///
     /// The caller should have a strong reference of the observer to prevent dropping.
-    pub fn register_internal(&mut self, new_observer: &Rc<RefCell<dyn InternalObserver<'c>>>) {
+    pub fn register_internal(&mut self, new_observer: &Rc<RefCell<dyn InternalObserver<'c> + 'c>>) {
         self.observers
             .borrow_mut()
             .push(Rc::downgrade(new_observer));

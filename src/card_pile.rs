@@ -181,6 +181,7 @@ impl<'a> MainCardPileBuilder<'a> {
         self
     }
 
+    /// Draw cards from the deck as normal achievements
     pub fn pick_normal(mut self) -> Self {
         self.pick_normal_after_init = true;
         self
