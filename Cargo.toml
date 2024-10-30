@@ -7,10 +7,10 @@ edition = "2018"
 
 [dependencies]
 generator = "0.7"
-counter = "0.5"
-ouroboros = "0.15"
-strum = "0.24"
-strum_macros = "0.24"
+counter = "0.6"
+ouroboros = "0.18"
+strum = "0.26"
+strum_macros = "0.26"
 convert_case = "0.6.0"
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
