@@ -404,7 +404,7 @@ pub fn agriculture() -> Vec<Dogma> {
         })?;
         if let Some(card) = card.flatten() {
             game.r#return(player, card)?;
-            game.draw_and_score(player, card.age())?;
+            game.draw_and_score(player, card.age() + 1)?;
         }
         Ok(())
     })]
