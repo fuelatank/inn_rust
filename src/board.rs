@@ -47,6 +47,8 @@ impl<'a> Stack<'a> {
         self.cards.insert(index, card)
     }
 
+    // TODO: fix mandatory unsplay etc.
+    // by adding specific case for unsplay or returning a Result
     /// Splay the stack.
     ///
     /// Panics when already splayed that direction or the stack has less than two cards.
