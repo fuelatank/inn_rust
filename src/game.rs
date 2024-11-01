@@ -519,6 +519,8 @@ pub struct OuterGame<'c> {
     #[covariant]
     state: State<'c, 'this>,
     next_action_type: ObsType<'c>,
+    // TODO: figure out where to place this field
+    acting_player: PlayerId,
 }
 
 impl<'c> OuterGame<'c> {
@@ -528,12 +530,14 @@ impl<'c> OuterGame<'c> {
     {
         // TODO: structure not clear
         let turn = Turn::new(num_players);
+        let first_player = turn.current_player();
         OuterGameBuilder {
             players: Players::new::<C>(num_players, cards, turn.current_player()),
             players_ref_builder: |players| players,
             turn_builder: |players| LoggingTurn::new(turn, players),
             state: State::Main,
             next_action_type: ObsType::Main,
+            acting_player: first_player,
         }
         .build()
     }
@@ -547,6 +551,7 @@ impl<'c> OuterGame<'c> {
     ) -> OuterGame<'c> {
         // TODO: structure not clear
         let turn = turn.build(players.len());
+        let first_player = turn.current_player();
         OuterGameBuilder {
             players: Players::from_builders(
                 cards,
@@ -559,6 +564,7 @@ impl<'c> OuterGame<'c> {
             turn_builder: |players| LoggingTurn::new(turn, players),
             state: State::Main,
             next_action_type: ObsType::Main,
+            acting_player: first_player,
         }
         .build()
     }
@@ -736,16 +742,17 @@ impl<'c> OuterGame<'c> {
         })? {
             (player, Info::Normal(obs_type)) => {
                 self.with_next_action_type_mut(|field| *field = obs_type.clone());
-                Ok(GameState::Normal(self.observe(player, obs_type)))
+                self.with_acting_player_mut(|field| *field = player);
+                Ok(GameState::Normal(player))
             }
             (player, Info::End(winners)) => Ok(GameState::End(self.observe_end(player, winners))),
         }
     }
 
-    fn observe<'a>(&'a self, id: PlayerId, obs_type: ObsType<'a>) -> Observation {
+    pub fn observe<'a>(&'a self, id: PlayerId) -> Observation {
         let players = *self.borrow_players_ref();
         Observation {
-            acting_player: id,
+            acting_player: *self.borrow_acting_player(),
             main_player: players.player_at(id).self_view(),
             other_players: players
                 .players_from(id)
@@ -754,7 +761,7 @@ impl<'c> OuterGame<'c> {
                 .collect(),
             main_pile: players.main_card_pile.borrow().view(),
             turn: self.borrow_turn().turn(),
-            obstype: obs_type,
+            obstype: self.borrow_next_action_type().clone(),
         }
     }
 
@@ -881,26 +888,29 @@ mod tests {
         // card pile: 1[oars];
         // act2.cur.p1.board[archery]; p2.hand[code of laws, agriculture]
         {
-            let obs = game
+            let player = game
                 .step(Action::Step(NoRefStep::Execute(String::from("Archery"))))
-                .expect("Action should be valid");
+                .expect("Action should be valid")
+                .as_normal()
+                .unwrap();
             // p2 must draw a 1, then give a card to p1
             // card pile: 1[], 2[];
             // act2.p1.board[archery.exe]; cur.p2.hand[code of laws, agriculture, oars]
             assert!(matches!(
-                obs.as_normal().unwrap().obstype,
+                game.observe(player).obstype,
                 ObsType::Executing(_)
             ))
         }
         // choose to transfer Oars
         {
-            let obs = game
+            let player = game
                 .step(Action::Executing(NoRefChoice::Card(vec![String::from(
                     "Oars",
                 )])))
                 .expect("Action should be valid")
                 .as_normal()
                 .unwrap();
+            let obs = game.observe(player);
             // card pile: 1[], 2[];
             // p1.hand[oars].board[archery]; act1.cur.p2.hand[code of laws, agriculture]
             println!("{:#?}", obs);
@@ -927,11 +937,12 @@ mod tests {
             // p1 executes 'Archery'.
             // p1 has 2 Castles, while p2 doesn't have any.
             // p1 demands p2 to draw a card 'Pottery' and transfer a 1 to p1's hand.
-            let obs = game
+            let player = game
                 .step(Action::Step(NoRefStep::Execute("Archery".to_owned())))
                 .expect("should be able to execute in this configured game")
                 .as_normal()
                 .expect("game should not end in this configured game");
+            let obs = game.observe(player);
             assert_eq!(obs.acting_player, 1);
             // TODO: maybe use HashSet in observation?
             assert!(vec_eq_unordered(
@@ -960,13 +971,14 @@ mod tests {
             ])))
             .is_err());
         {
-            let obs = game
+            let player = game
                 .step(Action::Executing(NoRefChoice::Card(vec![
                     "Agriculture".to_owned()
                 ])))
                 .unwrap()
                 .as_normal()
                 .unwrap();
+            let obs = game.observe(player);
             assert_eq!(obs.acting_player, 1);
             assert!(vec_eq_unordered(&obs.main_player.hand, [&pottery]));
             assert!(matches!(obs.obstype, ObsType::Main));

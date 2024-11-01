@@ -90,10 +90,12 @@ pub enum ObsType<'a> {
     Executing(ExecutionObs<'a>),
 }
 
+/// The complete observation made by `main_player`
 #[derive(Debug, Serialize)]
 pub struct Observation<'a> {
     /// The player who is making choice.
     pub acting_player: PlayerId,
+    /// The player who is observing.
     pub main_player: MainPlayerView<'a>,
     pub other_players: Vec<OtherPlayerView<'a>>,
     pub main_pile: [usize; 10],
@@ -113,12 +115,12 @@ pub struct EndObservation<'a> {
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum GameState<'a> {
-    Normal(Observation<'a>),
+    Normal(PlayerId), // who should act next
     End(EndObservation<'a>),
 }
 
 impl<'a> GameState<'a> {
-    pub fn as_normal(self) -> Option<Observation<'a>> {
+    pub fn as_normal(self) -> Option<PlayerId> {
         if let Self::Normal(v) = self {
             Some(v)
         } else {
