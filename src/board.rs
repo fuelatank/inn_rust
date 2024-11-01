@@ -1,11 +1,12 @@
 use counter::Counter;
-use serde::Serialize;
+use serde::{ser::SerializeStruct, Serialize};
+use strum::IntoEnumIterator;
 
 use crate::{
     card::{Age, Card, Color, Icon, Splay},
     containers::{Addable, Removeable},
 };
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct Stack<'a> {
@@ -104,7 +105,7 @@ impl<'a> Stack<'a> {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone)]
 pub struct Board<'a> {
     stacks: [Stack<'a>; 5],
 }
@@ -180,6 +181,11 @@ impl<'a> Board<'a> {
             .reduce(|accum, item| accum + item)
             .unwrap()
     }
+
+    pub fn regular_icon_count(&self) -> HashMap<Icon, usize> {
+        let raw_count = self.icon_count();
+        Icon::iter().map(|icon| (icon, raw_count[&icon])).collect()
+    }
 }
 
 impl<'a> Addable<&'a Card> for Board<'a> {
@@ -222,5 +228,54 @@ where
 {
     fn remove(&mut self, param: &(Color, P)) -> Option<&'a Card> {
         <Stack as Removeable<&'a Card, P>>::remove(self.get_stack_mut(param.0), &param.1)
+    }
+}
+
+impl<'a> Serialize for Board<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut s = serializer.serialize_struct("Board", 2)?;
+        s.serialize_field("stacks", &self.stacks)?;
+        s.serialize_field("icons", &self.regular_icon_count())?;
+        s.end()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use crate::card::default_cards::{agriculture, archery, domestication, metalworking, tools};
+
+    use super::*;
+
+    #[test]
+    fn board_serialize() {
+        let mut board = Board::new();
+        let cards = vec![
+            agriculture(),
+            archery(),
+            domestication(),
+            metalworking(),
+            tools(),
+        ];
+        for card in cards.iter() {
+            board.meld(card);
+        }
+        board.get_stack_mut(Color::Yellow).splay(Splay::Right);
+        board.get_stack_mut(Color::Red).splay(Splay::Up);
+        assert_eq!(
+            serde_json::to_value(board).unwrap()["icons"],
+            json!({
+                "Castle": 7,
+                "Clock": 0,
+                "Crown": 1,
+                "Factory": 0,
+                "Leaf": 1,
+                "Lightbulb": 3,
+            })
+        );
     }
 }
