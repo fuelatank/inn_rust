@@ -254,7 +254,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn board_serialize() {
+    fn board_serialization() {
         let mut board = Board::new();
         let cards = vec![
             agriculture(),
