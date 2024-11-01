@@ -4,6 +4,12 @@ use crate::card::{dogma_fn, Card, Color::*, Icon::*};
 
 macro_rules! card_decl {
     ($name:ident, $age:expr, $color:expr, $icons:expr, $doc:expr) => {
+        #[doc = concat!(
+            "**Age**: ", stringify!($age),
+            "\n\n**Color**: ", stringify!($color),
+            "\n\n**Icons**: ", stringify!($icons),
+            "\n\n", $doc
+        )]
         pub fn $name() -> Card {
             Card::new(
                 stringify!($name)
