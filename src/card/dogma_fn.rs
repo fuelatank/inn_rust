@@ -284,7 +284,10 @@ pub fn tools() -> Vec<Dogma> {
                     Ok(ctx.choose_cards_exact(player, player.hand().to_vec(), 3))
                 })?
                 .flatten();
-            if cards.is_some() {
+            if let Some(cards) = cards {
+                for card in cards {
+                    game.r#return(player, card)?;
+                }
                 game.draw_and_meld(player, 3)?;
             }
             Ok(())
@@ -295,7 +298,8 @@ pub fn tools() -> Vec<Dogma> {
                     Ok(ctx.choose_one_card(player, player.hand().filtered_vec(|&c| c.age() == 3)))
                 })?
                 .flatten();
-            if card.is_some() {
+            if let Some(card) = card {
+                game.r#return(player, card)?;
                 game.draw(player, 1)?;
                 game.draw(player, 1)?;
                 game.draw(player, 1)?;
