@@ -264,7 +264,7 @@ pub fn pottery() -> Vec<Dogma> {
                 for card in cards {
                     game.r#return(player, card)?;
                 }
-                game.draw(player, n.try_into().unwrap())?;
+                game.draw_and_score(player, n.try_into().unwrap())?;
             }
             Ok(())
         }),

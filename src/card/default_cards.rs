@@ -41,7 +41,8 @@ macro_rules! card_decls {
 card_decls! {
     pottery, 1, Blue, [Empty, Leaf, Leaf, Leaf],
     "You may return up to three cards from your hand. If you returned any cards, \
-    draw and score a card of value equal to the number of cards you returned.";
+    draw and score a card of value equal to the number of cards you returned.\n\
+    Draw a 1.";
 
     tools, 1, Blue, [Empty, Lightbulb, Lightbulb, Castle],
     "You may return three cards from your hand. If you do, draw and meld a 3.\n\
