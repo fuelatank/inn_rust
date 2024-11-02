@@ -412,7 +412,8 @@ pub fn agriculture() -> Vec<Dogma> {
 
 pub fn domestication() -> Vec<Dogma> {
     vec![shared(|player, game, ctx| {
-        if let Some(min_age) = player.hand().iter().map(|c| c.age()).min() {
+        let min_age = player.hand().iter().map(|c| c.age()).min();
+        if let Some(min_age) = min_age {
             let card = ctx
                 .choose_one_card(player, player.hand().filtered_vec(|c| c.age() == min_age))
                 .expect(
@@ -670,6 +671,28 @@ mod tests {
             .build();
         game.step(Action::Step(NoRefStep::Execute("Clothing".to_owned())))
             .unwrap();
+    }
+
+    #[test]
+    fn domestication_borrowing() {
+        let domestication = default_cards::domestication();
+        let agriculture = default_cards::agriculture();
+        let clothing = default_cards::clothing();
+        let mut game = GameConfig::new(vec![&domestication, &agriculture, &clothing])
+            .main_pile(MainCardPile::builder().draw_deck(vec![&clothing]).build())
+            .player(
+                0,
+                PlayerBuilder::default()
+                    .board(vec![&domestication])
+                    .hand(vec![&agriculture]),
+            )
+            .build();
+        game.step(Action::Step(NoRefStep::Execute("Domestication".to_owned())))
+            .unwrap();
+        assert!(vec![&domestication, &agriculture]
+            .into_iter()
+            .all(|card| game.observe(0).main_player.board.contains(card)));
+        assert!(game.observe(0).main_player.hand.contains(&&clothing))
     }
 
     #[test]
