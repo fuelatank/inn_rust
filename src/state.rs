@@ -110,15 +110,11 @@ pub struct ExecutionObs<'c> {
     pub card: &'c Card,
 }
 
+#[derive(Default)]
 pub enum State<'c, 'g> {
+    #[default]
     Main,
     Executing(FlowState<'c, 'g>),
-}
-
-impl<'c, 'g> Default for State<'c, 'g> {
-    fn default() -> Self {
-        State::Main
-    }
 }
 
 #[cfg(test)]

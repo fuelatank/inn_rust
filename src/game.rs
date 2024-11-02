@@ -749,7 +749,7 @@ impl<'c> OuterGame<'c> {
         }
     }
 
-    pub fn observe<'a>(&'a self, id: PlayerId) -> Observation {
+    pub fn observe(&self, id: PlayerId) -> Observation {
         let players = *self.borrow_players_ref();
         Observation {
             acting_player: *self.borrow_acting_player(),

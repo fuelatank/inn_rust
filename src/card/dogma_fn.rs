@@ -86,7 +86,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
             )
             .cards()?;
         debug_assert!(cards.len() <= 1);
-        cards.get(0).copied()
+        cards.first().copied()
     }
 
     pub fn choose_card_at_most(
