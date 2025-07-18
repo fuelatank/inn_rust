@@ -325,10 +325,10 @@ impl<'c> Players<'c> {
         Gn::new_scoped_local(move |mut s| {
             for dogma in card.dogmas() {
                 if let Dogma::Share(flow) = dogma {
-                    let mut gen = flow(player, self);
+                    let mut r#gen = flow(player, self);
 
                     // s.yield_from(gen); but with or(card)
-                    let mut state = gen.resume();
+                    let mut state = r#gen.resume();
                     while let Some(st) = state {
                         let a = s
                             .yield_(
@@ -336,8 +336,8 @@ impl<'c> Players<'c> {
                                     .map_err(|e| e.or_set_current_player(player.id())),
                             )
                             .expect("Generator got None");
-                        gen.set_para(a);
-                        state = gen.resume();
+                        r#gen.set_para(a);
+                        state = r#gen.resume();
                     }
                 }
             }
@@ -365,10 +365,10 @@ impl<'c> Players<'c> {
                             .zip(can_be_shared.iter())
                             .filter_map(|(p, mask)| mask.then_some(p))
                         {
-                            let mut gen = flow(player, self);
+                            let mut r#gen = flow(player, self);
 
                             // s.yield_from(gen); but with or(card)
-                            let mut state = gen.resume();
+                            let mut state = r#gen.resume();
                             while let Some(st) = state {
                                 let a = s
                                     .yield_(
@@ -376,8 +376,8 @@ impl<'c> Players<'c> {
                                             .map_err(|e| e.or_set_current_player(player.id())),
                                     )
                                     .expect("Generator got None");
-                                gen.set_para(a);
-                                state = gen.resume();
+                                r#gen.set_para(a);
+                                state = r#gen.resume();
                             }
                         }
                     }
@@ -389,9 +389,9 @@ impl<'c> Players<'c> {
                             .zip(can_be_shared.iter())
                             .filter_map(|(p, mask)| (!mask).then_some(p))
                         {
-                            let mut gen = flow(self.player_at(id), player, self);
+                            let mut r#gen = flow(self.player_at(id), player, self);
                             // s.yield_from(gen); but with or(card)
-                            let mut state = gen.resume();
+                            let mut state = r#gen.resume();
                             while let Some(st) = state {
                                 let a = s
                                     .yield_(
@@ -399,8 +399,8 @@ impl<'c> Players<'c> {
                                             .map_err(|e| e.or_set_current_player(player.id())),
                                     )
                                     .expect("Generator got None");
-                                gen.set_para(a);
-                                state = gen.resume();
+                                r#gen.set_para(a);
+                                state = r#gen.resume();
                             }
                         }
                     }

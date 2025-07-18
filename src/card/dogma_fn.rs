@@ -43,12 +43,12 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
 
     // TODO: implementation? use is_done or resume or send or ...?
     /// Manual yield from a (local) generator.
-    pub fn yield_from(&mut self, mut gen: FlowState<'c, 'g>) {
-        let mut res = gen.resume();
+    pub fn yield_from(&mut self, mut r#gen: FlowState<'c, 'g>) {
+        let mut res = r#gen.resume();
         while let Some(request) = res {
             let choice = self.s.yield_(request).expect("Generator got None");
-            gen.set_para(choice);
-            res = gen.resume();
+            r#gen.set_para(choice);
+            res = r#gen.resume();
         }
     }
 
