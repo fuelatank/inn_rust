@@ -14,6 +14,7 @@ pub mod structure;
 pub mod turn;
 pub mod utils;
 pub mod xx;
+pub mod space;
 
 #[cfg(test)]
 mod tests {

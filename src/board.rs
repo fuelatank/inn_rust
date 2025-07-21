@@ -10,8 +10,8 @@ use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct Stack<'a> {
-    cards: VecDeque<&'a Card>,
-    splay: Splay,
+    pub cards: VecDeque<&'a Card>,
+    pub splay: Splay,
 }
 
 impl<'a> Stack<'a> {
