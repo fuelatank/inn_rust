@@ -8,9 +8,9 @@ pub type GenYield<'c, 'g> = InnResult<ExecutionState<'c, 'g>>;
 pub type GenResume<'c, 'g> = RefChoice<'c, 'g>;
 pub type FlowState<'c, 'g> = Generator<'g, GenResume<'c, 'g>, GenYield<'c, 'g>>;
 
-pub type ShareFlow = Box<dyn for<'c, 'g> Fn(&'g Player<'c>, &'g Players<'c>) -> FlowState<'c, 'g> + Sync>;
+pub type ShareFlow = Box<dyn for<'c, 'g> Fn(&'g Player<'c>, &'g Players<'c>) -> FlowState<'c, 'g> + Send + Sync>;
 pub type DemandFlow =
-    Box<dyn for<'c, 'g> Fn(&'g Player<'c>, &'g Player<'c>, &'g Players<'c>) -> FlowState<'c, 'g> + Sync>;
+    Box<dyn for<'c, 'g> Fn(&'g Player<'c>, &'g Player<'c>, &'g Players<'c>) -> FlowState<'c, 'g> + Send + Sync>;
 
 pub enum Dogma {
     Share(ShareFlow),
