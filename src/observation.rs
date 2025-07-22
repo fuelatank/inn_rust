@@ -1,4 +1,4 @@
-use std::cell::Ref;
+use std::sync::RwLockReadGuard;
 
 use serde::{Serialize, Serializer};
 
@@ -11,7 +11,7 @@ use crate::{
 };
 
 // lifetime?
-type BoardView<'a> = Ref<'a, Board<'a>>;
+type BoardView<'a> = RwLockReadGuard<'a, Board<'a>>;
 
 type CardView<'a> = Vec<&'a Card>;
 type AgeView = Vec<Age>;

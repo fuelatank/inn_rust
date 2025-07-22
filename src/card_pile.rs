@@ -1,4 +1,4 @@
-use rand::{seq::SliceRandom, thread_rng};
+use rand::{seq::SliceRandom, rng};
 
 use crate::{
     card::{Achievement, Age, Card, SpecialAchievement},
@@ -177,7 +177,7 @@ impl<'a> MainCardPileBuilder<'a> {
     }
 
     pub fn shuffled(mut self) -> Self {
-        self.piles.shuffle(&mut thread_rng());
+        self.piles.shuffle(&mut rng());
         self
     }
 

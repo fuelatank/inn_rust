@@ -76,7 +76,8 @@ impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Hand {
     fn remove_from(&self, player: &Player<'c>, param: &'a Card) -> InnResult<&'c Card> {
         player
             .hand
-            .borrow_mut()
+            .write()
+            .unwrap()
             .remove(param)
             .ok_or(InnovationError::CardNotFound)
     }
@@ -94,7 +95,7 @@ impl<'c, 'a> TestRemoveFromPlayer<'c, &'a Card> for Hand {
 
 impl<'c> AddToPlayer<'c, ()> for Hand {
     fn add_to(&self, card: &'c Card, player: &Player<'c>, _param: ()) {
-        player.hand.borrow_mut().add(card)
+        player.hand.write().unwrap().add(card)
     }
 }
 
@@ -105,7 +106,8 @@ impl<'c, 'a> RemoveFromPlayer<'c, &'a Card> for Score {
     fn remove_from(&self, player: &Player<'c>, param: &'a Card) -> InnResult<&'c Card> {
         player
             .score_pile
-            .borrow_mut()
+            .write()
+            .unwrap()
             .remove(param)
             .ok_or(InnovationError::CardNotFound)
     }
@@ -123,7 +125,7 @@ impl<'c, 'a> TestRemoveFromPlayer<'c, &'a Card> for Score {
 
 impl<'c> AddToPlayer<'c, ()> for Score {
     fn add_to(&self, card: &'c Card, player: &Player<'c>, _param: ()) {
-        player.score_pile.borrow_mut().add(card)
+        player.score_pile.write().unwrap().add(card)
     }
 }
 
@@ -162,7 +164,8 @@ pub struct MainCardPile;
 impl<'c> RemoveFromGame<'c, Age> for MainCardPile {
     fn remove_from(&self, game: &Players<'c>, param: Age) -> InnResult<&'c Card> {
         game.main_card_pile()
-            .borrow_mut()
+            .write()
+            .unwrap()
             .remove(&param)
             .ok_or(InnovationError::Win {
                 current_player: None,
@@ -173,7 +176,7 @@ impl<'c> RemoveFromGame<'c, Age> for MainCardPile {
 
 impl<'c> AddToGame<'c, ()> for MainCardPile {
     fn add_to(&self, card: &'c Card, game: &Players<'c>, _param: ()) {
-        game.main_card_pile().borrow_mut().add(card)
+        game.main_card_pile().write().unwrap().add(card)
     }
 }
 

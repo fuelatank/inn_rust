@@ -1,7 +1,7 @@
-use std::rc::Rc;
-use std::{cell::RefCell, iter::repeat_with};
+use std::{iter::repeat_with, sync::Mutex};
+use std::sync::{Arc, RwLock};
 
-use generator::{done, Gn};
+use generator::{Gn, done};
 use ouroboros::self_referencing;
 use strum::IntoEnumIterator;
 
@@ -9,8 +9,8 @@ use crate::{
     action::{Action, NoRefChoice, NoRefStep, RefAction, RefChoice, RefStep},
     auto_achieve::{AchievementManager, WinByAchievementChecker},
     card::{
-        flow::FlowState, mk_execution, Achievement, Age, Card, Color, Dogma, SpecialAchievement,
-        Splay,
+        Achievement, Age, Card, Color, Dogma, SpecialAchievement, Splay, flow::FlowState,
+        mk_execution,
     },
     card_pile::MainCardPile,
     containers::{Addable, BoxCardSet, CardSet, Removeable, VecSet},
@@ -27,13 +27,12 @@ use crate::{
     utils::Pick,
 };
 
-pub type RcCell<T> = Rc<RefCell<T>>;
 pub type PlayerId = usize;
 
 pub struct Players<'c> {
     cards: Vec<&'c Card>,
     logger: Subject<'c>,
-    main_card_pile: RcCell<MainCardPile<'c>>,
+    main_card_pile: Arc<RwLock<MainCardPile<'c>>>,
     players: Vec<Player<'c>>,
 }
 
@@ -68,14 +67,14 @@ impl<'c> Players<'c> {
         Players {
             cards: Vec::new(),
             logger: Subject::new(),
-            main_card_pile: Rc::new(RefCell::new(MainCardPile::empty())),
+            main_card_pile: Arc::new(RwLock::new(MainCardPile::empty())),
             players: vec![],
         }
     }
 
     pub fn new<C>(num_players: usize, cards: Vec<&'c Card>, first_player: PlayerId) -> Players<'c>
     where
-        C: CardSet<'c, Card> + Default + 'c,
+        C: CardSet<'c, Card> + Default + 'c + Send + Sync,
     {
         let pile = MainCardPile::new_init(cards.clone(), SpecialAchievement::iter().collect());
         Players::from_builders(
@@ -96,11 +95,12 @@ impl<'c> Players<'c> {
         first_player: PlayerId,
         mut subject: Subject<'c>,
     ) -> Players<'c> {
-        let pile = Rc::new(RefCell::new(main_pile));
+        let pile = Arc::new(RwLock::new(main_pile));
         subject.register_internal_owned(AchievementManager::new(
             SpecialAchievement::iter()
                 .filter(|&sa| {
-                    pile.borrow()
+                    pile.read()
+                        .unwrap()
                         .has_achievement(&SingleAchievementView::Special(sa))
                 })
                 .collect(),
@@ -110,7 +110,7 @@ impl<'c> Players<'c> {
         Players {
             cards,
             logger: subject,
-            main_card_pile: Rc::clone(&pile),
+            main_card_pile: Arc::clone(&pile),
             players: players
                 .into_iter()
                 .enumerate()
@@ -167,7 +167,7 @@ impl<'c> Players<'c> {
         (0..len).map(move |i| (i + main_player_id) % len)
     }
 
-    pub fn main_card_pile(&self) -> &RcCell<MainCardPile<'c>> {
+    pub fn main_card_pile(&self) -> &Arc<RwLock<MainCardPile<'c>>> {
         &self.main_card_pile
     }
 
@@ -284,7 +284,7 @@ impl<'c> Players<'c> {
     }
 
     pub fn has_achievement(&self, view: &SingleAchievementView) -> bool {
-        self.main_card_pile.borrow().has_achievement(view)
+        self.main_card_pile.read().unwrap().has_achievement(view)
     }
 
     pub fn try_achieve<'g>(
@@ -304,7 +304,7 @@ impl<'c> Players<'c> {
         player: &'g Player<'c>,
         view: &SingleAchievementView,
     ) -> InnResult<bool> {
-        match self.main_card_pile.borrow_mut().remove(view) {
+        match self.main_card_pile.write().unwrap().remove(view) {
             Some(achievement) => {
                 player.achievements_mut().add(achievement);
                 self.logger
@@ -322,7 +322,7 @@ impl<'c> Players<'c> {
     ) -> FlowState<'c, 'g> {
         // this used an extra layer of generator
         // may eliminate this by passing in ctx?
-        Gn::new_scoped_local(move |mut s| {
+        Gn::new_scoped(move |mut s| {
             for dogma in card.dogmas() {
                 if let Dogma::Share(flow) = dogma {
                     let mut r#gen = flow(player, self);
@@ -346,7 +346,7 @@ impl<'c> Players<'c> {
     }
 
     pub fn execute<'g>(&'g self, player: &'g Player<'c>, card: &'c Card) -> FlowState<'c, 'g> {
-        Gn::new_scoped_local(move |mut s| {
+        Gn::new_scoped(move |mut s| {
             let id = player.id();
             let main_icon = card.main_icon();
             let main_icon_count = player.board().icon_count()[&main_icon];
@@ -526,7 +526,7 @@ pub struct OuterGame<'c> {
 impl<'c> OuterGame<'c> {
     pub fn init<C>(num_players: usize, cards: Vec<&'c Card>) -> OuterGame<'c>
     where
-        C: CardSet<'c, Card> + Default + 'c,
+        C: CardSet<'c, Card> + Default + 'c + Send + Sync,
     {
         // TODO: structure not clear
         let turn = Turn::new(num_players);
@@ -759,7 +759,7 @@ impl<'c> OuterGame<'c> {
                 .skip(1)
                 .map(|p| p.other_view())
                 .collect(),
-            main_pile: players.main_card_pile.borrow().view(),
+            main_pile: players.main_card_pile.read().unwrap().view(),
             turn: self.borrow_turn().turn(),
             obstype: self.borrow_next_action_type().clone(),
         }
@@ -772,7 +772,7 @@ impl<'c> OuterGame<'c> {
                 .ids_from(current_player)
                 .map(|id| players.player_at(id).self_view())
                 .collect(),
-            main_pile: players.main_card_pile().borrow().view(),
+            main_pile: players.main_card_pile().read().unwrap().view(),
             turn: self.borrow_turn().turn(),
             winners,
         }
@@ -828,12 +828,12 @@ impl<'c> GameConfig<'c> {
         self
     }
 
-    pub fn observe(mut self, observer: &Rc<RefCell<dyn Observer<'c> + 'c>>) -> GameConfig<'c> {
+    pub fn observe(mut self, observer: &Arc<Mutex<dyn Observer<'c> + 'c + Send>>) -> GameConfig<'c> {
         self.subject.register_external(observer);
         self
     }
 
-    pub fn observe_owned(mut self, observer: impl Observer<'c> + 'c) -> GameConfig<'c> {
+    pub fn observe_owned(mut self, observer: impl Observer<'c> + 'c + Send) -> GameConfig<'c> {
         self.subject.register_external_owned(observer);
         self
     }
@@ -956,24 +956,27 @@ mod tests {
         }
         assert!(game.step(Action::Step(NoRefStep::Draw)).is_err());
         assert!(game.step(Action::Executing(NoRefChoice::Yn(true))).is_err());
-        assert!(game
-            .step(Action::Executing(NoRefChoice::Card(vec![])))
-            .is_err());
-        assert!(game
-            .step(Action::Executing(NoRefChoice::Card(vec![
+        assert!(
+            game.step(Action::Executing(NoRefChoice::Card(vec![])))
+                .is_err()
+        );
+        assert!(
+            game.step(Action::Executing(NoRefChoice::Card(vec![
                 "Archery".to_owned()
             ])))
-            .is_err());
-        assert!(game
-            .step(Action::Executing(NoRefChoice::Card(vec![
+            .is_err()
+        );
+        assert!(
+            game.step(Action::Executing(NoRefChoice::Card(vec![
                 "Agriculture".to_owned(),
                 "Pottery".to_owned()
             ])))
-            .is_err());
+            .is_err()
+        );
         {
             let player = game
                 .step(Action::Executing(NoRefChoice::Card(vec![
-                    "Agriculture".to_owned()
+                    "Agriculture".to_owned(),
                 ])))
                 .unwrap()
                 .as_normal()

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, cmp::min, convert::TryInto, rc::Rc};
+use std::{cmp::min, convert::TryInto, sync::{Arc, RwLock}};
 
 use generator::{done, Gn, Scope};
 use strum::IntoEnumIterator;
@@ -14,7 +14,7 @@ use crate::{
         Splay::{self, *},
     },
     error::InnResult,
-    game::{Players, RcCell},
+    game::Players,
     player::Player,
     state::{Choose, ExecutionState},
     structure::{Board, Hand, Score},
@@ -182,7 +182,7 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
         let available_top_cards: Vec<_> = colors
             .into_iter()
             .filter(|&color| player.can_splay(color, direction))
-            .map(|color| player.stack(color).top_card().unwrap())
+            .map(|color| player.with_stack(color, |s| s.top_card().unwrap()))
             .collect();
         if available_top_cards.is_empty() {
             return Ok(false);
@@ -201,9 +201,9 @@ impl<'a, 'c, 'g> Context<'a, 'c, 'g> {
 
 pub fn mk_execution<'c, 'g, F>(f: F) -> FlowState<'c, 'g>
 where
-    F: for<'a> FnOnce(&mut Context<'a, 'c, 'g>) -> InnResult<()> + 'g,
+    F: for<'a> FnOnce(&mut Context<'a, 'c, 'g>) -> InnResult<()> + 'g + Send,
 {
-    Gn::new_scoped_local(|s| {
+    Gn::new_scoped(|s| {
         let mut ctx = Context::new(s);
         if let Err(e) = f(&mut ctx) {
             ctx.into_raw().yield_(Err(e));
@@ -224,16 +224,16 @@ where
             &'g Players<'c>,
             &mut Context<'a, 'c, 'g>,
         ) -> InnResult<()>
-        + 'static,
+        + 'static + Send + Sync,
 {
     // convert a ctx-based dogma draft into a real ((player, game) -> generator) dogma
     // but several generators may exist at one time, each has a reference to f
     // meanwhile, the real dogma may have ended, so they can't refer to the dogma
     // so Rc is used
     // TODO: check if there's some relationship between Rc and Box here
-    let rcf = Rc::new(f);
+    let rcf = Arc::new(f);
     Dogma::Share(Box::new(move |player, game| {
-        let cloned = Rc::clone(&rcf);
+        let cloned = Arc::clone(&rcf);
         mk_execution(move |ctx| cloned(player, game, ctx))
     }))
 }
@@ -246,11 +246,11 @@ where
             &'g Players<'c>,
             &mut Context<'a, 'c, 'g>,
         ) -> InnResult<()>
-        + 'static,
+        + 'static + Send + Sync,
 {
-    let rcf = Rc::new(f);
+    let rcf = Arc::new(f);
     Dogma::Demand(Box::new(move |player, opponent, game| {
-        let cloned = Rc::clone(&rcf);
+        let cloned = Arc::clone(&rcf);
         mk_execution(move |ctx| cloned(player, opponent, game, ctx))
     }))
 }
@@ -348,8 +348,8 @@ pub fn metalworking() -> Vec<Dogma> {
 // whether call it only once (lazy???) or once for every execution is a question
 // I guess both can work
 pub fn oars() -> Vec<Dogma> {
-    let transferred: RcCell<bool> = Rc::new(RefCell::new(false));
-    let view = Rc::clone(&transferred);
+    let transferred: Arc<RwLock<bool>> = Arc::new(RwLock::new(false));
+    let view = Arc::clone(&transferred);
     vec![
         demand(move |player, opponent, game, ctx| {
             let card = ctx.choose_one_card(opponent, opponent.hand().has_icon(Crown));
@@ -357,12 +357,12 @@ pub fn oars() -> Vec<Dogma> {
                 // MAYFIXED: TODO: handle the Result
                 game.transfer_card(&opponent.with_id(Hand), &player.with_id(Score), card)?;
                 game.draw(opponent, 1)?;
-                *transferred.borrow_mut() = true;
+                *transferred.write().unwrap() = true;
             }
             Ok(())
         }),
         shared(move |player, game, _ctx| {
-            if !*view.borrow() {
+            if !*view.read().unwrap() {
                 game.draw(player, 1)?;
             }
             Ok(())
@@ -377,7 +377,7 @@ pub fn clothing() -> Vec<Dogma> {
                 player,
                 player
                     .hand()
-                    .filtered_vec(|c| player.stack(c.color()).is_empty()),
+                    .filtered_vec(|c| player.with_stack(c.color(), |s| s.is_empty())),
             ); // make this a separate statement to avoid hand borrowing issue
             if let Some(card) = card {
                 game.meld(player, card)?;
@@ -387,10 +387,10 @@ pub fn clothing() -> Vec<Dogma> {
         shared(|player, game, _ctx| {
             let num_scores = Color::iter()
                 .filter(|&color| {
-                    !player.stack(color).is_empty()
+                    !player.with_stack(color, |s| s.is_empty())
                         && game
                             .opponents_of(player.id())
-                            .all(|op| op.stack(color).is_empty())
+                            .all(|op| op.with_stack(color, |s| s.is_empty()))
                 })
                 .count();
             for _ in 0..num_scores {
@@ -471,7 +471,7 @@ pub fn code_of_laws() -> Vec<Dogma> {
             player,
             player
                 .hand()
-                .filtered_vec(|card| !player.stack(card.color()).is_empty()),
+                .filtered_vec(|card| !player.with_stack(card.color(), |s| s.is_empty())),
         );
         let card = match opt_card {
             Some(c) => c,
@@ -489,7 +489,7 @@ pub fn code_of_laws() -> Vec<Dogma> {
 pub fn mysticism() -> Vec<Dogma> {
     vec![shared(|player, game, _ctx| {
         let card = game.draw(player, 1)?;
-        if !player.stack(card.color()).is_empty() {
+        if !player.with_stack(card.color(), |s| s.is_empty()) {
             game.meld(player, card)?;
             game.draw(player, 1)?;
         }
@@ -504,7 +504,7 @@ pub fn monotheism() -> Vec<Dogma> {
                 .board()
                 .top_cards()
                 .into_iter()
-                .filter(|&card| player.stack(card.color()).is_empty())
+                .filter(|&card| player.with_stack(card.color(), |s| s.is_empty()))
                 .collect();
             // you must transfer a top card in available_cards
             // from your board to my score pile! If you do, draw and tuck a 1!
@@ -650,7 +650,7 @@ pub fn computers() -> Vec<Dogma> {
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, rc::Rc};
+    use std::sync::{Arc, Mutex};
 
     use crate::{
         action::{Action, NoRefStep},
@@ -706,7 +706,7 @@ mod tests {
         let anatomy = default_cards::anatomy();
         let mut logger = Logger::new();
         logger.start(Default::default()); // TODO: make recording starting card order "optional"
-        let logger: Rc<RefCell<dyn Observer>> = Rc::new(RefCell::new(logger));
+        let logger: Arc<Mutex<dyn Observer + Send>> = Arc::new(Mutex::new(logger));
         let mut game = GameConfig::new(vec![&optics, &enterprise, &anatomy])
             .main_pile(MainCardPile::builder().draw_deck(vec![&anatomy]).build())
             .players(vec![

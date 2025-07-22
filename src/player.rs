@@ -5,14 +5,14 @@ use crate::{
     game::PlayerId,
     observation::{MainPlayerView, OtherPlayerView},
 };
-use std::cell::{Ref, RefCell, RefMut};
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub struct Player<'c> {
     id: usize,
-    main_board: RefCell<Board<'c>>,
-    pub hand: RefCell<BoxCardSet<'c>>,
-    pub score_pile: RefCell<BoxCardSet<'c>>,
-    achievements: RefCell<VecSet<Achievement<'c>>>,
+    main_board: RwLock<Board<'c>>,
+    pub hand: RwLock<BoxCardSet<'c>>,
+    pub score_pile: RwLock<BoxCardSet<'c>>,
+    achievements: RwLock<VecSet<Achievement<'c>>>,
 }
 
 impl<'c> Player<'c> {
@@ -24,16 +24,16 @@ impl<'c> Player<'c> {
     ) -> Player<'c> {
         Player {
             id,
-            main_board: RefCell::new(Board::new()),
-            hand: RefCell::new(hand),
-            score_pile: RefCell::new(score_pile),
-            achievements: RefCell::new(achievements),
+            main_board: RwLock::new(Board::new()),
+            hand: RwLock::new(hand),
+            score_pile: RwLock::new(score_pile),
+            achievements: RwLock::new(achievements),
         }
     }
 
     pub fn builder<C>() -> PlayerBuilder<'c>
     where
-        C: CardSet<'c, Card> + Default + 'c,
+        C: CardSet<'c, Card> + Default + 'c + Send + Sync,
     {
         PlayerBuilder::new::<C>()
     }
@@ -47,57 +47,58 @@ impl<'c> Player<'c> {
     }
 
     pub fn age(&self) -> Age {
-        self.main_board.borrow().highest_age()
+        self.main_board.read().unwrap().highest_age()
     }
 
-    pub fn hand(&self) -> Ref<BoxCardSet<'c>> {
-        self.hand.borrow()
+    pub fn hand(&self) -> RwLockReadGuard<BoxCardSet<'c>> {
+        self.hand.read().unwrap()
     }
 
-    pub fn score_pile(&self) -> Ref<BoxCardSet<'c>> {
-        self.score_pile.borrow()
+    pub fn score_pile(&self) -> RwLockReadGuard<BoxCardSet<'c>> {
+        self.score_pile.read().unwrap()
     }
 
-    pub fn board(&self) -> Ref<Board<'c>> {
-        self.main_board.borrow()
+    pub fn board(&self) -> RwLockReadGuard<Board<'c>> {
+        self.main_board.read().unwrap()
     }
 
-    pub fn board_mut(&self) -> RefMut<Board<'c>> {
-        self.main_board.borrow_mut()
+    pub fn board_mut(&self) -> RwLockWriteGuard<Board<'c>> {
+        self.main_board.write().unwrap()
     }
 
     pub fn total_score(&self) -> usize {
         self.score_pile().iter().map(|i| i.age() as usize).sum()
     }
 
-    pub fn achievements(&self) -> Ref<VecSet<Achievement<'c>>> {
-        self.achievements.borrow()
+    pub fn achievements(&self) -> RwLockReadGuard<VecSet<Achievement<'c>>> {
+        self.achievements.read().unwrap()
     }
 
-    pub fn achievements_mut(&self) -> RefMut<VecSet<Achievement<'c>>> {
-        self.achievements.borrow_mut()
+    pub fn achievements_mut(&self) -> RwLockWriteGuard<VecSet<Achievement<'c>>> {
+        self.achievements.write().unwrap()
     }
 
-    pub fn stack(&self, color: Color) -> Ref<Stack<'c>> {
-        Ref::map(self.main_board.borrow(), |board| board.get_stack(color))
+    pub fn with_stack<T, F: FnOnce(&Stack<'c>) -> T>(&self, color: Color, f: F) -> T {
+        f(self.main_board.read().unwrap().get_stack(color))
     }
 
     pub fn is_splayed(&self, color: Color, direction: Splay) -> bool {
-        self.main_board.borrow().is_splayed(color, direction)
+        self.main_board.read().unwrap().is_splayed(color, direction)
     }
 
     pub fn can_splay(&self, color: Color, direction: Splay) -> bool {
-        self.stack(color).can_splay(direction)
+        self.with_stack(color, |s| s.can_splay(direction))
     }
 
     pub fn self_view(&self) -> MainPlayerView {
         MainPlayerView {
-            hand: self.hand.borrow().to_vec(),
-            score: self.score_pile.borrow().to_vec(),
-            board: self.main_board.borrow(), /* what if it's mut borrowed? */
+            hand: self.hand.read().unwrap().to_vec(),
+            score: self.score_pile.read().unwrap().to_vec(),
+            board: self.main_board.read().unwrap(), /* what if it's mut borrowed? */
             achievements: self
                 .achievements
-                .borrow()
+                .read()
+                .unwrap()
                 .inner()
                 .iter()
                 .map(|a| a.view())
@@ -114,10 +115,11 @@ impl<'c> Player<'c> {
                 .into_iter()
                 .map(|c| c.age())
                 .collect(),
-            board: self.main_board.borrow(), /* what if it's mut borrowed? */
+            board: self.main_board.read().unwrap(), /* what if it's mut borrowed? */
             achievements: self
                 .achievements
-                .borrow()
+                .read()
+                .unwrap()
                 .clone_inner()
                 .into_iter()
                 .map(|a| a.view())
@@ -136,7 +138,7 @@ pub struct PlayerBuilder<'c> {
 impl<'c> PlayerBuilder<'c> {
     pub fn new<C>() -> PlayerBuilder<'c>
     where
-        C: CardSet<'c, Card> + Default + 'c,
+        C: CardSet<'c, Card> + Default + 'c + Send + Sync,
     {
         PlayerBuilder {
             main_board: Board::new(),
@@ -182,10 +184,10 @@ impl<'c> PlayerBuilder<'c> {
     pub fn build(self, id: PlayerId) -> Player<'c> {
         Player {
             id,
-            main_board: RefCell::new(self.main_board),
-            hand: RefCell::new(self.hand),
-            score_pile: RefCell::new(self.score_pile),
-            achievements: RefCell::new(self.achievements),
+            main_board: RwLock::new(self.main_board),
+            hand: RwLock::new(self.hand),
+            score_pile: RwLock::new(self.score_pile),
+            achievements: RwLock::new(self.achievements),
         }
     }
 }

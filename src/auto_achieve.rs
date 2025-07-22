@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, sync::RwLock};
 
 use strum::IntoEnumIterator;
 
@@ -34,20 +34,20 @@ impl<'c> InternalObserver<'c> for WinByAchievementChecker {
     }
 }
 
-type Condition<'c> = RefCell<Box<dyn Achievement<'c>>>;
+type Condition<'c> = RefCell<Box<dyn Achievement<'c> + Send>>;
 pub struct AchievementManager<'c> {
-    available_achievements: RefCell<Vec<(SpecialAchievement, Condition<'c>)>>,
+    available_achievements: RwLock<Vec<(SpecialAchievement, Condition<'c>)>>,
     acting_player: PlayerId, // may be a duplicated Turn?
 }
 
 impl<'c> AchievementManager<'c> {
     pub fn new(special_achievements: Vec<SpecialAchievement>, first_player: PlayerId) -> Self {
         Self {
-            available_achievements: RefCell::new(
+            available_achievements: RwLock::new(
                 special_achievements
                     .into_iter()
                     .map(|sa| {
-                        let condition: Box<dyn Achievement> = match &sa {
+                        let condition: Box<dyn Achievement + Send> = match &sa {
                             SpecialAchievement::Monument => Box::new(Monument::new(first_player)),
                             SpecialAchievement::Empire => Box::new(Empire),
                             SpecialAchievement::World => Box::new(World),
@@ -71,7 +71,7 @@ impl<'c> InternalObserver<'c> for AchievementManager<'c> {
         // TODO: who is the "current player" that gets the achievement if two players
         // satisty the condition at exactly the same time?
         let mut should_remove = Vec::new();
-        for (card, check) in self.available_achievements.borrow().iter() {
+        for (card, check) in self.available_achievements.read().unwrap().iter() {
             let interesting_players = check.borrow_mut().update_interested(event);
             let order = game.ids_from(self.acting_player);
             for player in order
@@ -88,7 +88,8 @@ impl<'c> InternalObserver<'c> for AchievementManager<'c> {
             }
         }
         self.available_achievements
-            .borrow_mut()
+            .write()
+            .unwrap()
             .retain(|a| !should_remove.contains(&a.0));
         Ok(())
     }

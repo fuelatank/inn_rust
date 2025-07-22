@@ -27,7 +27,7 @@ impl<'a, T> Removeable<&'a T, T> for Box<dyn CardSet<'a, T> + 'a> {
     }
 }
 
-impl<'a, 'b, T> dyn CardSet<'a, T> + 'b {
+impl<'a, 'b, T> dyn CardSet<'a, T> + 'b + Send + Sync {
     pub fn filtered_vec<P>(&self, predicate: P) -> Vec<&'a T>
     where
         P: FnMut(&&'a T) -> bool,
@@ -36,7 +36,7 @@ impl<'a, 'b, T> dyn CardSet<'a, T> + 'b {
     }
 }
 
-impl<'a, 'b> dyn CardSet<'a, Card> + 'b {
+impl<'a, 'b> dyn CardSet<'a, Card> + 'b + Send + Sync {
     pub fn has_icon(&self, icon: Icon) -> Vec<&'a Card> {
         self.filtered_vec(|&c| c.contains(icon))
     }
@@ -97,5 +97,5 @@ impl<'a, T: PartialEq> CardSet<'a, T> for VecSet<&'a T> {
     }
 }
 
-pub type BoxCardSet<'a> = Box<dyn CardSet<'a, Card> + 'a>;
+pub type BoxCardSet<'a> = Box<dyn CardSet<'a, Card> + 'a + Send + Sync>;
 pub type BoxAchievementSet<'a> = Box<dyn CardSet<'a, Achievement<'a>> + 'a>;

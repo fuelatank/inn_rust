@@ -1,4 +1,4 @@
-use std::iter::{repeat, repeat_with};
+use std::iter::{repeat_n, repeat_with};
 
 use enum_as_inner::EnumAsInner;
 use rand::Rng as _;
@@ -47,7 +47,7 @@ impl Space {
                         instance_dict
                             .iter()
                             .find(|(k, _)| k == key)
-                            .map_or(false, |(_, instance)| space.contains(instance))
+                            .is_some_and(|(_, instance)| space.contains(instance))
                     })
             }
             (Space::Tuple(spaces), Instance::Tuple(instances)) => {
@@ -106,7 +106,7 @@ impl Instance {
         len: usize,
         default_value: bool,
     ) -> Instance {
-        let mut v: Vec<bool> = repeat(default_value).take(len).collect();
+        let mut v: Vec<bool> = repeat_n(default_value, len).collect();
         for item in items {
             v[index(item)] = !default_value;
         }
@@ -137,15 +137,11 @@ pub fn observation_space_2p() -> Space {
         ("self_score".to_owned(), Space::MultiBinary(105)),
         (
             "self_board".to_owned(),
-            Space::Tuple(
-                repeat(Space::Sequence(Box::new(Space::Discrete(105))))
-                    .take(5)
-                    .collect(),
-            ),
+            Space::Tuple(repeat_n(Space::Sequence(Box::new(Space::Discrete(105))), 5).collect()),
         ),
         (
             "self_board_splay".to_owned(),
-            Space::Tuple(repeat(Space::Discrete(4)).take(5).collect()),
+            Space::Tuple(repeat_n(Space::Discrete(4), 5).collect()),
         ),
         (
             "self_achievement".to_owned(),
@@ -158,15 +154,11 @@ pub fn observation_space_2p() -> Space {
         ),
         (
             "other_board".to_owned(),
-            Space::Tuple(
-                repeat(Space::Sequence(Box::new(Space::Discrete(105))))
-                    .take(5)
-                    .collect(),
-            ),
+            Space::Tuple(repeat_n(Space::Sequence(Box::new(Space::Discrete(105))), 5).collect()),
         ),
         (
             "other_board_splay".to_owned(),
-            Space::Tuple(repeat(Space::Discrete(4)).take(5).collect()),
+            Space::Tuple(repeat_n(Space::Discrete(4), 5).collect()),
         ),
         (
             "other_achievement".to_owned(),
@@ -209,7 +201,7 @@ fn map_board_splay(board: &Board) -> Instance {
 }
 
 fn map_back_card_set(ages: &[Age]) -> Instance {
-    let mut freq: Vec<_> = repeat(0).take(10).collect();
+    let mut freq: Vec<_> = repeat_n(0, 10).collect();
     for age in ages {
         freq[(age - 1) as usize] += 1;
     }
@@ -240,7 +232,7 @@ pub fn map_observation_2p(
             "executing".to_owned(),
             Instance::Discrete(match &obs.obstype {
                 ObsType::Main => 105,
-                ObsType::Executing(c) => card_index(&c.card),
+                ObsType::Executing(c) => card_index(c.card),
             }),
         ),
         (

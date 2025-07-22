@@ -1,7 +1,6 @@
 use std::{
-    cell::RefCell,
     collections::VecDeque,
-    rc::{Rc, Weak},
+    sync::{Arc, Mutex, RwLock, Weak},
 };
 
 use crate::{
@@ -50,61 +49,61 @@ pub struct Subject<'c> {
     // empty observers in notify(). But, inside it still need to be Weak<RefCell>,
     // because we want to make it general so that the observers can borrow
     // each other in its turn. (Although not a common case)
-    observers: RefCell<Vec<Weak<RefCell<dyn InternalObserver<'c> + 'c>>>>,
-    owned_observers: Vec<RefCell<Box<dyn InternalObserver<'c> + 'c>>>,
-    ext_observers: RefCell<Vec<Weak<RefCell<dyn Observer<'c> + 'c>>>>,
-    owned_ext_observers: Vec<RefCell<Box<dyn Observer<'c> + 'c>>>,
-    waiting: RefCell<VecDeque<Item<'c>>>,
-    processing: RefCell<()>, // can't be bool because we need to mutate it
+    observers: RwLock<Vec<Weak<Mutex<dyn InternalObserver<'c> + 'c + Send>>>>,
+    owned_observers: Vec<Mutex<Box<dyn InternalObserver<'c> + 'c + Send>>>,
+    ext_observers: Mutex<Vec<Weak<Mutex<dyn Observer<'c> + 'c + Send>>>>,
+    owned_ext_observers: Vec<Mutex<Box<dyn Observer<'c> + 'c + Send>>>,
+    waiting: Mutex<VecDeque<Item<'c>>>,
+    processing: Mutex<()>, // can't be bool because we need to mutate it
 }
 
 impl<'c> Subject<'c> {
     pub fn new() -> Self {
         Self {
-            observers: RefCell::new(Vec::new()),
+            observers: RwLock::new(Vec::new()),
             owned_observers: Vec::new(),
-            ext_observers: RefCell::new(Vec::new()),
+            ext_observers: Mutex::new(Vec::new()),
             owned_ext_observers: Vec::new(),
-            waiting: RefCell::new(VecDeque::new()),
-            processing: RefCell::new(()),
+            waiting: Mutex::new(VecDeque::new()),
+            processing: Mutex::new(()),
         }
     }
 
     /// Register an external observer to the system.
     ///
     /// The caller should have a strong reference of the observer to prevent dropping.
-    pub fn register_external(&mut self, new_observer: &Rc<RefCell<dyn Observer<'c> + 'c>>) {
+    pub fn register_external(&mut self, new_observer: &Arc<Mutex<dyn Observer<'c> + 'c + Send>>) {
         self.ext_observers
-            .borrow_mut()
-            .push(Rc::downgrade(new_observer));
+            .lock().unwrap()
+            .push(Arc::downgrade(new_observer));
     }
 
     /// Register a permanent external observer to the system.
-    pub fn register_external_owned(&mut self, new_observer: impl Observer<'c> + 'c) {
+    pub fn register_external_owned(&mut self, new_observer: impl Observer<'c> + 'c + Send) {
         self.owned_ext_observers
-            .push(RefCell::new(Box::new(new_observer)));
+            .push(Mutex::new(Box::new(new_observer)));
     }
 
     /// Register an internal observer to the system.
     ///
     /// The caller should have a strong reference of the observer to prevent dropping.
-    pub fn register_internal(&mut self, new_observer: &Rc<RefCell<dyn InternalObserver<'c> + 'c>>) {
+    pub fn register_internal(&mut self, new_observer: &Arc<Mutex<dyn InternalObserver<'c> + 'c + Send>>) {
         self.observers
-            .borrow_mut()
-            .push(Rc::downgrade(new_observer));
+            .write().unwrap()
+            .push(Arc::downgrade(new_observer));
     }
 
     /// Register a permanent internal observer to the system.
-    pub fn register_internal_owned(&mut self, new_observer: impl InternalObserver<'c> + 'c) {
+    pub fn register_internal_owned(&mut self, new_observer: impl InternalObserver<'c> + 'c + Send) {
         self.owned_observers
-            .push(RefCell::new(Box::new(new_observer)));
+            .push(Mutex::new(Box::new(new_observer)));
     }
 
     // must be immutable &self, because there may be multiple calls in the stack
     pub fn notify(&self, item: Item<'c>, game: &Players<'c>) -> InnResult<()> {
-        self.waiting.borrow_mut().push_back(item);
+        self.waiting.lock().unwrap().push_back(item);
 
-        let check = self.processing.try_borrow_mut();
+        let check = self.processing.try_lock();
 
         if check.is_err() {
             return Ok(());
@@ -115,7 +114,7 @@ impl<'c> Subject<'c> {
         // process until no message delay.
         loop {
             // using while let has lifetime issue
-            let next = self.waiting.borrow_mut().pop_front();
+            let next = self.waiting.lock().unwrap().pop_front();
             if next.is_none() {
                 break;
             }
@@ -123,13 +122,13 @@ impl<'c> Subject<'c> {
             let item = next.unwrap();
 
             // first notify external observers, which may log events and don't modify game state,
-            // so we won't worry about multiple RefCell borrow_mut
+            // so we won't worry about multiple RefCell lock().unwrap
             for owned_observer in self.owned_ext_observers.iter() {
-                owned_observer.borrow_mut().on_notify(&item);
+                owned_observer.lock().unwrap().on_notify(&item);
             }
-            self.ext_observers.borrow_mut().retain_mut(|observer| {
+            self.ext_observers.lock().unwrap().retain_mut(|observer| {
                 if let Some(active_observer) = observer.upgrade() {
-                    active_observer.borrow_mut().on_notify(&item);
+                    active_observer.lock().unwrap().on_notify(&item);
                     true
                 } else {
                     false
@@ -138,17 +137,17 @@ impl<'c> Subject<'c> {
 
             // second notify internal observers, letting them modify the game state and send new events
             for owned_observer in self.owned_observers.iter() {
-                owned_observer.borrow_mut().update(&item, game)?;
+                owned_observer.lock().unwrap().update(&item, game)?;
             }
             // can't retain_mut directly because of InnResult
             // i.e., the list must be filtered after update and possibly return earlier.
-            for observer in self.observers.borrow().iter() {
+            for observer in self.observers.read().unwrap().iter() {
                 if let Some(active_observer) = observer.upgrade() {
-                    active_observer.borrow_mut().update(&item, game)?;
+                    active_observer.lock().unwrap().update(&item, game)?;
                 }
             }
             self.observers
-                .borrow_mut()
+                .write().unwrap()
                 .retain_mut(|o| o.upgrade().is_some());
         }
 
@@ -193,10 +192,10 @@ impl<'c> InternalObserver<'c> for FnInternalObserver<'c> {
     }
 }
 
-pub struct FnObserver<'c>(Box<dyn FnMut(&Item<'c>) + 'c>);
+pub struct FnObserver<'c>(Box<dyn FnMut(&Item<'c>) + 'c + Send>);
 
 impl<'c> FnObserver<'c> {
-    pub fn new(f: impl FnMut(&Item<'c>) + 'c) -> Self {
+    pub fn new(f: impl FnMut(&Item<'c>) + 'c + Send) -> Self {
         Self(Box::new(f))
     }
 }
